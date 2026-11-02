@@ -57,6 +57,12 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "score: chicken hand", () => ScoreChickenHand(report));
             Run(report, "score: minimum eight points", () => ScoreRejectsLowHand(report));
             Run(report, "score: flowers are paid but do not help the minimum", () => ScoreFlowers(report));
+            Run(report, "score: pure terminal chows is worth 64", () => ScorePureTerminalChows(report));
+            Run(report, "hand: seven pairs may use four of a kind as two pairs", () => SevenPairsWithQuad(report));
+            Run(report, "score: knitted tiles (lesser and greater)", () => ScoreKnittedTiles(report));
+            Run(report, "score: knitted straight hand", () => ScoreKnittedStraight(report));
+            Run(report, "settlement: self-draw and discard payments", () => SettlementPayments(report));
+            Run(report, "session: sixteen hands, dealer rotation and table points", () => SessionFlow(report));
             Run(report, "state: every mechanic is reachable in random play", () => RandomPlayInvariants(report));
 
             return report;
@@ -233,7 +239,7 @@ namespace Mahjong.Rules.Diagnostics
             var result = Score(hand, null, ClaimSource.SelfDraw);
             report.Check(result.IsValidWin, $"seven pairs must win: {result.Error}");
             report.Check(Has(result, Fans.SevenPairs), "seven pairs fan");
-            report.Equal(29, result.HandPoints, "24 seven pairs + 4 fully concealed + 1 self-draw");
+            report.Equal(28, result.HandPoints, "24 seven pairs + 4 fully concealed, self-draw does not stack");
         }
 
         private static void ScoreThirteenOrphans(SelfTestReport report)
@@ -242,7 +248,7 @@ namespace Mahjong.Rules.Diagnostics
             var result = Score(hand, null, ClaimSource.SelfDraw);
             report.Check(result.IsValidWin, $"thirteen orphans must win: {result.Error}");
             report.Check(Has(result, Fans.ThirteenOrphans), "thirteen orphans fan");
-            report.Equal(93, result.HandPoints, "88 + 4 fully concealed + 1 self-draw");
+            report.Equal(92, result.HandPoints, "88 + 4 fully concealed, self-draw does not stack");
         }
 
         private static void ScoreBigFourWinds(SelfTestReport report)
@@ -318,6 +324,124 @@ namespace Mahjong.Rules.Diagnostics
             report.Equal(result.HandPoints + 2, result.TotalPoints, "every flower adds one point");
         }
 
+        private static void ScorePureTerminalChows(SelfTestReport report)
+        {
+            var hand = Hand("1c 2c 3c 1c 2c 3c 7c 8c 9c 7c 8c 9c 5c 5c");
+            var result = Score(hand, null, ClaimSource.SelfDraw);
+            report.Check(result.IsValidWin, $"pure terminal chows must win: {result.Error}");
+            var fan = result.Fans.FirstOrDefault(f => f.Fan.Id == Fans.FourTerminalChows.Id);
+            report.Check(fan != null, $"expected pure terminal chows, got [{Ids(result)}]");
+            report.Equal(64, fan!.Fan.Points, "the rulebook value of Pure Terminal Chows");
+        }
+
+        private static void SevenPairsWithQuad(SelfTestReport report)
+        {
+            var hand = Hand("1c 1c 1c 1c 2c 2c 3d 3d 4d 4d 5b 5b 6b 6b");
+            var analysis = HandSolver.Analyse(hand);
+            report.Check(analysis.IsComplete, $"four of a kind counts as two pairs: {analysis.Error}");
+            report.Equal(WinningPattern.SevenPairs, analysis.Pattern, "pattern");
+        }
+
+        private static void ScoreKnittedTiles(SelfTestReport report)
+        {
+            // Nine knitted suit tiles plus five single honors.
+            var lesser = Hand("1c 4c 7c 2d 5d 8d 3b 6b 9b E S W N Rd");
+            var lesserAnalysis = HandSolver.Analyse(lesser);
+            report.Check(lesserAnalysis.IsComplete, $"lesser knitted must win: {lesserAnalysis.Error}");
+            report.Equal(WinningPattern.KnittedTiles, lesserAnalysis.Pattern, "lesser knitted pattern");
+
+            var lesserScore = Score(lesser, null, ClaimSource.Discard);
+            report.Check(Has(lesserScore, Fans.LesserHonorsKnitted), $"expected lesser honors knitted, got [{Ids(lesserScore)}]");
+            report.Check(Has(lesserScore, Fans.KnittedStraight), "complete knitted straight stacks with lesser honors");
+
+            // Seven honors plus seven knitted suit tiles.
+            var greater = Hand("1c 4c 7c 2d 5d 8d 3b E S W N Rd Gd Wd");
+            var greaterAnalysis = HandSolver.Analyse(greater);
+            report.Equal(WinningPattern.KnittedTiles, greaterAnalysis.Pattern, "greater knitted pattern");
+            var greaterScore = Score(greater, null, ClaimSource.Discard);
+            report.Check(Has(greaterScore, Fans.GreaterHonorsKnitted), $"expected greater honors knitted, got [{Ids(greaterScore)}]");
+            report.Check(!Has(greaterScore, Fans.LesserHonorsKnitted), "greater replaces lesser");
+        }
+
+        private static void ScoreKnittedStraight(SelfTestReport report)
+        {
+            // Nine knitted tiles plus a pung and a pair: not four sets and a pair.
+            var hand = Hand("1c 4c 7c 2d 5d 8d 3b 6b 9b 5d 5d 5d E E");
+            var analysis = HandSolver.Analyse(hand);
+            report.Check(analysis.IsComplete, $"knitted straight must win: {analysis.Error}");
+            report.Equal(WinningPattern.KnittedStraight, analysis.Pattern, "knitted straight pattern");
+
+            var result = Score(hand, null, ClaimSource.SelfDraw);
+            report.Check(result.IsValidWin, $"knitted straight must reach the minimum: {result.Error}");
+            report.Check(Has(result, Fans.KnittedStraight), $"expected knitted straight, got [{Ids(result)}]");
+        }
+
+        private static void SettlementPayments(SelfTestReport report)
+        {
+            var discardWin = SettlementFromHand("1c 1c 1c 3c 3c 3c 5c 5c 5c 7c 7c 7c 9c 9c", ClaimSource.Discard, 2);
+            report.Check(discardWin != null, "the sample hand must be a win");
+            report.Equal(3, discardWin!.Payments.Count, "three opponents pay");
+            report.Equal(discardWin.HandPoints + Settlements.ExtraPoints * 3, discardWin.TotalPaid,
+                "discarder pays hand plus eight, the other two pay eight each");
+            report.Equal(discardWin.HandPoints + Settlements.ExtraPoints,
+                discardWin.Payments.Single(p => p.FromPlayer == 2).Points, "the discarder pays the hand value");
+
+            var selfDrawn = SettlementFromHand("1c 1c 1c 3c 3c 3c 5c 5c 5c 7c 7c 7c 9c 9c", ClaimSource.SelfDraw, null);
+            report.Check(selfDrawn != null, "the sample hand must be a win");
+            report.Equal((selfDrawn!.HandPoints + Settlements.ExtraPoints) * 3, selfDrawn.TotalPaid, "every opponent pays in full");
+        }
+
+        private static Settlement? SettlementFromHand(string spec, ClaimSource source, int? discarder)
+        {
+            var hand = Hand(spec);
+            var result = Score(hand, null, source);
+            if (!result.IsValidWin) return null;
+            return Settlements.ForWin(new WinResult(0, source, result, discarder));
+        }
+
+        private static void SessionFlow(SelfTestReport report)
+        {
+            var session = new GameSession();
+            for (var hand = 0; hand < GameSession.TotalHands; hand++)
+            {
+                report.Check(!session.IsFinished, "the session must not end early");
+                report.Equal((Wind)(hand / 4), session.RoundWind, $"round wind of hand {hand}");
+                report.Equal(hand % 4, session.Dealer, $"dealer of hand {hand}");
+
+                session.StartNextHand(seed: 1000 + hand);
+                PlayHandToEnd(session.State!, new Random(hand * 31 + 5));
+                session.CompleteHand();
+            }
+
+            report.Check(session.IsFinished, "sixteen hands finish the session");
+            report.Equal(0, session.Scores.Sum(), "payments are zero-sum");
+            var tablePoints = session.TablePoints();
+            report.Check(Math.Abs(tablePoints.Sum() - 7) < 1e-9, $"table points must total 7, got {tablePoints.Sum()}");
+        }
+
+        private static void PlayHandToEnd(GameState state, Random random)
+        {
+            var steps = 0;
+            while (state.Phase != GamePhase.HandFinished && steps++ < 3000)
+            {
+                if (state.Phase is GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)
+                {
+                    for (var player = 0; player < 4; player++)
+                    {
+                        var options = state.GetLegalActions(player);
+                        if (options.Count == 0) continue;
+                        state.Apply(Choose(options, random, state.Players[player]));
+                        if (state.Phase is not (GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)) break;
+                    }
+                    continue;
+                }
+
+                var current = state.GetLegalActions(state.CurrentPlayer);
+                if (current.Count == 0) break;
+                state.Apply(Choose(current, random, state.Players[state.CurrentPlayer]));
+            }
+        }
+
         private static void AssertConservation(SelfTestReport report, GameState state, string label)
         {
             var ids = new List<int>();
@@ -368,6 +492,9 @@ namespace Mahjong.Rules.Diagnostics
                         for (var player = 0; player < 4; player++)
                         {
                             var options = state.GetLegalActions(player);
+                            if (state.Phase == GamePhase.AwaitingClaims && state.Wall.IsExhausted)
+                                report.Check(options.All(o => o.Kind is ActionKind.Win or ActionKind.Pass),
+                                    $"seed {seed}: only Hu may be declared after the last wall tile");
                             if (options.Count == 0) continue;
                             state.Apply(Choose(options, random, state.Players[player]));
                             if (state.Phase is not (GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)) break;

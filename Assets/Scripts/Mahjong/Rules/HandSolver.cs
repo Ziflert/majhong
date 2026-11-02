@@ -5,7 +5,7 @@ using System.Linq;
 namespace Mahjong.Rules
 {
     public enum GroupKind { Chow, Pung }
-    public enum WinningPattern { Standard, SevenPairs, ThirteenOrphans, SevenShiftedPairs }
+    public enum WinningPattern { Standard, SevenPairs, ThirteenOrphans, SevenShiftedPairs, KnittedTiles, KnittedStraight }
     public enum WaitType { None, Edge, Closed, Single }
 
     public sealed record HandGroup(GroupKind Kind, IReadOnlyList<TileType> Tiles)
@@ -56,21 +56,14 @@ namespace Mahjong.Rules
                 ? DetermineWait(concealed, hand.Melds.Count, winningTile.Value)
                 : WaitType.None;
 
-            if (hand.Melds.Count == 0)
-            {
-                if (IsThirteenOrphans(counts))
-                    return HandAnalysis.Ok(WinningPattern.ThirteenOrphans, Array.Empty<HandDecomposition>(), waitTiles, wait);
-                if (IsSevenPairs(counts))
-                    return HandAnalysis.Ok(WinningPattern.SevenPairs, Array.Empty<HandDecomposition>(), waitTiles, wait);
-                if (IsSevenShiftedPairs(counts))
-                    return HandAnalysis.Ok(WinningPattern.SevenShiftedPairs, Array.Empty<HandDecomposition>(), waitTiles, wait);
-            }
-
             var decompositions = new List<HandDecomposition>();
             EnumerateDecompositions(counts, 4 - hand.Melds.Count, new List<HandGroup>(), decompositions);
-            if (decompositions.Count == 0) return HandAnalysis.Fail("The tiles do not form four groups and a pair.");
 
-            return HandAnalysis.Ok(WinningPattern.Standard, decompositions, waitTiles, wait);
+            var special = DetectSpecialPattern(hand, counts, concealed, decompositions.Count);
+            if (!special.HasValue && decompositions.Count == 0)
+                return HandAnalysis.Fail("The tiles do not form four groups and a pair.");
+
+            return HandAnalysis.Ok(special ?? WinningPattern.Standard, decompositions, waitTiles, wait);
         }
 
         /// <summary>All faces that turn the waiting hand into a complete one.</summary>
@@ -95,8 +88,11 @@ namespace Mahjong.Rules
             if (concealed.Count != 13 - hand.Melds.Count * 3) return false;
             var counts = CountOf(concealed);
             counts[tile] = counts.GetValueOrDefault(tile) + 1;
-            return Completes(counts, 4 - hand.Melds.Count)
-                   || (hand.Melds.Count == 0 && (IsThirteenOrphans(counts) || IsSevenPairs(counts) || IsSevenShiftedPairs(counts)));
+            if (Completes(counts, 4 - hand.Melds.Count)) return true;
+
+            var complete = concealed.Append(tile).ToList();
+            if (DetectSpecialPattern(hand, counts, complete, 0).HasValue) return true;
+            return hand.Melds.All(m => !m.IsKong) && Knitted.ContainsKnittedStraight(Flatten(hand, complete));
         }
 
         private static bool Completes(Dictionary<TileType, int> counts, int groupsNeeded)
@@ -171,6 +167,36 @@ namespace Mahjong.Rules
             return null;
         }
 
+        /// <summary>
+        /// Special hands that do not follow the four groups and a pair shape. They are reported as the
+        /// primary pattern, but ordinary decompositions are still returned so scoring can pick the
+        /// highest-paying reading (for example Pure Terminal Chows instead of Seven Pairs).
+        /// </summary>
+        private static WinningPattern? DetectSpecialPattern(PlayerHand hand, Dictionary<TileType, int> counts,
+            IReadOnlyList<TileType> concealed, int decompositionCount)
+        {
+            if (hand.Melds.Count == 0)
+            {
+                if (IsThirteenOrphans(counts)) return WinningPattern.ThirteenOrphans;
+                if (Knitted.IsKnittedTiles(counts, out _)) return WinningPattern.KnittedTiles;
+                if (IsSevenShiftedPairs(counts)) return WinningPattern.SevenShiftedPairs;
+                if (IsSevenPairs(counts)) return WinningPattern.SevenPairs;
+            }
+
+            if (decompositionCount == 0 && hand.Melds.All(m => !m.IsKong)
+                && Knitted.ContainsKnittedStraight(Flatten(hand, concealed)))
+                return WinningPattern.KnittedStraight;
+
+            return null;
+        }
+
+        private static List<TileType> Flatten(PlayerHand hand, IEnumerable<TileType> concealed)
+        {
+            var all = concealed.ToList();
+            foreach (var meld in hand.Melds) all.AddRange(meld.Types);
+            return all;
+        }
+
         private static List<TileType> ComputeWaits(List<TileType> completeTiles, int meldCount, TileType winningTile)
         {
             var waiting = new List<TileType>(completeTiles);
@@ -184,7 +210,9 @@ namespace Mahjong.Rules
                 var counts = CountOf(waiting);
                 counts[candidate] = counts.GetValueOrDefault(candidate) + 1;
                 if (Completes(counts, 4 - melds)
-                    || (melds == 0 && (IsThirteenOrphans(counts) || IsSevenPairs(counts) || IsSevenShiftedPairs(counts))))
+                    || (melds == 0 && (IsThirteenOrphans(counts) || IsSevenPairs(counts) || IsSevenShiftedPairs(counts)
+                                      || Knitted.IsKnittedTiles(counts, out _)))
+                    || (melds == 0 && Knitted.ContainsKnittedStraight(waiting.Append(candidate).ToList())))
                     result.Add(candidate);
             }
             return result;
@@ -221,8 +249,13 @@ namespace Mahjong.Rules
         private static void Change(Dictionary<TileType, int> counts, TileType type, int delta) =>
             counts[type] = counts.GetValueOrDefault(type) + delta;
 
-        private static bool IsSevenPairs(Dictionary<TileType, int> counts) =>
-            counts.Values.Sum() == 14 && counts.Count == 7 && counts.Values.All(v => v == 2);
+        private static bool IsSevenPairs(Dictionary<TileType, int> counts)
+        {
+            // MCR allows four identical tiles to count as two pairs.
+            if (counts.Values.Sum() != 14) return false;
+            if (counts.Values.Any(value => value % 2 != 0)) return false;
+            return counts.Values.Sum(value => value / 2) == 7;
+        }
 
         private static bool IsSevenShiftedPairs(Dictionary<TileType, int> counts)
         {

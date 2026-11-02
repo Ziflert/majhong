@@ -27,7 +27,7 @@ namespace Mahjong.Rules
         public override string ToString() => $"P{PlayerIndex} {Kind}: {Description}";
     }
 
-    public sealed record WinResult(int PlayerIndex, ClaimSource Source, ScoreResult Score);
+    public sealed record WinResult(int PlayerIndex, ClaimSource Source, ScoreResult Score, int? DiscarderPlayer = null);
 
     /// <summary>
     /// Hand state machine: deal, draw, discard, claims, kongs, win and draw.
@@ -211,6 +211,7 @@ namespace Mahjong.Rules
                 actions.Add(new LegalAction(ActionKind.Win, player, tile, Array.Empty<Tile>(), $"Claim Hu on {tile.Type} for {win.TotalPoints} points"));
 
             var copies = hand.Concealed.Where(t => t.Type == tile.Type).ToList();
+            // Rule: once the last tile of the wall has been taken, only Hu may be declared.
             if (!Wall.IsExhausted)
             {
                 if (copies.Count >= 3)
@@ -219,7 +220,7 @@ namespace Mahjong.Rules
                     actions.Add(new LegalAction(ActionKind.Pung, player, tile, copies.Take(2).ToList(), $"Pung of {tile.Type}"));
             }
 
-            if (discarder == (player + 3) % 4 && tile.Type.IsNumbered)
+            if (!Wall.IsExhausted && discarder == (player + 3) % 4 && tile.Type.IsNumbered)
                 foreach (var chow in FindChows(hand, tile.Type))
                     actions.Add(new LegalAction(ActionKind.Chow, player, tile, chow, $"Chow {tile.Type} with {string.Join(", ", chow.Select(t => t.Type))}"));
 
@@ -441,7 +442,8 @@ namespace Mahjong.Rules
             }
 
             hand.AddConcealed(tile);
-            Result = new WinResult(player, ClaimSource.Discard, score);
+            var discarder = robbedKong ? robbery!.Value.Player : pendingDiscard!.Value.Player;
+            Result = new WinResult(player, ClaimSource.Discard, score, discarder);
             Phase = GamePhase.HandFinished;
             pendingDiscard = null;
             robbery = null;

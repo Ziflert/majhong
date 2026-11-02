@@ -77,11 +77,8 @@ namespace Mahjong.Rules
 
         private static IEnumerable<Shape> BuildShapes(ScoringContext context, HandAnalysis analysis)
         {
-            if (analysis.Pattern is WinningPattern.SevenPairs or WinningPattern.ThirteenOrphans or WinningPattern.SevenShiftedPairs)
-            {
+            if (analysis.Pattern != WinningPattern.Standard)
                 yield return new Shape { Pattern = analysis.Pattern.Value };
-                yield break;
-            }
 
             foreach (var decomposition in analysis.Decompositions)
             {
@@ -141,8 +138,15 @@ namespace Mahjong.Rules
                     case WinningPattern.SevenPairs:
                         Add(Fans.SevenPairs, "seven pairs");
                         break;
+                    case WinningPattern.KnittedTiles:
+                        EvaluateKnittedTiles(context, Add);
+                        break;
+                    case WinningPattern.KnittedStraight:
+                        Add(Fans.KnittedStraight, "147, 258 and 369 in three suits plus one set and a pair");
+                        break;
                 }
-                if (closed && isSelfDraw) Add(Fans.FullyConcealed, "closed hand won by self-draw");
+                if (shape.Pattern != WinningPattern.KnittedTiles && closed && isSelfDraw)
+                    Add(Fans.FullyConcealed, "closed hand won by self-draw");
                 if (isSelfDraw) Add(Fans.SelfDrawn, "won from the wall");
                 return ApplyExclusions(fans);
             }
@@ -256,6 +260,10 @@ namespace Mahjong.Rules
                 Add(Fans.HalfFlush, $"one suit plus honors ({numberedSuits[0]})");
             if (isMixedShiftedChows(chows))
                 Add(Fans.MixedShiftedChows, "consecutive chows in three suits");
+            if (Knitted.ContainsKnittedStraight(tiles))
+                Add(Fans.KnittedStraight, "147, 258 and 369 in three suits plus one set and a pair");
+            if (kongs.Count(k => k.IsConcealed) == 1 && kongs.Count(k => !k.IsConcealed) == 1)
+                Add(Fans.ConcealedAndMeldedKong, "one concealed and one melded kong");
             if (isAllTypes(groups, shape))
                 Add(Fans.AllTypes, "five different tile types");
             if (isMeldedHand(context))
@@ -322,6 +330,21 @@ namespace Mahjong.Rules
         }
 
         // ------------------------------------------------------------ predicates
+
+        private static void EvaluateKnittedTiles(ScoringContext context, System.Action<Fan, string> add)
+        {
+            var tiles = context.Hand.Concealed.Select(t => t.Type).ToList();
+            if (context.WinningTile.HasValue) tiles.Add(context.WinningTile.Value);
+
+            var suited = tiles.Where(t => t.IsNumbered).ToList();
+            var honors = tiles.Where(t => t.IsHonor).ToList();
+
+            if (honors.Count == 7) add(Fans.GreaterHonorsKnitted, "all seven honors plus knitted suit tiles");
+            else add(Fans.LesserHonorsKnitted, $"{honors.Count} single honors plus knitted suit tiles");
+
+            if (Knitted.IsCompleteKnittedStraight(suited))
+                add(Fans.KnittedStraight, "147, 258 and 369 in three suits");
+        }
 
         private static bool nineGatesPredicate(ScoringContext context)
         {
@@ -483,44 +506,63 @@ namespace Mahjong.Rules
 
         // ------------------------------------------------------------ exclusions
 
+        /// <summary>
+        /// Implication table from the MCR scoring rules: a higher fan suppresses the lower ones
+        /// it necessarily contains. Kept in one place so it can be audited against the rulebook.
+        /// </summary>
         private static readonly Dictionary<string, string[]> ExclusionTable = new()
         {
-            ["big-four-winds"] = new[] { "big-three-winds", "all-pungs", "round-wind-pung", "seat-wind-pung", "pung-of-terminals-or-honors" },
+            ["big-four-winds"] = new[] { "big-three-winds", "little-four-winds", "all-pungs", "round-wind-pung", "seat-wind-pung", "pung-of-terminals-or-honors" },
             ["big-three-dragons"] = new[] { "little-three-dragons", "two-dragon-pungs", "dragon-pung" },
-            ["nine-gates"] = new[] { "full-flush", "concealed-hand", "pung-of-terminals-or-honors", "no-honors", "all-chows" },
+            ["nine-gates"] = new[] { "full-flush", "concealed-hand", "edge-wait", "closed-wait", "single-wait", "pung-of-terminals-or-honors" },
             ["four-kongs"] = new[] { "single-wait", "three-kongs" },
-            ["seven-shifted-pairs"] = new[] { "full-flush", "concealed-hand", "single-wait", "seven-pairs", "all-chows", "no-honors" },
-            ["seven-pairs"] = new[] { "concealed-hand", "all-chows" },
-            ["thirteen-orphans"] = new[] { "all-types", "concealed-hand", "single-wait", "all-terminals", "all-honors" },
-            ["all-terminals"] = new[] { "all-pungs", "outside-hand", "pung-of-terminals-or-honors", "no-honors", "all-simples" },
+            ["seven-shifted-pairs"] = new[] { "full-flush", "concealed-hand", "single-wait" },
+            ["seven-pairs"] = new[] { "concealed-hand", "single-wait" },
+            ["thirteen-orphans"] = new[] { "concealed-hand", "all-types", "single-wait" },
+            ["all-terminals"] = new[] { "no-honors", "all-pungs", "outside-hand", "pung-of-terminals-or-honors" },
             ["little-four-winds"] = new[] { "big-three-winds", "pung-of-terminals-or-honors" },
-            ["little-three-dragons"] = new[] { "dragon-pung", "two-dragon-pungs" },
+            ["little-three-dragons"] = new[] { "two-dragon-pungs", "dragon-pung" },
             ["all-honors"] = new[] { "all-pungs", "outside-hand", "pung-of-terminals-or-honors" },
-            ["four-concealed-pungs"] = new[] { "all-pungs", "concealed-hand", "three-concealed-pungs", "two-concealed-pungs" },
-            ["four-terminal-chows"] = new[] { "full-flush", "all-chows", "pure-double-chow", "two-terminal-chows", "seven-pairs" },
-            ["quadruple-chow"] = new[] { "pure-triple-chow", "pure-double-chow" },
-            ["four-pure-shifted-pungs"] = new[] { "pure-shifted-pungs", "double-pung" },
-            ["four-pure-shifted-chows"] = new[] { "pure-shifted-chows", "short-straight" },
-            ["three-kongs"] = new[] { "two-concealed-kongs", "two-melded-kongs", "concealed-kong", "melded-kong" },
-            ["all-terminals-and-honors"] = new[] { "outside-hand", "pung-of-terminals-or-honors", "no-honors" },
-            ["all-even-pungs"] = new[] { "all-pungs" },
-            ["full-flush"] = new[] { "no-honors", "one-voided-suit", "half-flush" },
-            ["pure-triple-chow"] = new[] { "pure-double-chow", "two-terminal-chows" },
-            ["pure-shifted-pungs"] = new[] { "double-pung" },
+            ["four-concealed-pungs"] = new[] { "concealed-hand", "all-pungs", "three-concealed-pungs", "two-concealed-pungs" },
+            ["four-terminal-chows"] = new[] { "full-flush", "all-chows", "seven-pairs", "pure-double-chow", "mixed-double-chow", "two-terminal-chows" },
+            ["quadruple-chow"] = new[] { "pure-double-chow", "pure-triple-chow", "tile-hog", "pure-shifted-pungs" },
+            ["four-pure-shifted-pungs"] = new[] { "pure-double-chow", "pure-triple-chow", "tile-hog", "pure-shifted-pungs" },
+            ["four-pure-shifted-chows"] = new[] { "short-straight" },
+            ["three-kongs"] = new[] { "two-concealed-kongs", "two-melded-kongs", "concealed-kong", "melded-kong", "concealed-and-melded-kong" },
+            ["all-terminals-and-honors"] = new[] { "pung-of-terminals-or-honors", "outside-hand", "all-pungs" },
+            ["greater-honors-knitted"] = new[] { "concealed-hand", "fully-concealed", "all-types", "single-wait", "lesser-honors-knitted" },
+            ["lesser-honors-knitted"] = new[] { "concealed-hand", "fully-concealed", "all-types", "single-wait" },
+            ["all-even-pungs"] = new[] { "all-pungs", "all-simples" },
+            ["full-flush"] = new[] { "no-honors" },
+            ["pure-triple-chow"] = new[] { "pure-shifted-pungs", "pure-double-chow" },
+            ["pure-shifted-pungs"] = new[] { "pure-triple-chow" },
+            ["upper-tiles"] = new[] { "no-honors" },
+            ["middle-tiles"] = new[] { "no-honors" },
+            ["lower-tiles"] = new[] { "no-honors" },
             ["pure-straight"] = new[] { "short-straight" },
-            ["three-suited-terminal-chows"] = new[] { "two-terminal-chows", "pure-double-chow", "mixed-double-chow", "edge-wait" },
+            ["three-suited-terminal-chows"] = new[] { "all-chows", "two-terminal-chows", "mixed-double-chow", "pure-double-chow" },
+            ["all-fives"] = new[] { "all-simples" },
+            ["triple-pung"] = new[] { "double-pung" },
             ["three-concealed-pungs"] = new[] { "two-concealed-pungs" },
-            ["mixed-straight"] = new[] { "short-straight" },
+            ["knitted-straight"] = new[] { "edge-wait", "closed-wait" },
+            ["upper-four"] = new[] { "no-honors" },
+            ["lower-four"] = new[] { "no-honors" },
+            ["reversible-tiles"] = new[] { "one-voided-suit" },
             ["mixed-triple-chow"] = new[] { "mixed-double-chow" },
-            ["mixed-shifted-pungs"] = new[] { "double-pung" },
             ["chicken-hand"] = new[] { "*" },
-            ["robbing-kong"] = new[] { "last-tile" },
-            ["half-flush"] = new[] { "no-honors", "one-voided-suit" },
-            ["melded-hand"] = new[] { "concealed-hand", "fully-concealed" },
-            ["all-pungs"] = new[] { "all-chows", "double-pung", "two-concealed-pungs", "three-concealed-pungs", "four-concealed-pungs" },
-            ["outside-hand"] = new[] { "no-honors" },
-            ["fully-concealed"] = new[] { "concealed-hand" },
-            ["no-honors"] = new[] { "one-voided-suit" }
+            ["last-tile-draw"] = new[] { "self-drawn" },
+            ["out-with-replacement"] = new[] { "self-drawn" },
+            ["robbing-kong"] = new[] { "last-tile", "last-tile-draw", "last-tile-claim" },
+            ["two-concealed-kongs"] = new[] { "concealed-kong" },
+            ["all-pungs"] = new[] { "all-chows" },
+            ["half-flush"] = new[] { "no-honors" },
+            ["melded-hand"] = new[] { "single-wait", "concealed-hand", "fully-concealed" },
+            ["two-dragon-pungs"] = new[] { "dragon-pung" },
+            ["fully-concealed"] = new[] { "self-drawn", "concealed-hand" },
+            ["two-melded-kongs"] = new[] { "melded-kong" },
+            ["concealed-and-melded-kong"] = new[] { "concealed-kong", "melded-kong" },
+            ["last-tile"] = new[] { "robbing-kong" },
+            ["all-chows"] = new[] { "no-honors" }
         };
 
         private static List<ScoredFan> ApplyExclusions(List<ScoredFan> fans)

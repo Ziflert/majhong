@@ -24,7 +24,7 @@ namespace Mahjong.Rules
         public static readonly Fan AllHonors = new("all-honors", "Все благородные", "All Honors", 64);
         public static readonly Fan FourConcealedPungs = new("four-concealed-pungs", "Четыре закрытых панга", "Four Concealed Pungs", 64);
 
-        public static readonly Fan FourTerminalChows = new("four-terminal-chows", "Чистые терминальные чоу", "Four Terminal Chows", 48);
+        public static readonly Fan FourTerminalChows = new("four-terminal-chows", "Чистые терминальные чоу", "Pure Terminal Chows", 64);
         public static readonly Fan QuadrupleChow = new("quadruple-chow", "Четверное чоу", "Quadruple Chow", 48);
         public static readonly Fan FourPureShiftedPungs = new("four-pure-shifted-pungs", "Четыре чистых смещённых панга", "Four Pure Shifted Pungs", 48);
 
@@ -72,6 +72,7 @@ namespace Mahjong.Rules
         public static readonly Fan AllTypes = new("all-types", "Все типы", "All Types", 6);
         public static readonly Fan MeldedHand = new("melded-hand", "Открытая рука", "Melded Hand", 6);
         public static readonly Fan TwoDragonPungs = new("two-dragon-pungs", "Два панга драконов", "Two Dragon Pungs", 6);
+        public static readonly Fan ConcealedAndMeldedKong = new("concealed-and-melded-kong", "Закрытый и открытый конги", "Concealed Kong and Melded Kong", 6);
 
         public static readonly Fan OutsideHand = new("outside-hand", "Внешняя рука", "Outside Hand", 4);
         public static readonly Fan FullyConcealed = new("fully-concealed", "Полностью закрытая рука", "Fully Concealed Hand", 4);
@@ -115,7 +116,7 @@ namespace Mahjong.Rules
             LesserHonorsKnitted, KnittedStraight, UpperFour, LowerFour, BigThreeWinds,
             MixedStraight, ReversibleTiles, MixedTripleChow, MixedShiftedPungs, ChickenHand, LastTileDraw,
             LastTileClaim, OutWithReplacement, RobbingKong, TwoConcealedKongs,
-            AllPungs, HalfFlush, MixedShiftedChows, AllTypes, MeldedHand, TwoDragonPungs,
+            AllPungs, HalfFlush, MixedShiftedChows, AllTypes, MeldedHand, TwoDragonPungs, ConcealedAndMeldedKong,
             OutsideHand, FullyConcealed, TwoMeldedKongs, LastTile,
             DragonPung, RoundWindPung, SeatWindPung, ConcealedHand, AllChows, TileHog, DoublePung,
             TwoConcealedPungs, ConcealedKong, AllSimples,
