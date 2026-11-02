@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Mahjong.Bots;
+using Mahjong.Controls;
 
 namespace Mahjong.Rules.Diagnostics
 {
@@ -65,6 +66,8 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "settlement: self-draw and discard payments", () => SettlementPayments(report));
             Run(report, "session: sixteen hands, dealer rotation and table points", () => SessionFlow(report));
             Run(report, "bots: heuristic play finishes sessions and wins hands", () => BotSession(report));
+            Run(report, "controls: the action bar offers every human decision", () => ActionBarCoverage(report));
+            Run(report, "claims: priority of Hu, kong, pung, chow and seat order", () => ClaimPriorityRules(report));
             Run(report, "state: every mechanic is reachable in random play", () => RandomPlayInvariants(report));
 
             return report;
@@ -572,6 +575,140 @@ namespace Mahjong.Rules.Diagnostics
             report.Check(winsFromDiscard > 0 || lastTileWins > 0, "random play must produce discard wins or last-tile wins");
             _ = robberies;
         }
+        /// <summary>
+        /// Plays hundreds of hands and checks that the action bar never hides a legal decision:
+        /// every choice the engine offers ends up as a numbered button.
+        /// </summary>
+        private static void ActionBarCoverage(SelfTestReport report)
+        {
+            var kinds = new Dictionary<ActionKind, int>();
+            var prompts = 0;
+
+            for (var seed = 0; seed < 60; seed++)
+            {
+                var state = new GameState();
+                state.StartHand(seed: seed, dealer: seed % 4);
+
+                var steps = 0;
+                while (state.Phase != GamePhase.HandFinished && steps++ < 3000)
+                {
+                    if (state.Phase is GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)
+                    {
+                        for (var player = 0; player < 4; player++)
+                        {
+                            var options = state.GetLegalActions(player);
+                            if (options.Count == 0) continue;
+
+                            Count(Prompt(report, options, ref prompts));
+                            state.Apply(BotLikeChoice(options));
+                            if (state.Phase is not (GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)) break;
+                        }
+                        continue;
+                    }
+
+                    var current = state.GetLegalActions(state.CurrentPlayer);
+                    if (current.Count == 0) break;
+
+                    Count(Prompt(report, current, ref prompts));
+                    state.Apply(BotLikeChoice(current));
+                }
+            }
+
+            report.Check(prompts > 100, $"random play should offer many decisions, got {prompts}");
+            report.Check(kinds.GetValueOrDefault(ActionKind.Win) > 0, "the bar never offered Hu");
+            report.Check(kinds.GetValueOrDefault(ActionKind.Pung) > 0, "the bar never offered a pung");
+            report.Check(kinds.GetValueOrDefault(ActionKind.Chow) > 0, "the bar never offered a chow");
+            report.Check(kinds.GetValueOrDefault(ActionKind.OpenKong) + kinds.GetValueOrDefault(ActionKind.ClosedKong)
+                         + kinds.GetValueOrDefault(ActionKind.AddedKong) > 0, "the bar never offered a kong");
+            return;
+
+            void Count(ActionPrompt prompt)
+            {
+                foreach (var option in prompt.Options)
+                    kinds[option.Action.Kind] = kinds.GetValueOrDefault(option.Action.Kind) + 1;
+            }
+        }
+
+        /// <summary>Checks one bar rebuild against the actions the engine offered.</summary>
+        private static ActionPrompt Prompt(SelfTestReport report, IReadOnlyList<LegalAction> options, ref int prompts)
+        {
+            var offered = options.Where(action => action.Kind is not (ActionKind.Discard or ActionKind.Draw)).ToList();
+            var prompt = ActionPrompt.FromLegalActions(options);
+
+            if (offered.All(action => action.Kind == ActionKind.Pass))
+            {
+                report.Check(!prompt.IsOpen, "a window that only offers a pass must not open the action bar");
+                return prompt;
+            }
+
+            prompts++;
+            report.Equal(offered.Count, prompt.Count, "the action bar offers every legal decision");
+            report.Check(prompt.Options.All(option => !string.IsNullOrWhiteSpace(option.Label)),
+                "every button has a caption");
+            report.Check(prompt.Options.All(option => !string.IsNullOrWhiteSpace(option.Hint)),
+                "every button has a hint from LegalAction.Description");
+
+            for (var i = 0; i < prompt.Count; i++)
+            {
+                var option = prompt.Options[i];
+                report.Equal(i + 1, option.Number, "hotkeys are numbered from one");
+                report.Check(prompt.TrySelect(option.Number, out var selected), $"hotkey {option.Number} selects an action");
+                report.Check(offered.Any(action => action.Kind == selected.Kind && action.Tile?.InstanceId == selected.Tile?.InstanceId),
+                    $"the bar invented an action: {selected}");
+                if (i == 0) continue;
+                report.Check(ActionPrompt.Priority(prompt.Options[i - 1].Action.Kind) <= ActionPrompt.Priority(option.Action.Kind),
+                    "buttons follow the claim priority: Hu, kong, pung, chow, pass");
+            }
+
+            return prompt;
+        }
+
+        /// <summary>A decision for the coverage run: prefer a claim, otherwise discard the last tile.</summary>
+        private static LegalAction BotLikeChoice(IReadOnlyList<LegalAction> options)
+        {
+            return options.FirstOrDefault(action => action.Kind is ActionKind.Win
+                       or ActionKind.OpenKong or ActionKind.Pung or ActionKind.Chow
+                       or ActionKind.ClosedKong or ActionKind.AddedKong)
+                   ?? options.FirstOrDefault(action => action.Kind == ActionKind.Pass)
+                   ?? options.FirstOrDefault(action => action.Kind == ActionKind.Draw)
+                   ?? options[options.Count - 1];
+        }
+
+        /// <summary>
+        /// Synthetic claim windows: the winner cannot depend on who answered first, which is what the
+        /// engine used to do when two players both claim the same discard.
+        /// </summary>
+        private static void ClaimPriorityRules(SelfTestReport report)
+        {
+            var discard = new Tile(new TileType(TileSuit.Characters, 5), 500);
+            LegalAction Claim(ActionKind kind, int player) =>
+                new(kind, player, discard, Array.Empty<Tile>(), $"{kind} by P{player}");
+
+            report.Equal(null, ClaimPriority.Winner(new[] { Claim(ActionKind.Pass, 1), Claim(ActionKind.Pass, 2) }, 0),
+                "all passes leave the window without a claim");
+
+            report.Equal(3, ClaimPriority.Winner(new[] { Claim(ActionKind.Chow, 2), Claim(ActionKind.Pung, 3) }, 0)!.PlayerIndex,
+                "a pung beats a chow even from a further seat");
+
+            report.Equal(1, ClaimPriority.Winner(new[] { Claim(ActionKind.Pung, 3), Claim(ActionKind.OpenKong, 1) }, 0)!.PlayerIndex,
+                "a kong beats a pung");
+
+            report.Equal(3, ClaimPriority.Winner(new[] { Claim(ActionKind.Win, 3), Claim(ActionKind.OpenKong, 1) }, 0)!.PlayerIndex,
+                "Hu beats every meld");
+
+            report.Equal(1, ClaimPriority.Winner(new[] { Claim(ActionKind.Pung, 3), Claim(ActionKind.Pung, 1) }, 0)!.PlayerIndex,
+                "equal claims go to the nearest seat after the discarder");
+
+            report.Equal(2, ClaimPriority.Winner(new[] { Claim(ActionKind.Chow, 3), Claim(ActionKind.Chow, 2) }, 1)!.PlayerIndex,
+                "seat order is counted from the discarder, not from seat zero");
+
+            report.Equal(1, ClaimPriority.Winner(new[] { Claim(ActionKind.Win, 3), Claim(ActionKind.Win, 1) }, 0)!.PlayerIndex,
+                "double Hu goes to the nearest seat (rule 3.6.7.2)");
+
+            report.Equal(1, ClaimPriority.Distance(1, 0), "the next seat is one step away");
+            report.Equal(1, ClaimPriority.Distance(0, 3), "the round wraps from North to East");
+        }
+
         private static LegalAction Choose(IReadOnlyList<LegalAction> options, Random random, PlayerHand hand)
         {
             var win = options.FirstOrDefault(o => o.Kind == ActionKind.Win);

@@ -51,11 +51,12 @@ namespace Mahjong.Unity
             labelObject.transform.SetParent(parent, false);
             // sit just above the top face; the root is unscaled, so these are world units
             labelObject.transform.localPosition = new Vector3(0f, Height * 0.5f + 0.0015f, 0f);
-            // Lay the label flat and face up: LookRotation maps the text normal to world up and the
-            // glyph tops away from the camera. Measured on screen that reads upside down, so the
-            // text is turned 180 degrees around its own normal (a pure in-plane rotation).
-            labelObject.transform.localRotation =
-                Quaternion.LookRotation(Vector3.up, Vector3.forward) * Quaternion.Euler(0f, 0f, 180f);
+            // Lay the label flat and face up, with the text top pointing away from the player seat.
+            // A +90 degree turn about X maps the text normal to world up (+Y) and the text up
+            // direction to +Z, so the glyphs read upright from the camera in front of the table.
+            // LookRotation(up, forward) looks right on paper but shows the back of the text: the
+            // screenshot of the prototype had doubled, upside-down captions.
+            labelObject.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
 
             var mesh = labelObject.AddComponent<TextMesh>();
             mesh.anchor = TextAnchor.MiddleCenter;

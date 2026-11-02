@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Mahjong.Bots;
+using Mahjong.Controls;
 using Mahjong.Rules;
 using UnityEngine;
 
@@ -24,6 +25,12 @@ namespace Mahjong.Unity
         /// </summary>
         public TextMesh Status => status;
 
+        /// <summary>The bar of legal actions offered to the human. Exposed for tests and tools.</summary>
+        public ActionBar Bar => bar;
+
+        /// <summary>The choices currently offered to the human; closed when it is not his decision.</summary>
+        public ActionPrompt Prompt { get; private set; } = ActionPrompt.Closed;
+
         /// <summary>Tiles rest on the table top, which sits at y = -0.005.</summary>
         private const float TileY = 0.01f;
 
@@ -35,6 +42,7 @@ namespace Mahjong.Unity
         private GameSession session = null!;
         private IMahjongBot[] bots = null!;
         private TextMesh status = null!;
+        private ActionBar bar = null!;
         private Transform table = null!;
         private Transform board = null!;
         private float nextBotAction;
@@ -112,11 +120,14 @@ namespace Mahjong.Unity
             status.fontSize = 64;
             status.characterSize = 0.0016f;
             status.color = Color.white;
+
+            bar = ActionBar.Create(camera.transform);
         }
 
         private void StartHand(int seed)
         {
             waitingForNextHand = false;
+            ClosePrompt();
             session.StartNextHand(seed);
             ClearViews();
             Rebuild();
@@ -132,6 +143,7 @@ namespace Mahjong.Unity
                 {
                     waitingForNextHand = true;
                     nextHandAt = Time.time + 3f;
+                    ClosePrompt();
                     session.CompleteHand();
                     status.text = DescribeResult();
                 }
@@ -163,21 +175,29 @@ namespace Mahjong.Unity
         {
             var state = session.State!;
             var options = state.GetLegalActions(humanSeat);
-            HighlightHand(true);
-
-            var declarable = options.FirstOrDefault(option => option.Kind == ActionKind.Win);
-            if (declarable != null && Input.GetKeyDown(KeyCode.H))
-            {
-                state.Apply(declarable);
-                AfterAction();
-                return;
-            }
 
             var draw = options.FirstOrDefault(option => option.Kind == ActionKind.Draw);
             if (draw != null)
             {
+                ClosePrompt();
                 state.Apply(draw);
                 AfterAction();
+                return;
+            }
+
+            HighlightHand(true);
+            ShowPrompt(ActionPrompt.FromLegalActions(options));
+
+            // H stays as a shortcut for the decision that a tile click cannot express
+            if (Input.GetKeyDown(KeyCode.H) && Prompt.TrySelectKind(ActionKind.Win, out var hu))
+            {
+                Play(hu);
+                return;
+            }
+
+            if (TryReadSelection(out var chosen))
+            {
+                Play(chosen);
                 return;
             }
 
@@ -190,8 +210,7 @@ namespace Mahjong.Unity
                 option.Kind == ActionKind.Discard && option.Tile?.InstanceId == picked.Value);
             if (discard == null) return;
 
-            state.Apply(discard);
-            AfterAction();
+            Play(discard);
         }
 
         private void HandleBotTurn()
@@ -208,37 +227,101 @@ namespace Mahjong.Unity
             AfterAction();
         }
 
+        /// <summary>
+        /// Open claim window: the bots answer on their own timer while the human picks from the bar.
+        /// The engine keeps the window open as long as somebody still holds a real claim, so a human
+        /// who can Pung, Kong or Hu is never passed for by the UI.
+        /// </summary>
         private void HandleClaims()
+        {
+            var state = session.State!;
+            var phase = state.Phase;
+
+            RunBotResponses(state);
+
+            if (state.Phase != phase)
+            {
+                ClosePrompt();
+                AfterAction();
+                return;
+            }
+
+            ShowPrompt(ActionPrompt.FromLegalActions(state.GetLegalActions(humanSeat)));
+            if (!Prompt.IsOpen) return;
+
+            if (TryReadSelection(out var chosen)) Play(chosen);
+        }
+
+        /// <summary>Bots answer the claim window one by one; the human is left to the action bar.</summary>
+        private void RunBotResponses(GameState state)
         {
             if (Time.time < nextBotAction) return;
             nextBotAction = Time.time + botDelay;
 
-            var state = session.State!;
-            var claiming = state.Phase;
+            var phase = state.Phase;
             for (var player = 0; player < 4; player++)
             {
+                if (player == humanSeat) continue;
+
                 var options = state.GetLegalActions(player);
                 if (options.Count == 0) continue;
 
-                if (claiming == GamePhase.AwaitingKongRobbery && options.All(o => o.Kind != ActionKind.Win))
+                if (phase == GamePhase.AwaitingKongRobbery && options.All(o => o.Kind != ActionKind.Win))
                     continue;
 
-                LegalAction action;
-                if (player == humanSeat)
-                {
-                    action = options.FirstOrDefault(o => o.Kind == ActionKind.Win)
-                             ?? options.First(o => o.Kind == ActionKind.Pass);
-                }
-                else
-                {
-                    action = bots[player].Choose(state, player, options);
-                }
-
-                state.Apply(action);
-                if (state.Phase != claiming) break;
+                state.Apply(bots[player].Choose(state, player, options));
+                if (state.Phase != phase) break;
             }
+        }
 
+        // -------------------------------------------------------------- prompt
+
+        private void ShowPrompt(ActionPrompt prompt)
+        {
+            Prompt = prompt;
+            bar.Show(prompt);
+            if (!prompt.IsOpen) return;
+
+            var hovered = bar.Hover(MouseRay());
+            bar.SetHint(hovered?.Hint ?? DefaultHint(prompt));
+        }
+
+        private void ClosePrompt()
+        {
+            Prompt = ActionPrompt.Closed;
+            bar.Hide();
+        }
+
+        private static string DefaultHint(ActionPrompt prompt) =>
+            prompt.Count == 1
+                ? prompt.Options[0].Hint
+                : $"Press 1-{prompt.Count} or click a button";
+
+        private void Play(LegalAction action)
+        {
+            ClosePrompt();
+            session.State!.Apply(action);
             AfterAction();
+        }
+
+        /// <summary>Reads a number key or a click on the bar; false when the bar was not used.</summary>
+        private bool TryReadSelection(out LegalAction action)
+        {
+            action = null!;
+            if (!Prompt.IsOpen) return false;
+
+            for (var i = 0; i < Prompt.Count && i < ActionPrompt.MaxOptions; i++)
+                if (Input.GetKeyDown(KeyCode.Alpha1 + i))
+                    return Prompt.TrySelect(Prompt.Options[i].Number, out action);
+
+            if (!Input.GetMouseButtonDown(0)) return false;
+            return bar.TryPick(MouseRay(), out action);
+        }
+
+        private static Ray MouseRay()
+        {
+            var camera = Camera.main;
+            return camera == null ? default : camera.ScreenPointToRay(Input.mousePosition);
         }
 
         private void AfterAction()
@@ -374,7 +457,7 @@ namespace Mahjong.Unity
             {
                 $"Hand {session.HandsPlayed + 1}/{GameSession.TotalHands}  Round {session.RoundWind}  Your seat {wind}",
                 state.Phase == GamePhase.AwaitingDiscard && state.CurrentPlayer == humanSeat
-                    ? "Your turn: click a tile to discard, H to declare Hu"
+                    ? "Your turn: click a tile to discard, 1-N for the action bar, H for Hu"
                     : $"Waiting for player {state.CurrentPlayer}",
                 $"Wall: {state.Wall.Remaining}",
                 $"Points: {string.Join("  ", session.Scores.Select((score, player) => $"P{player}={score}"))}"

@@ -370,20 +370,10 @@ namespace Mahjong.Rules
                 throw new InvalidOperationException("No claim window is open.");
 
             var (discarder, tile) = pendingDiscard.Value;
-            var claims = claimResponses.Values.Where(c => c.Kind != ActionKind.Pass).ToList();
-
-            var winner = claims.Where(c => c.Kind == ActionKind.Win)
-                .OrderBy(c => (c.PlayerIndex - discarder + 4) % 4)
-                .FirstOrDefault();
-            if (winner != null) { ApplyClaimedWin(winner.PlayerIndex, tile, false); return; }
-
-            var claim = claims.FirstOrDefault(c => c.Kind == ActionKind.OpenKong)
-                        ?? claims.FirstOrDefault(c => c.Kind == ActionKind.Pung)
-                        ?? claims.Where(c => c.Kind == ActionKind.Chow)
-                            .OrderBy(c => (c.PlayerIndex - discarder + 4) % 4)
-                            .FirstOrDefault();
+            var claim = ClaimPriority.Winner(claimResponses.Values, discarder);
 
             if (claim == null) { AdvanceTurn(); return; }
+            if (claim.Kind == ActionKind.Win) { ApplyClaimedWin(claim.PlayerIndex, tile, false); return; }
 
             var hand = Players[claim.PlayerIndex];
             if (!hand.RemoveConcealed(claim.RequiredTiles)) throw new InvalidOperationException("Claim tiles are missing.");
