@@ -36,7 +36,8 @@
 | `ClaimPriority.cs` | Кто выигрывает окно заявок: Ху > конг > панг > чоу, равные — ближайшему по ходу |
 | `Controls/ActionPrompt.cs` | Панель действий: какие действия человека становятся кнопками, подписи, горячие клавиши |
 | `Settlement.cs` | Выплаты за руку: самобор и выигрыш со сноса (3.9.1.2–3.9.1.3) |
-| `GameSession.cs` | Сессия: 4 раунда × 4 руки, смена разыгрывающего, игровые и турнирные очки |
+| `Penalties.cs` | Нарушения 3.11: каталог, шкала «предупреждение → 5/10/20/40», счётчики по сессии и раунду, `PenaltyLedger` |
+| `GameSession.cs` | Сессия: 4 раунда × 4 руки, смена разыгрывающего, часы на 150 минут (3.5.6), штрафные очки, итоговая таблица `Standings()` (3.9.2, 3.10.1) |
 
 ## Точки входа
 - `new GameState().StartHand(dealer, seed)` — начать руку.
@@ -46,8 +47,14 @@
 - `ActionPrompt.FromLegalActions(state.GetLegalActions(player))` — что показать человеку.
 - `ClaimPriority.Winner(claims, discarder)` — чья заявка выигрывает.
 - `state.Result` — результат победы с разбивкой по фанам.
+- `state.ForbidWin(player, reason)` / `state.IsWinForbidden(player)` — лишение права на Ху в текущей руке (3.11.6).
 - `Settlements.ForWin(result)` — кто кому сколько платит.
+- `Penalties.Rule(kind)` / `Penalties.EscalatedPoints(n)` — каталог штрафов и шкала повторов.
+- `new PenaltyLedger().Register(player, kind, judgePoints, victim, tileSeen)` — размер одного нарушения.
 - `new GameSession()` → `StartNextHand()` → `CompleteHand()` — полная сессия из 16 рук.
+- `session.AdvanceClock(...)` / `AbandonRunningHand()` — часы сессии и остановка недоигранной руки.
+- `session.ReportViolation(player, kind)` — штраф, который вычитается после руки.
+- `session.Standings()` — финальная таблица: место, игровые и турнирные очки.
 
 ## Команды
 ```bash
@@ -83,7 +90,7 @@ $env:MAHJONG_SHOT_DIR="D:\Temprary\shots"
   -executeMethod Mahjong.EditorTools.ActionBarPreview.CaptureAndExit
 ```
 
-Проверено на 2026-11-02: `RulesCheck` — 26 групп, 68 188 проверок; EditMode 13/13; PlayMode 5/5.
+Проверено на 2026-11-03: `RulesCheck` — 31 группа, 68 292 проверки; EditMode 13/13; PlayMode 5/5.
 
 ## Архитектура
 ```text

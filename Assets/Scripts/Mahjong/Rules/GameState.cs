@@ -37,6 +37,7 @@ namespace Mahjong.Rules
     {
         private readonly List<(int Player, Tile Tile)> discards = new();
         private readonly Dictionary<int, LegalAction> claimResponses = new();
+        private readonly Dictionary<int, string> winForbidden = new();
 
         private (int Player, Tile Tile)? pendingDiscard;
         private (int Player, Tile Tile)? robbery;
@@ -61,6 +62,23 @@ namespace Mahjong.Rules
 
         public Wind SeatWindOf(int player) => (Wind)(((player - Dealer) % 4 + 4) % 4);
         public IReadOnlyList<LegalAction> CurrentPlayerActions => GetLegalActions(CurrentPlayer);
+
+        // ------------------------------------------------------- penalties
+
+        /// <summary>
+        /// Rule 3.11.6.2, 3.11.6.6, 3.11.6.7, 3.11.6.8, 3.11.6.9: some violations cost the player
+        /// the right to declare Hu for the rest of the hand. The engine then stops offering the win.
+        /// </summary>
+        public void ForbidWin(int player, string reason)
+        {
+            if (player is < 0 or > 3) throw new ArgumentOutOfRangeException(nameof(player));
+            winForbidden[player] = reason;
+        }
+
+        public bool IsWinForbidden(int player) => winForbidden.ContainsKey(player);
+
+        public string? WinForbiddenReason(int player) =>
+            winForbidden.TryGetValue(player, out var reason) ? reason : null;
 
         // ---------------------------------------------------------------- deal
 
@@ -109,6 +127,7 @@ namespace Mahjong.Rules
             EndedInDraw = false;
             LastDraw = null;
             LastDrawSource = null;
+            winForbidden.Clear();
             for (var i = 0; i < 4; i++) Players[i] = new PlayerHand();
         }
 
@@ -169,7 +188,10 @@ namespace Mahjong.Rules
 
             if (LastDrawSource.HasValue || hand.Concealed.Count == 14 - hand.Melds.Count * 3)
             {
-                var win = EvaluateWin(player, hand, null, LastDrawSource ?? ClaimSource.SelfDraw, Wall.IsLastLiveTile, false);
+                // A forbidden player keeps drawing and discarding, but the engine stops offering Hu (3.11.6).
+                var win = IsWinForbidden(player)
+                    ? ScoreResult.Forbidden(WinForbiddenReason(player) ?? "Hu is forbidden in this hand.")
+                    : EvaluateWin(player, hand, null, LastDrawSource ?? ClaimSource.SelfDraw, Wall.IsLastLiveTile, false);
                 if (win.IsValidWin)
                     actions.Add(new LegalAction(ActionKind.Win, player, null, Array.Empty<Tile>(), $"Declare Hu for {win.TotalPoints} points"));
             }
@@ -206,7 +228,9 @@ namespace Mahjong.Rules
             var hand = Players[player];
             var actions = new List<LegalAction>();
 
-            var win = EvaluateWin(player, hand, tile.Type, ClaimSource.Discard, false, Wall.IsExhausted);
+            var win = IsWinForbidden(player)
+                ? ScoreResult.Forbidden(WinForbiddenReason(player) ?? "Hu is forbidden in this hand.")
+                : EvaluateWin(player, hand, tile.Type, ClaimSource.Discard, false, Wall.IsExhausted);
             if (win.IsValidWin)
                 actions.Add(new LegalAction(ActionKind.Win, player, tile, Array.Empty<Tile>(), $"Claim Hu on {tile.Type} for {win.TotalPoints} points"));
 
@@ -235,7 +259,9 @@ namespace Mahjong.Rules
             if (player == robbery.Value.Player) return Array.Empty<LegalAction>();
 
             var actions = new List<LegalAction>();
-            var win = EvaluateWin(player, Players[player], robbery.Value.Tile.Type, ClaimSource.Discard, false, false, robbedKong: true);
+            var win = IsWinForbidden(player)
+                ? ScoreResult.Forbidden(WinForbiddenReason(player) ?? "Hu is forbidden in this hand.")
+                : EvaluateWin(player, Players[player], robbery.Value.Tile.Type, ClaimSource.Discard, false, false, robbedKong: true);
             if (win.IsValidWin)
                 actions.Add(new LegalAction(ActionKind.Win, player, robbery.Value.Tile, Array.Empty<Tile>(), $"Robbing the kong for {win.TotalPoints} points"));
             actions.Add(new LegalAction(ActionKind.Pass, player, null, Array.Empty<Tile>(), "Pass"));

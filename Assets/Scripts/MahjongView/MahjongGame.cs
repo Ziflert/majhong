@@ -69,8 +69,22 @@ namespace Mahjong.Unity
             };
 
             BuildScene();
-            session = new GameSession();
+            session = new GameSession(SessionTimeLimit());
             StartHand(random.Next());
+        }
+
+        /// <summary>
+        /// Rule 3.5.6 gives a session 150 minutes. The prototype can shorten that with
+        /// MAHJONG_SESSION_MINUTES so the time-up path can be seen in a capture run.
+        /// </summary>
+        private static System.TimeSpan? SessionTimeLimit()
+        {
+            var raw = System.Environment.GetEnvironmentVariable("MAHJONG_SESSION_MINUTES");
+            // Invariant culture: "0.2" must mean a fifth of a minute even under a Russian locale.
+            return double.TryParse(raw, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var minutes) && minutes > 0
+                ? System.TimeSpan.FromMinutes(minutes)
+                : null;
         }
 
         private void BuildScene()
@@ -136,6 +150,22 @@ namespace Mahjong.Unity
         private void Update()
         {
             if (session.State == null) return;
+
+            // Rule 3.5.6: the session clock runs during play, not during the pause between hands.
+            if (!session.IsFinished && session.State.Phase != GamePhase.HandFinished)
+                session.AdvanceClock(System.TimeSpan.FromSeconds(Time.deltaTime));
+
+            if (session.IsTimeUp && session.State.Phase != GamePhase.HandFinished && !session.EndedByTimeLimit)
+            {
+                ClosePrompt();
+                session.AbandonRunningHand();
+                waitingForNextHand = false;
+                status.text = "Time is up: the hand in progress scores nothing\n" + session.Describe();
+                return;
+            }
+
+            // The table is closed for good: keep the final table on screen.
+            if (session.EndedByTimeLimit) return;
 
             if (session.State.Phase == GamePhase.HandFinished)
             {
@@ -460,10 +490,18 @@ namespace Mahjong.Unity
                     ? "Your turn: click a tile to discard, 1-N for the action bar, H for Hu"
                     : $"Waiting for player {state.CurrentPlayer}",
                 $"Wall: {state.Wall.Remaining}",
-                $"Points: {string.Join("  ", session.Scores.Select((score, player) => $"P{player}={score}"))}"
+                $"Points: {string.Join("  ", session.Scores.Select((score, player) => $"P{player}={score}"))}",
+                $"Clock: {Clock(session.Elapsed)} / {Clock(session.TimeLimit)}"
+                + (session.IsTimeUp ? "  time is up" : session.IsFinalQuarterHour ? "  last quarter of an hour" : string.Empty)
             };
+
+            if (state.IsWinForbidden(humanSeat))
+                lines.Add($"Hu is forbidden this hand: {state.WinForbiddenReason(humanSeat)}");
+
             return string.Join("\n", lines);
         }
+
+        private static string Clock(System.TimeSpan span) => $"{(int)span.TotalMinutes}:{span.Seconds:00}";
 
         private string DescribeResult()
         {

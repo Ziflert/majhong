@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="13" result="Passed" total="13" passed="13" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:54Z" duration="37,9696253">
+  <test-suite type="TestSuite" id="1000" name="Mahjong" fullname="Mahjong" runstate="Runnable" testcasecount="13" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:54Z" duration="37.969625" total="13" passed="13" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <test-suite type="Assembly" id="1017" name="Mahjong.Tests.dll" fullname="D:/Temprary/game/Library/ScriptAssemblies/Mahjong.Tests.dll" runstate="Runnable" testcasecount="13" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:54Z" duration="37.961203" total="13" passed="13" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="19884" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <test-suite type="TestSuite" id="1018" name="Mahjong" fullname="Mahjong" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.053378" total="12" passed="12" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1019" name="EditorTests" fullname="Mahjong.EditorTests" runstate="Runnable" testcasecount="12" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.053286" total="12" passed="12" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestFixture" id="1003" name="ActionPromptTests" fullname="Mahjong.EditorTests.ActionPromptTests" classname="Mahjong.EditorTests.ActionPromptTests" runstate="Runnable" testcasecount="9" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.039497" total="9" passed="9" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-case id="1006" name="APassOnItsOwnOpensNothing" fullname="Mahjong.EditorTests.ActionPromptTests.APassOnItsOwnOpensNothing" methodname="APassOnItsOwnOpensNothing" classname="Mahjong.EditorTests.ActionPromptTests" runstate="Runnable" seed="683649449" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.018568" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1005" name="ChowsAreOrderedByTheirLowestRank" fullname="Mahjong.EditorTests.ActionPromptTests.ChowsAreOrderedByTheirLowestRank" methodname="ChowsAreOrderedByTheirLowestRank" classname="Mahjong.EditorTests.ActionPromptTests" runstate="Runnable" seed="40787845" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.004657" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1004" name="ClaimWindowIsOrderedByPriorityAndNumberedFromOne" fullname="Mahjong.EditorTests.ActionPromptTests.ClaimWindowIsOrderedByPriorityAndNumberedFromOne" methodname="ClaimWindowIsOrderedByPriorityAndNumberedFromOne" classname="Mahjong.EditorTests.ActionPromptTests" runstate="Runnable" seed="131075063" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.001895" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1012" name="ClosedPromptIsNotOpen" fullname="Mahjong.EditorTests.ActionPromptTests.ClosedPromptIsNotOpen" methodname="ClosedPromptIsNotOpen" classname="Mahjong.EditorTests.ActionPromptTests" runstate="Runnable" seed="1955236767" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.000398" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1008" name="DiscardPhaseAloneOpensNothing" fullname="Mahjong.EditorTests.ActionPromptTests.DiscardPhaseAloneOpensNothing" methodname="DiscardPhaseAloneOpensNothing" classname="Mahjong.EditorTests.ActionPromptTests" runstate="Runnable" seed="1389466562" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.000182" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1007" name="DiscardsAndDrawsAreNotButtons" fullname="Mahjong.EditorTests.ActionPromptTests.DiscardsAndDrawsAreNotButtons" methodname="DiscardsAndDrawsAreNotButtons" classname="Mahjong.EditorTests.ActionPromptTests" runstate="Runnable" seed="563130694" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.000337" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1010" name="FingerprintIdentifiesTheOptionSet" fullname="Mahjong.EditorTests.ActionPromptTests.FingerprintIdentifiesTheOptionSet" methodname="FingerprintIdentifiesTheOptionSet" classname="Mahjong.EditorTests.ActionPromptTests" runstate="Runnable" seed="1622559254" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.001108" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1011" name="HintComesFromTheEngineDescription" fullname="Mahjong.EditorTests.ActionPromptTests.HintComesFromTheEngineDescription" methodname="HintComesFromTheEngineDescription" classname="Mahjong.EditorTests.ActionPromptTests" runstate="Runnable" seed="131006785" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.000280" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1009" name="SelectionWorksByNumberAndByKind" fullname="Mahjong.EditorTests.ActionPromptTests.SelectionWorksByNumberAndByKind" methodname="SelectionWorksByNumberAndByKind" classname="Mahjong.EditorTests.ActionPromptTests" runstate="Runnable" seed="615199000" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.000436" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+          </test-suite>
+          <test-suite type="TestFixture" id="1013" name="FansTableTests" fullname="Mahjong.EditorTests.FansTableTests" classname="Mahjong.EditorTests.FansTableTests" runstate="Runnable" testcasecount="3" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.012946" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-case id="1015" name="CatalogueKeepsThePointsOfEveryFan" fullname="Mahjong.EditorTests.FansTableTests.CatalogueKeepsThePointsOfEveryFan" methodname="CatalogueKeepsThePointsOfEveryFan" classname="Mahjong.EditorTests.FansTableTests" runstate="Runnable" seed="2021955049" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.009461" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1014" name="RuleTableHasEightyOneFans" fullname="Mahjong.EditorTests.FansTableTests.RuleTableHasEightyOneFans" methodname="RuleTableHasEightyOneFans" classname="Mahjong.EditorTests.FansTableTests" runstate="Runnable" seed="888902132" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.001619" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+            <test-case id="1016" name="TheOnlyExtraFanIsTheMeldedAndConcealedKong" fullname="Mahjong.EditorTests.FansTableTests.TheOnlyExtraFanIsTheMeldedAndConcealedKong" methodname="TheOnlyExtraFanIsTheMeldedAndConcealedKong" classname="Mahjong.EditorTests.FansTableTests" runstate="Runnable" seed="1650846124" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:16Z" duration="0.001087" asserts="0">
+              <properties>
+                <property name="retryIteration" value="0" />
+                <property name="repeatIteration" value="0" />
+              </properties>
+            </test-case>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+      <test-suite type="TestFixture" id="1001" name="MahjongRulesTests" fullname="MahjongRulesTests" classname="MahjongRulesTests" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:54Z" duration="37.907561" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1002" name="RulesSelfTestPasses" fullname="MahjongRulesTests.RulesSelfTestPasses" methodname="RulesSelfTestPasses" classname="MahjongRulesTests" runstate="Runnable" seed="39685085" result="Passed" start-time="2026-11-02 21:39:16Z" end-time="2026-11-02 21:39:54Z" duration="37.907222" asserts="0">
+          <properties>
+            <property name="retryIteration" value="0" />
+            <property name="repeatIteration" value="0" />
+          </properties>
+          <output><![CDATA[Saving results to: D:Temprarytempeditmode.xml
+]]></output>
+        </test-case>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

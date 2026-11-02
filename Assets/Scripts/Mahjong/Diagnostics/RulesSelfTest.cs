@@ -65,6 +65,11 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "score: knitted straight hand", () => ScoreKnittedStraight(report));
             Run(report, "settlement: self-draw and discard payments", () => SettlementPayments(report));
             Run(report, "session: sixteen hands, dealer rotation and table points", () => SessionFlow(report));
+            Run(report, "penalties: catalogue, escalation and doubling", () => PenaltyEscalation(report));
+            Run(report, "penalties: a forbidden player cannot declare Hu", () => ForbiddenWin(report));
+            Run(report, "penalties: points are charged when the hand ends", () => PenaltySettlement(report));
+            Run(report, "session: the 150-minute clock stops an unfinished hand", () => SessionClock(report));
+            Run(report, "session: standings rank by game points and split ties", () => SessionStandings(report));
             Run(report, "bots: heuristic play finishes sessions and wins hands", () => BotSession(report));
             Run(report, "controls: the action bar offers every human decision", () => ActionBarCoverage(report));
             Run(report, "claims: priority of Hu, kong, pung, chow and seat order", () => ClaimPriorityRules(report));
@@ -422,6 +427,233 @@ namespace Mahjong.Rules.Diagnostics
             report.Equal(0, session.Scores.Sum(), "payments are zero-sum");
             var tablePoints = session.TablePoints();
             report.Check(Math.Abs(tablePoints.Sum() - 7) < 1e-9, $"table points must total 7, got {tablePoints.Sum()}");
+        }
+
+        private static void PenaltyEscalation(SelfTestReport report)
+        {
+            var expected = new[] { 0, 5, 10, 20, 40, 80, 80 };
+            for (var offence = 1; offence <= expected.Length; offence++)
+                report.Equal(expected[offence - 1], Penalties.EscalatedPoints(offence),
+                    $"penalty for offence {offence} (warning, five, ten, twenty, then doubling)");
+
+            report.Equal(12, Penalties.Catalogue.Count, "the catalogue covers every violation of 3.11.6 and the lateness fine");
+            report.Equal(Penalties.Catalogue.Count,
+                Penalties.Catalogue.Select(rule => rule.Kind).Distinct().Count(), "no violation is listed twice");
+            report.Check(Penalties.Catalogue.All(rule => !string.IsNullOrWhiteSpace(rule.Name)),
+                "every penalty has a name");
+            report.Check(Penalties.Catalogue.All(rule => !string.IsNullOrWhiteSpace(rule.Reference)),
+                "every penalty points at a rule number");
+
+            var ledger = new PenaltyLedger();
+            var first = ledger.Register(1, ViolationKind.EmptyClaim);
+            report.Check(first.WarningOnly, "the first empty requirement is only a warning");
+            report.Equal(0, first.TotalLoss, "a warning costs nothing");
+            report.Equal(5, ledger.Register(1, ViolationKind.EmptyClaim).TotalLoss, "the second empty requirement costs five points");
+            report.Equal(10, ledger.Register(1, ViolationKind.EmptyClaim).TotalLoss, "the third costs ten points");
+            var fourth = ledger.Register(1, ViolationKind.EmptyClaim);
+            report.Equal(20, fourth.TotalLoss, "the fourth costs twenty points");
+            report.Equal(20, fourth.PointsLostFromTable, "nobody receives the fine (3.11.2)");
+            report.Check(ledger.Register(2, ViolationKind.EmptyClaim).WarningOnly, "counters are per player");
+            report.Equal(4, ledger.Occurrences(1, ViolationKind.EmptyClaim), "four offences are counted for P1");
+
+            ledger.StartRound(0);
+            ledger.Register(0, ViolationKind.LatePungClaim);
+            report.Equal(5, ledger.Register(0, ViolationKind.LatePungClaim).TotalLoss,
+                "the second late pung of the round costs five points");
+            ledger.StartRound(1);
+            report.Check(ledger.Register(0, ViolationKind.LatePungClaim).WarningOnly,
+                "the late pung counter restarts in every round (3.11.6.5)");
+
+            var falseHu = ledger.Register(3, ViolationKind.FalseHuClaim);
+            report.Equal(20, falseHu.PointsPerRecipient, "a wrong Hu claim costs twenty points to every opponent");
+            report.Equal(3, falseHu.Recipients.Count, "all three opponents are paid");
+            report.Equal(60, falseHu.TotalLoss, "the wrong Hu claim costs sixty points in total");
+            report.Check(falseHu.LosesRightToWin, "a false Hu takes the right to win the current hand");
+
+            var touched = ledger.Register(2, ViolationKind.TouchedWallTile);
+            report.Check(touched.WarningOnly && !touched.LosesRightToWin, "an unseen wall tile only earns a warning");
+            var seen = ledger.Register(2, ViolationKind.TouchedWallTile, tileSeen: true);
+            report.Equal(5, seen.TotalLoss, "a second offence costs five points");
+            report.Check(seen.LosesRightToWin, "a seen wall tile also costs the right to declare Hu");
+
+            var mistaken = ledger.Register(0, ViolationKind.MistakenMeld);
+            report.Equal(0, mistaken.TotalLoss, "a mistaken meld costs no points");
+            report.Check(mistaken.LosesRightToWin, "a mistaken meld costs the right to win the hand");
+
+            var knocked = ledger.Register(1, ViolationKind.KnockedOverTile, judgePoints: 25, victim: 2);
+            report.Equal(25, knocked.TotalLoss, "the referee sets the fine for knocking a tile over");
+            report.Equal(2, knocked.Recipients.Single(), "only the player whose tile was knocked over is paid");
+            report.Check(ledger.Register(0, ViolationKind.Deception).WarningOnly,
+                "a referee may answer cheating with a warning alone");
+
+            var rejected = false;
+            try { ledger.Register(0, ViolationKind.Deception, judgePoints: 61); }
+            catch (ArgumentOutOfRangeException) { rejected = true; }
+            report.Check(rejected, "a referee fine above sixty points is rejected");
+
+            report.Equal(0, Penalties.LateArrivalPoints(TimeSpan.Zero), "arriving on time is free");
+            report.Equal(10, Penalties.LateArrivalPoints(TimeSpan.FromMinutes(7)), "up to ten minutes late costs ten points");
+            report.Equal(20, Penalties.LateArrivalPoints(TimeSpan.FromMinutes(13)), "up to fifteen minutes late costs twenty points");
+            report.Check(!Penalties.MissesSession(TimeSpan.FromMinutes(15)), "fifteen minutes late still plays the session");
+            report.Check(Penalties.MissesSession(TimeSpan.FromMinutes(16)), "past fifteen minutes the session is missed");
+        }
+
+        /// <summary>
+        /// Rule 3.11.6: a player who lost the right to win keeps drawing and discarding,
+        /// but the engine never offers Hu again in that hand.
+        /// </summary>
+        private static void ForbiddenWin(SelfTestReport report)
+        {
+            for (var seed = 0; seed < 3; seed++)
+            {
+                var state = new GameState();
+                var random = new Random(seed * 17 + 3);
+                state.StartHand(seed % 4, 7000 + seed);
+                for (var player = 0; player < 4; player++) state.ForbidWin(player, "self-test");
+
+                var offeredWin = false;
+                var steps = 0;
+                while (state.Phase != GamePhase.HandFinished && steps++ < 3000)
+                {
+                    if (state.Phase is GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)
+                    {
+                        for (var player = 0; player < 4; player++)
+                        {
+                            var options = state.GetLegalActions(player);
+                            if (options.Count == 0) continue;
+                            offeredWin |= options.Any(option => option.Kind == ActionKind.Win);
+                            state.Apply(Choose(options, random, state.Players[player]));
+                            if (state.Phase is not (GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)) break;
+                        }
+                        continue;
+                    }
+
+                    var current = state.GetLegalActions(state.CurrentPlayer);
+                    if (current.Count == 0) break;
+                    offeredWin |= current.Any(action => action.Kind == ActionKind.Win);
+                    state.Apply(Choose(current, random, state.Players[state.CurrentPlayer]));
+                }
+
+                report.Check(!offeredWin, $"seed {seed}: a forbidden player is never offered Hu");
+                report.Check(state.Phase == GamePhase.HandFinished, $"seed {seed}: the hand still finishes");
+                report.Check(state.EndedInDraw, $"seed {seed}: with nobody allowed to win the hand is a draw");
+                report.Check(state.IsWinForbidden(0) && state.WinForbiddenReason(0) != null,
+                    $"seed {seed}: the ban and its reason are kept");
+
+                state.StartHand(0, 7000 + seed);
+                report.Check(!state.IsWinForbidden(0), "a new hand clears the ban");
+            }
+        }
+
+        private static void PenaltySettlement(SelfTestReport report)
+        {
+            var session = new GameSession();
+            session.StartNextHand(seed: 99);
+            session.ReportViolation(2, ViolationKind.EmptyClaim);
+            session.ReportViolation(2, ViolationKind.EmptyClaim);
+            var falseHu = session.ReportViolation(3, ViolationKind.FalseHuClaim);
+
+            report.Check(falseHu.LosesRightToWin, "the false Hu claim takes the right to win");
+            report.Check(session.State!.IsWinForbidden(3), "the engine forbids Hu for that player");
+            report.Equal(3, session.PendingPenalties.Count, "penalties wait for the end of the hand (3.9.1.2)");
+            report.Equal(0, session.Scores.Sum(), "nothing is charged while the hand runs");
+
+            PlayHandToEnd(session.State!, new Random(3));
+            var before = session.Scores.Sum();
+            session.CompleteHand();
+
+            report.Equal(0, session.PendingPenalties.Count, "every penalty is paid once");
+            report.Equal(60, session.AppliedPenalties.Where(penalty => penalty.Kind == ViolationKind.FalseHuClaim)
+                .Sum(penalty => penalty.TotalLoss), "the wrong Hu claim costs sixty points");
+            report.Equal(before - 5, session.Scores.Sum(),
+                "a fine leaves the table while a transfer stays inside it (3.11.2)");
+        }
+
+        private static void SessionClock(SelfTestReport report)
+        {
+            var session = new GameSession();
+            report.Equal(TimeSpan.FromMinutes(150), session.TimeLimit, "a session lasts 150 minutes (3.5.6)");
+            report.Equal(TimeSpan.FromMinutes(15), GameSession.TimeWarning, "the referee warns a quarter of an hour ahead");
+
+            session.StartNextHand(seed: 1);
+            PlayHandToEnd(session.State!, new Random(7));
+            session.CompleteHand(TimeSpan.FromMinutes(100));
+            report.Equal(100.0, session.Elapsed.TotalMinutes, "the hand time goes into the clock");
+            report.Check(!session.IsFinalQuarterHour && !session.IsTimeUp, "a hundred minutes leave time to play");
+
+            session.StartNextHand(seed: 2);
+            PlayHandToEnd(session.State!, new Random(8));
+            session.CompleteHand(TimeSpan.FromMinutes(40));
+            report.Equal(140.0, session.Elapsed.TotalMinutes, "the clock adds up");
+            report.Check(session.IsFinalQuarterHour, "the last quarter of an hour is announced");
+            report.Check(!session.IsTimeUp, "the clock has not run out yet");
+
+            var handsBefore = session.HandsPlayed;
+            var pointsBefore = session.Scores.Sum();
+            session.StartNextHand(seed: 3);
+            var running = session.State!;
+            session.AbandonRunningHand(TimeSpan.FromMinutes(10));
+
+            report.Check(running.Phase != GamePhase.HandFinished, "the hand really was still running");
+            report.Check(session.IsTimeUp, "ten more minutes use up the session");
+            report.Equal(handsBefore, session.HandsPlayed, "an unfinished hand is not counted as played");
+            report.Equal(pointsBefore, session.Scores.Sum(), "an unfinished hand scores nothing (3.5.6)");
+            report.Equal(1, session.AbandonedHands.Count, "the abandoned hand is recorded");
+            report.Check(session.IsFinished && session.EndedByTimeLimit, "the session ends on the clock");
+
+            var started = false;
+            try { session.StartNextHand(seed: 4); }
+            catch (InvalidOperationException) { started = true; }
+            report.Check(started, "no hand may start after the clock ran out");
+        }
+
+        private static void SessionStandings(SelfTestReport report)
+        {
+            var session = new GameSession();
+            session.Apply(new Settlement(0, 0, false,
+                new[] { new Payment(1, 0, 30), new Payment(2, 3, 40), new Payment(3, 2, 30) }, 0, "self-test"));
+
+            report.Equal(30, session.Scores[0], "P0 leads");
+            report.Equal(-30, session.Scores[1], "P1 is last");
+            report.Equal(-10, session.Scores[2], "P2 holds minus ten");
+            report.Equal(10, session.Scores[3], "P3 holds ten");
+
+            var standings = session.Standings();
+            report.Equal(4, standings.Count, "every player gets a row");
+            report.Equal(1, standings[0].Place, "first place");
+            report.Equal(0, standings[0].Player, "the leader is P0 (3.9.2)");
+            report.Equal(4.0, standings[0].TablePoints, "first place is worth four table points");
+            report.Equal(2, standings[1].Place, "second place");
+            report.Equal(3, standings[1].Player, "P3 takes second place");
+            report.Equal(2.0, standings[1].TablePoints, "second place is worth two table points");
+            report.Equal(3, standings[2].Place, "third place");
+            report.Equal(2, standings[2].Player, "P2 takes third place");
+            report.Equal(1.0, standings[2].TablePoints, "third place is worth one table point");
+            report.Equal(4, standings[3].Place, "last place");
+            report.Equal(1, standings[3].Player, "P1 takes the last place");
+            report.Equal(0.0, standings[3].TablePoints, "last place is worth nothing");
+            report.Check(session.PlaceOf(0) == 1 && session.PlaceOf(1) == 4, "PlaceOf answers for both ends of the table");
+            report.Check(Math.Abs(session.TablePoints().Sum() - 7) < 1e-9, "table points total seven");
+
+            var tied = new GameSession();
+            tied.Apply(new Settlement(0, 0, false,
+                new[] { new Payment(1, 0, 30), new Payment(2, 0, 30), new Payment(3, 0, 30) }, 0, "self-test"));
+            var tiedStandings = tied.Standings();
+            report.Equal(1, tiedStandings[0].Place, "the leader keeps first place alone");
+            report.Check(tiedStandings.Skip(1).All(row => row.Place == 2 && row.Tied),
+                "three tied players share second place");
+            report.Check(tiedStandings.Skip(1).All(row => Math.Abs(row.TablePoints - 1.0) < 1e-9),
+                "places two to four are split three ways");
+            report.Check(Math.Abs(tied.TablePoints().Sum() - 7) < 1e-9, "a split still totals seven table points");
+
+            var late = new GameSession();
+            report.Equal(0, late.ReportLateArrival(2, TimeSpan.FromMinutes(18)),
+                "a player eighteen minutes late scores nothing (3.11.2)");
+            report.Check(late.IsForfeited(2), "that player misses the session");
+            report.Check(late.Standings().Single(row => row.Player == 2).Forfeited, "the table marks the forfeit");
+            report.Equal(10, late.ReportLateArrival(1, TimeSpan.FromMinutes(8)), "eight minutes late costs ten points");
+            report.Equal(-10, late.Scores[1], "the lateness fine leaves the table");
+            report.Check(late.Scores.Sum() == -10, "no opponent receives a lateness fine");
         }
 
         private static void PlayHandToEnd(GameState state, Random random)

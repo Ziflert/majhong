@@ -25,7 +25,12 @@ namespace Mahjong.Rules
         int HandPoints,
         IReadOnlyList<ScoredFan> Fans,
         HandAnalysis Analysis,
-        string? Error = null);
+        string? Error = null)
+    {
+        /// <summary>A hand that may not win at all, e.g. after a violation of rule 3.11.6.</summary>
+        public static ScoreResult Forbidden(string reason) =>
+            new(false, 0, 0, Array.Empty<ScoredFan>(), HandAnalysis.Fail(reason), reason);
+    }
 
     internal sealed class ShapeGroup
     {
