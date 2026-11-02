@@ -8,8 +8,11 @@
 | `docs/rules-status.md` | Что реализовано, какие упрощения и что осталось по правилам |
 | `Assets/Scripts/Mahjong/Rules/` | Ядро правил: кости, рука, стена, кубики, разбор руки, подсчёт, состояние руки |
 | `Assets/Scripts/Mahjong/Diagnostics/` | `RulesSelfTest` — проверки ядра, общие для Unity и headless |
+| `Assets/Scripts/Mahjong/Bots/` | `HeuristicBot` — бот уровня 1, `BotTable` — прогон сессии между ботами |
+| `Assets/Scripts/MahjongView/` | Unity-слой: 3D-тайлы из примитивов, сборка стола, ввод мышью |
 | `Tests/Editor/` | Обёртка Unity Test Framework над `RulesSelfTest` |
 | `Tools/RulesCheck/` | Консольный прогон проверок без Unity (`dotnet run`) |
+| `docs/unity-layer.md` | Как запустить 3D-прототип и что он умеет |
 
 ## Ключевые файлы ядра
 | Файл | Назначение |
@@ -44,14 +47,15 @@ dotnet run --project Tools/RulesCheck
 # сборка проверок
 dotnet build Tools/RulesCheck/RulesCheck.csproj
 ```
-Unity: открыть проект, Test Runner → EditMode.
+Unity: открыть проект, Test Runner → EditMode; для игры — Play (см. `docs/unity-layer.md`).
 
 ## Архитектура
 ```text
-Mahjong.Rules          чистая логика, без UnityEngine
-Mahjong.Rules.Diagnostics  самопроверки, без UnityEngine
-Tools/RulesCheck       консольный раннер тех же проверок
-Unity-слой (план)      MahjongTableView, TileView, GameController
+Assets/Scripts/Mahjong/Rules         чистая логика, без UnityEngine
+Assets/Scripts/Mahjong/Bots          боты поверх LegalAction
+Assets/Scripts/Mahjong/Diagnostics   самопроверки, без UnityEngine
+Assets/Scripts/MahjongView           MonoBehaviour: TileObject, TileLabel, MahjongGame
+Tools/RulesCheck                     консольный раннер тех же проверок
 ```
 
 Правило: Unity-слой только отображает состояние и передаёт действия. Вся логика руки живёт в `Mahjong.Rules`.

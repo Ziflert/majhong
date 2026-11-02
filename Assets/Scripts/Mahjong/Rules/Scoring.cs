@@ -77,7 +77,7 @@ namespace Mahjong.Rules
 
         private static IEnumerable<Shape> BuildShapes(ScoringContext context, HandAnalysis analysis)
         {
-            if (analysis.Pattern != WinningPattern.Standard)
+            if (analysis.Pattern.HasValue && analysis.Pattern.Value != WinningPattern.Standard)
                 yield return new Shape { Pattern = analysis.Pattern.Value };
 
             foreach (var decomposition in analysis.Decompositions)

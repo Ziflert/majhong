@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Mahjong.Bots;
 
 namespace Mahjong.Rules.Diagnostics
 {
@@ -63,6 +64,7 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "score: knitted straight hand", () => ScoreKnittedStraight(report));
             Run(report, "settlement: self-draw and discard payments", () => SettlementPayments(report));
             Run(report, "session: sixteen hands, dealer rotation and table points", () => SessionFlow(report));
+            Run(report, "bots: heuristic play finishes sessions and wins hands", () => BotSession(report));
             Run(report, "state: every mechanic is reachable in random play", () => RandomPlayInvariants(report));
 
             return report;
@@ -440,6 +442,34 @@ namespace Mahjong.Rules.Diagnostics
                 if (current.Count == 0) break;
                 state.Apply(Choose(current, random, state.Players[state.CurrentPlayer]));
             }
+        }
+
+        private static void BotSession(SelfTestReport report)
+        {
+            var wins = 0;
+            var draws = 0;
+            var sessions = 0;
+
+            for (var seed = 0; seed < 3; seed++)
+            {
+                var bots = new IMahjongBot[]
+                {
+                    new HeuristicBot(seed * 10 + 1),
+                    new HeuristicBot(seed * 10 + 2),
+                    new HeuristicBot(seed * 10 + 3),
+                    new HeuristicBot(seed * 10 + 4)
+                };
+                var session = BotTable.PlaySession(seed, bots);
+                sessions++;
+                report.Equal(16, session.HandsPlayed, "a bot session plays sixteen hands");
+                report.Equal(0, session.Scores.Sum(), "bot payments are zero-sum");
+                wins += session.History.Count(s => s.WinnerPlayer >= 0);
+                draws += session.History.Count(s => s.WinnerPlayer < 0);
+            }
+
+            report.Check(sessions == 3, "three sessions were played");
+            report.Check(wins > draws, $"heuristic bots should win more often than they draw (wins {wins}, draws {draws})");
+            report.Check(wins > 10, $"bots should complete hands regularly, got {wins} wins");
         }
 
         private static void AssertConservation(SelfTestReport report, GameState state, string label)
