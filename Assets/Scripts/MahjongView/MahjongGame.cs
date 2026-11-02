@@ -31,6 +31,37 @@ namespace Mahjong.Unity
         /// <summary>The choices currently offered to the human; closed when it is not his decision.</summary>
         public ActionPrompt Prompt { get; private set; } = ActionPrompt.Closed;
 
+        /// <summary>The hand clock of rules 3.5.7.6, 3.6.4 and 3.6.7. Exposed for tests and tools.</summary>
+        public PlayClock HandClock => clock;
+
+        /// <summary>How many tiles lie in the discard piles; a timed-out turn adds one.</summary>
+        public int DiscardTileCount => discardTiles.Count;
+
+        /// <summary>Phase of the hand that is being played. Exposed for tests and tools.</summary>
+        public GamePhase Phase => session?.State?.Phase ?? GamePhase.NotStarted;
+
+        /// <summary>Seat that has to act, or the discarder while a claim window is open.</summary>
+        public int CurrentSeat => session?.State?.CurrentPlayer ?? -1;
+
+        /// <summary>
+        /// Concealed tiles of the three opponents: exactly the tiles the view has to draw face down.
+        /// Exposed so a test can compare the engine with the table instead of hard-coding 13.
+        /// </summary>
+        public int OpponentConcealedTileCount
+        {
+            get
+            {
+                if (session?.State == null) return 0;
+                var total = 0;
+                for (var player = 0; player < 4; player++)
+                {
+                    if (player == humanSeat) continue;
+                    total += session.State.Players[player].Concealed.Count;
+                }
+                return total;
+            }
+        }
+
         /// <summary>Tiles rest on the table top, which sits at y = -0.005.</summary>
         private const float TileY = 0.01f;
 
@@ -45,9 +76,20 @@ namespace Mahjong.Unity
         private ActionBar bar = null!;
         private Transform table = null!;
         private Transform board = null!;
+        private readonly PlayClock clock = new();
+
         private float nextBotAction;
         private float nextHandAt;
         private bool waitingForNextHand;
+
+        /// <summary>Bumped on every engine action; a new value means a new decision and a new clock window.</summary>
+        private long stateVersion;
+
+        private string clockKey = string.Empty;
+        private bool humanDiscardedThisHand;
+
+        private long claimCheckVersion = -1;
+        private bool humanHasRealClaim;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -141,6 +183,11 @@ namespace Mahjong.Unity
         private void StartHand(int seed)
         {
             waitingForNextHand = false;
+            humanDiscardedThisHand = false;
+            stateVersion++;
+            claimCheckVersion = -1;
+            clock.Stop();
+            clockKey = string.Empty;
             ClosePrompt();
             session.StartNextHand(seed);
             ClearViews();
@@ -158,6 +205,7 @@ namespace Mahjong.Unity
             if (session.IsTimeUp && session.State.Phase != GamePhase.HandFinished && !session.EndedByTimeLimit)
             {
                 ClosePrompt();
+                StopClock();
                 session.AbandonRunningHand();
                 waitingForNextHand = false;
                 status.text = "Time is up: the hand in progress scores nothing\n" + session.Describe();
@@ -174,6 +222,7 @@ namespace Mahjong.Unity
                     waitingForNextHand = true;
                     nextHandAt = Time.time + 3f;
                     ClosePrompt();
+                    StopClock();
                     session.CompleteHand();
                     status.text = DescribeResult();
                 }
@@ -184,6 +233,12 @@ namespace Mahjong.Unity
                 }
                 return;
             }
+
+            // Rules 3.5.7.6, 3.6.4 and 3.6.7: the human is on a clock for every decision.
+            SyncClock();
+            TickClock(System.TimeSpan.FromSeconds(Time.deltaTime));
+            if (session.State.Phase == GamePhase.HandFinished) return;
+            RefreshStatus();
 
             switch (session.State.Phase)
             {
@@ -331,7 +386,98 @@ namespace Mahjong.Unity
         {
             ClosePrompt();
             session.State!.Apply(action);
+            if (action.Kind == ActionKind.Discard) humanDiscardedThisHand = true;
             AfterAction();
+        }
+
+        // ----------------------------------------------------------------- clock
+
+        /// <summary>
+        /// Keeps the hand clock in step with the table: a new decision opens a window, no decision
+        /// closes it. The key changes only when the engine state changes, so the countdown is not
+        /// restarted by calling this every frame.
+        /// </summary>
+        private void SyncClock()
+        {
+            var state = session.State!;
+            var key = DecisionKey(state);
+            if (key == clockKey) return;
+            clockKey = key;
+
+            if (key.Length == 0)
+            {
+                clock.Stop();
+                return;
+            }
+
+            if (state.Phase is GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)
+                clock.Restart(ClockWindow.Claim);
+            else
+                // Rule 3.5.7.6 gives twenty seconds to arrange the tiles; the human gets them for his
+                // first discard of the hand, so a fresh hand is not rushed.
+                clock.Restart(humanDiscardedThisHand ? ClockWindow.Discard : ClockWindow.Arrange);
+        }
+
+        /// <summary>Names the current decision; empty when the human is not to act.</summary>
+        private string DecisionKey(GameState state)
+        {
+            if (state.Phase is GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)
+                return HumanHasRealClaim(state) ? $"claim:{stateVersion}" : string.Empty;
+
+            if (state.Phase == GamePhase.AwaitingDiscard && state.CurrentPlayer == humanSeat)
+                return $"turn:{stateVersion}";
+
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// True when the human has something to decide in the open claim window. A window where he can
+        /// only pass is not a decision — the engine closes it by itself — so it must not put him on the
+        /// clock either. Evaluated once per engine action, because the win check scores the whole hand.
+        /// </summary>
+        private bool HumanHasRealClaim(GameState state)
+        {
+            if (claimCheckVersion == stateVersion) return humanHasRealClaim;
+
+            claimCheckVersion = stateVersion;
+            humanHasRealClaim = state.GetLegalActions(humanSeat).Any(action =>
+                action.Kind is not (ActionKind.Pass or ActionKind.Draw or ActionKind.Discard));
+            return humanHasRealClaim;
+        }
+
+        private void TickClock(System.TimeSpan delta) => AdvanceClock(delta.TotalSeconds);
+
+        /// <summary>
+        /// Ticks the hand clock and plays the forced move when a window runs out: a claim becomes a
+        /// pass and a turn becomes a discard (see <see cref="ClockExpiry"/>). Public so a test or a
+        /// capture run can jump over the wait instead of sleeping for ten seconds.
+        /// </summary>
+        public void AdvanceClock(double seconds)
+        {
+            if (session.State == null || !clock.IsRunning) return;
+            if (!clock.Tick(System.TimeSpan.FromSeconds(seconds))) return;
+
+            var window = clock.Window;
+            StopClock();
+
+            var state = session.State!;
+            var options = state.GetLegalActions(humanSeat);
+            var forced = ClockExpiry.Choose(state, humanSeat, options,
+                window == ClockWindow.Claim ? null : bots[humanSeat]);
+            if (forced == null)
+            {
+                Debug.LogWarning($"[clock] the {window} window ran out with nothing to play.");
+                return;
+            }
+
+            Debug.Log($"[clock] the {window} window ran out, playing {forced}");
+            Play(forced);
+        }
+
+        private void StopClock()
+        {
+            clock.Stop();
+            clockKey = string.Empty;
         }
 
         /// <summary>Reads a number key or a click on the bar; false when the bar was not used.</summary>
@@ -356,6 +502,7 @@ namespace Mahjong.Unity
 
         private void AfterAction()
         {
+            stateVersion++;
             if (session.State!.Phase == GamePhase.HandFinished)
             {
                 waitingForNextHand = false;
@@ -438,6 +585,16 @@ namespace Mahjong.Unity
             status.text = DescribeState();
         }
 
+        /// <summary>
+        /// Rebuilds the HUD only when its text changes: the countdown makes it change once a second,
+        /// which is cheap, but rebuilding every frame would allocate a string per frame for nothing.
+        /// </summary>
+        private void RefreshStatus()
+        {
+            var text = DescribeState();
+            if (text != status.text) status.text = text;
+        }
+
         /// <summary>Discard blocks sit in the four quadrants of the table centre, one per player.</summary>
         private (Vector3 Origin, Vector3 Direction, Vector3 RowStep) DiscardOrigin(int player)
         {
@@ -495,6 +652,9 @@ namespace Mahjong.Unity
                 + (session.IsTimeUp ? "  time is up" : session.IsFinalQuarterHour ? "  last quarter of an hour" : string.Empty)
             };
 
+            if (clock.IsRunning)
+                lines.Add($"{ClockLabel(clock.Window)}: {clock.SecondsLeft} s");
+
             if (state.IsWinForbidden(humanSeat))
                 lines.Add($"Hu is forbidden this hand: {state.WinForbiddenReason(humanSeat)}");
 
@@ -502,6 +662,14 @@ namespace Mahjong.Unity
         }
 
         private static string Clock(System.TimeSpan span) => $"{(int)span.TotalMinutes}:{span.Seconds:00}";
+
+        private static string ClockLabel(ClockWindow window) => window switch
+        {
+            ClockWindow.Arrange => "Arrange your tiles",
+            ClockWindow.Discard => "Time to discard",
+            ClockWindow.Claim => "Time to claim",
+            _ => "Time"
+        };
 
         private string DescribeResult()
         {

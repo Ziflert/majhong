@@ -72,6 +72,8 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "session: standings rank by game points and split ties", () => SessionStandings(report));
             Run(report, "bots: heuristic play finishes sessions and wins hands", () => BotSession(report));
             Run(report, "controls: the action bar offers every human decision", () => ActionBarCoverage(report));
+            Run(report, "clock: three, ten and twenty-second windows", () => HandClockRules(report));
+            Run(report, "clock: silence becomes a pass or a discard, never a Hu", () => ClockExpiryRules(report));
             Run(report, "claims: priority of Hu, kong, pung, chow and seat order", () => ClaimPriorityRules(report));
             Run(report, "state: every mechanic is reachable in random play", () => RandomPlayInvariants(report));
 
@@ -807,6 +809,151 @@ namespace Mahjong.Rules.Diagnostics
             report.Check(winsFromDiscard > 0 || lastTileWins > 0, "random play must produce discard wins or last-tile wins");
             _ = robberies;
         }
+        /// <summary>
+        /// Rules 3.5.7.6, 3.6.4 and 3.6.7: twenty seconds to arrange the tiles, ten to discard and three
+        /// to claim. Checked on the clock itself, with no waiting: the view feeds it frame deltas.
+        /// </summary>
+        private static void HandClockRules(SelfTestReport report)
+        {
+            report.Equal(TimeSpan.FromSeconds(3), PlayClock.ClaimLimit, "a claim has three seconds (3.6.7)");
+            report.Equal(TimeSpan.FromSeconds(10), PlayClock.DiscardLimit, "a discard has ten seconds (3.6.4)");
+            report.Equal(TimeSpan.FromSeconds(20), PlayClock.ArrangeLimit, "arranging the tiles has twenty seconds (3.5.7.6)");
+            report.Equal(PlayClock.ClaimLimit, PlayClock.LimitOf(ClockWindow.Claim), "a claim window carries its own limit");
+            report.Equal(PlayClock.DiscardLimit, PlayClock.LimitOf(ClockWindow.Discard), "a discard window carries its own limit");
+            report.Equal(PlayClock.ArrangeLimit, PlayClock.LimitOf(ClockWindow.Arrange), "an arrange window carries its own limit");
+            report.Equal(TimeSpan.Zero, PlayClock.LimitOf(ClockWindow.Idle), "an idle window has no limit");
+
+            var clock = new PlayClock();
+            report.Check(!clock.IsRunning && !clock.IsExpired, "a fresh clock is idle and not expired");
+            report.Equal(0, clock.SecondsLeft, "an idle clock shows no seconds");
+            report.Equal(0d, clock.Fraction, "an idle clock has no progress to show");
+
+            clock.Restart(ClockWindow.Claim);
+            report.Equal(ClockWindow.Claim, clock.Window, "the claim window is open");
+            report.Equal(TimeSpan.FromSeconds(3), clock.Limit, "the claim window takes the limit of 3.6.7");
+            report.Equal(3, clock.SecondsLeft, "three seconds are left at the start");
+
+            report.Check(!clock.Tick(TimeSpan.FromMilliseconds(2500)), "two and a half seconds do not expire a claim");
+            report.Equal(1, clock.SecondsLeft, "half a second left is shown as one second");
+            report.Check(Math.Abs(clock.Fraction - 2.5 / 3.0) < 1e-9, "the used fraction of the window is two thirds");
+            report.Check(clock.Tick(TimeSpan.FromMilliseconds(500)), "the claim expires exactly at three seconds");
+            report.Check(clock.IsExpired, "an expired window stays expired");
+            report.Equal(TimeSpan.Zero, clock.Remaining, "nothing is left of an expired window");
+            report.Equal(0, clock.SecondsLeft, "an expired window shows no seconds");
+            report.Equal(1d, clock.Fraction, "an expired window is fully used");
+            report.Check(!clock.Tick(TimeSpan.FromSeconds(5)), "expiry is reported once, not on every following tick");
+
+            clock.Restart(ClockWindow.Discard);
+            report.Check(!clock.IsExpired, "restarting clears the expiry");
+            report.Equal(10, clock.SecondsLeft, "a discard has ten seconds");
+            report.Check(!clock.Tick(TimeSpan.FromSeconds(9.5)), "nine and a half seconds do not expire a discard");
+            report.Check(clock.Tick(TimeSpan.FromSeconds(0.5)), "ten seconds end the discard window");
+
+            clock.Restart(ClockWindow.Discard, TimeSpan.FromSeconds(1));
+            report.Equal(1, clock.SecondsLeft, "a window can be shortened for demos and tests");
+            report.Check(!clock.Tick(TimeSpan.Zero), "a zero tick does nothing");
+            report.Check(!clock.Tick(TimeSpan.FromSeconds(-4)), "a negative tick is ignored");
+            report.Equal(1, clock.SecondsLeft, "the clock never runs backwards");
+
+            clock.Restart(ClockWindow.Arrange);
+            report.Equal(20, clock.SecondsLeft, "arranging the hand gets twenty seconds");
+            clock.Tick(TimeSpan.FromSeconds(5));
+            clock.Restart(ClockWindow.Claim);
+            report.Equal(3, clock.SecondsLeft, "a new window does not inherit the time of the old one");
+
+            clock.Stop();
+            report.Check(!clock.IsRunning && !clock.IsExpired, "a stopped clock is neither running nor expired");
+            report.Equal(TimeSpan.Zero, clock.Limit, "a stopped clock carries no limit");
+            report.Equal(0, clock.SecondsLeft, "a stopped clock shows no seconds");
+            report.Check(!clock.Tick(TimeSpan.FromSeconds(1)), "ticking a stopped clock does nothing");
+
+            var idleThrew = false;
+            try { clock.Restart(ClockWindow.Idle); }
+            catch (ArgumentOutOfRangeException) { idleThrew = true; }
+            report.Check(idleThrew, "an idle window cannot be restarted with a limit");
+        }
+
+        /// <summary>
+        /// What an expired window does to the table: a claim that nobody spoke is a pass, a turn that
+        /// ran out is played for the player, and the clock never claims Hu for a silent player.
+        /// </summary>
+        private static void ClockExpiryRules(SelfTestReport report)
+        {
+            var bot = new HeuristicBot(17);
+            var random = new Random(4242);
+            var claimWindows = 0;
+            var forcedDiscards = 0;
+            var passOnlyWindows = 0;
+
+            for (var handIndex = 0; handIndex < 30; handIndex++)
+            {
+                var state = new GameState();
+                state.StartHand(dealer: handIndex % 4, seed: random.Next());
+
+                var guard = 0;
+                while (state.Phase != GamePhase.HandFinished && guard++ < 3000)
+                {
+                    if (state.Phase is GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)
+                    {
+                        claimWindows++;
+                        var answered = false;
+                        for (var player = 0; player < 4; player++)
+                        {
+                            if (state.Phase is not (GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)) break;
+
+                            var options = state.GetLegalActions(player);
+                            if (options.Count == 0) continue;
+
+                            var forced = ClockExpiry.Choose(state, player, options, bot);
+                            report.Equal(ActionKind.Pass, forced?.Kind ?? ActionKind.Draw,
+                                "silence in a claim window is a pass, whatever the player could have claimed");
+                            passOnlyWindows += options.Count == 1 ? 1 : 0;
+
+                            if (!answered && random.Next(4) == 0) { state.Apply(forced!); answered = true; }
+                        }
+
+                        // everybody stays silent: the window has to close by itself
+                        for (var player = 0; player < 4; player++)
+                        {
+                            if (state.Phase is not (GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)) break;
+                            var pass = state.GetLegalActions(player).FirstOrDefault(option => option.Kind == ActionKind.Pass);
+                            if (pass == null) continue;
+                            state.Apply(pass);
+                        }
+                        continue;
+                    }
+
+                    var current = state.CurrentPlayer;
+                    var legal = state.GetLegalActions(current);
+                    if (legal.Count == 0) break;
+
+                    var draw = legal.FirstOrDefault(option => option.Kind == ActionKind.Draw);
+                    if (draw != null) { state.Apply(draw); continue; }
+
+                    var turn = ClockExpiry.Choose(state, current, legal, bot);
+                    report.Check(turn is { Kind: ActionKind.Discard },
+                        "a turn that has finished drawing always has a discard the clock may play");
+                    report.Check(turn!.Kind != ActionKind.Win, "the clock never declares Hu for a silent player");
+                    forcedDiscards++;
+
+                    state.Apply(bot.Choose(state, current, legal));
+                }
+            }
+
+            report.Check(claimWindows > 0, "random play reaches claim windows");
+            report.Check(forcedDiscards > 0, "the clock plays the discard of a silent turn");
+            report.Check(passOnlyWindows > 0, "some claim windows offer nothing but a pass");
+
+            // A window with nothing to play: the clock returns null instead of inventing an action.
+            var idleState = new GameState();
+            idleState.StartHand(dealer: 0, seed: 7);
+            report.Equal(null, ClockExpiry.Choose(idleState, 0, Array.Empty<LegalAction>()),
+                "an empty action list gives the clock nothing to play");
+            idleState.Apply(idleState.GetLegalActions(0).First(option => option.Kind == ActionKind.Discard));
+            report.Equal(null, ClockExpiry.Choose(idleState, 0, idleState.GetLegalActions(0)),
+                "a turn that already discarded has nothing left for the clock");
+        }
+
         /// <summary>
         /// Plays hundreds of hands and checks that the action bar never hides a legal decision:
         /// every choice the engine offers ends up as a numbered button.

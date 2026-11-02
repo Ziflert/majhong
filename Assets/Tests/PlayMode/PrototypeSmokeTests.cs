@@ -38,7 +38,12 @@ namespace Mahjong.PlayTests
             var faceUp = tiles.Where(tile => tile.IsFaceUp).ToList();
             var faceDown = tiles.Where(tile => !tile.IsFaceUp).ToList();
             Assert.GreaterOrEqual(faceUp.Count, 13, "The human hand is not laid out.");
-            Assert.GreaterOrEqual(faceDown.Count, 39, "Opponent tiles are not drawn face down.");
+            // Three opponents hold thirteen tiles each minus three per opened meld, so the count comes
+            // from the engine instead of a hard-coded 39: a bot that claimed a discard holds fewer.
+            Assert.AreEqual(game.OpponentConcealedTileCount, faceDown.Count,
+                "The opponents' concealed tiles are not drawn face down.");
+            Assert.IsTrue(faceDown.All(tile => string.IsNullOrEmpty(LabelOf(tile))),
+                "A face-down tile shows its face label.");
 
             var label = faceUp[0].GetComponentInChildren<TextMesh>();
             Assert.IsNotNull(label, "A face-up tile has no TextMesh label.");
@@ -108,6 +113,12 @@ namespace Mahjong.PlayTests
                 "After two simulated seconds the table is still not in a turn: the game loop is stuck.");
             Debug.Log($"[smoke] reached a turn, wall at start {wallAtStart}, wall now {ParseWall(status.text)}"
                       + "\n" + status.text);
+        }
+
+        private static string LabelOf(TileObject tile)
+        {
+            var label = tile.GetComponentInChildren<TextMesh>();
+            return label == null ? string.Empty : label.text;
         }
 
         private static int ParseWall(string statusText)
