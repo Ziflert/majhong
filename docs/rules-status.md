@@ -70,4 +70,4 @@
 dotnet run --project Tools/RulesCheck
 ```
 
-Проверки общие с Unity: `Tests/Editor/MahjongRulesTests.cs` вызывает тот же `RulesSelfTest`.
+Проверки общие с Unity: `Assets/Tests/Editor/MahjongRulesTests.cs` вызывает тот же `RulesSelfTest`.

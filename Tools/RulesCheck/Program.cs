@@ -5,7 +5,7 @@ namespace Mahjong.RulesCheck
 {
     /// <summary>
     /// Headless runner for the shared rules self-test. The same checks run inside Unity
-    /// through Tests/Editor/MahjongRulesTests.cs.
+    /// through Assets/Tests/Editor/MahjongRulesTests.cs.
     ///
     ///   dotnet run --project Tools/RulesCheck
     /// </summary>

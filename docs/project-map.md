@@ -11,7 +11,7 @@
 | `Assets/Scripts/Mahjong/Diagnostics/` | `RulesSelfTest` — проверки ядра, общие для Unity и headless |
 | `Assets/Scripts/Mahjong/Bots/` | `HeuristicBot` — бот уровня 1, `BotTable` — прогон сессии между ботами |
 | `Assets/Scripts/MahjongView/` | Unity-слой: 3D-тайлы из примитивов, сборка стола, ввод мышью |
-| `Tests/Editor/` | Обёртка Unity Test Framework над `RulesSelfTest` |
+| `Assets/Tests/Editor/` | Обёртка Unity Test Framework над `RulesSelfTest` |
 | `Tools/RulesCheck/` | Консольный прогон проверок без Unity (`dotnet run`) |
 | `docs/unity-layer.md` | Как запустить 3D-прототип и что он умеет |
 
@@ -50,13 +50,33 @@ dotnet build Tools/RulesCheck/RulesCheck.csproj
 ```
 Unity: открыть проект, Test Runner → EditMode; для игры — Play (см. `docs/unity-layer.md`).
 
+## Установленный движок
+| Что | Где |
+|---|---|
+| Unity Hub 3.22.5 | `D:\Software\Unity\Hub\Unity Hub.exe` |
+| Редактор Unity 6.0 LTS 6000.0.85f1 | `D:\Software\Unity\6000.0.85f1\Editor\Unity.exe` |
+| Кэш/скачанные установщики (можно удалять) | `D:\Temprary\unity-download` |
+
+```bash
+# открыть проект в редакторе
+"D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game"
+
+# прогон EditMode-тестов без GUI
+"D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -batchmode -nographics -projectPath "D:\Temprary\game" \
+  -runTests -testPlatform EditMode -testResults "D:\Temprary\unity-download\editmode.xml" -logFile -
+```
+
 ## Архитектура
 ```text
-Assets/Scripts/Mahjong/Rules         чистая логика, без UnityEngine
+Assets/Scripts/Mahjong/Rules         чистая логика, без UnityEngine (asmdef `Mahjong`)
 Assets/Scripts/Mahjong/Bots          боты поверх LegalAction
 Assets/Scripts/Mahjong/Diagnostics   самопроверки, без UnityEngine
-Assets/Scripts/MahjongView           MonoBehaviour: TileObject, TileLabel, MahjongGame
+Assets/Scripts/MahjongView           MonoBehaviour: TileObject, TileLabel, MahjongGame (asmdef `Mahjong.View`)
+Assets/Tests/Editor                  NUnit-обёртка над RulesSelfTest (asmdef `Mahjong.Tests`)
 Tools/RulesCheck                     консольный раннер тех же проверок
 ```
+
+Ассамблеи разделены через `.asmdef`: правка `MahjongView` не перекомпилирует ядро правил, а ядро
+физически не может сослаться на UnityEngine (`noEngineReferences`).
 
 Правило: Unity-слой только отображает состояние и передаёт действия. Вся логика руки живёт в `Mahjong.Rules`.

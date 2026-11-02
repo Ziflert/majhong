@@ -1,0 +1,16 @@
+{
+    "name": "Mahjong.View",
+    "rootNamespace": "Mahjong.Unity",
+    "references": [
+        "Mahjong"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

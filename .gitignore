@@ -13,3 +13,15 @@ bin/
 *.pidb
 *.booproj
 .DS_Store
+
+# Unity generated
+.vs/
+.idea/
+MemoryCaptures/
+Recordings/
+*.unityproj
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+crashlytics-build.properties
+sysinfo.txt
