@@ -33,7 +33,7 @@ namespace Mahjong.Rules
         public static readonly Fan AllTerminalsAndHonors = new("all-terminals-and-honors", "Все терминальные и благородные", "All Terminals and Honors", 32);
 
         public static readonly Fan SevenPairs = new("seven-pairs", "Семь пар", "Seven Pairs", 24);
-        public static readonly Fan GreaterHonorsKnitted = new("greater-honors-knitted", "Большие благородные и переплетённые", "Greater Honors and Knitted Tiles", 24);
+        public static readonly Fan GreaterHonorsKnitted = new("greater-honors-knitted", "Большие благородные и переплетённые кости", "Greater Honors and Knitted Tiles", 24);
         public static readonly Fan AllEvenPungs = new("all-even-pungs", "Все чётные панги", "All Even Pungs", 24);
         public static readonly Fan FullFlush = new("full-flush", "Полное изобилие", "Full Flush", 24);
         public static readonly Fan PureTripleChow = new("pure-triple-chow", "Чистое тройное чоу", "Pure Triple Chow", 24);
@@ -49,7 +49,7 @@ namespace Mahjong.Rules
         public static readonly Fan TriplePung = new("triple-pung", "Тройной панг", "Triple Pung", 16);
         public static readonly Fan ThreeConcealedPungs = new("three-concealed-pungs", "Три закрытых панга", "Three Concealed Pungs", 16);
 
-        public static readonly Fan LesserHonorsKnitted = new("lesser-honors-knitted", "Малые благородные и переплетённые", "Lesser Honors and Knitted Tiles", 12);
+        public static readonly Fan LesserHonorsKnitted = new("lesser-honors-knitted", "Малые благородные и переплетённые кости", "Lesser Honors and Knitted Tiles", 12);
         public static readonly Fan KnittedStraight = new("knitted-straight", "Переплетённый ряд", "Knitted Straight", 12);
         public static readonly Fan UpperFour = new("upper-four", "Четыре верхних", "Upper Four", 12);
         public static readonly Fan LowerFour = new("lower-four", "Четыре нижних", "Lower Four", 12);

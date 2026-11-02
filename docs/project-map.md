@@ -13,7 +13,7 @@
 | `Assets/Scripts/Mahjong/Controls/` | `ActionPrompt` — что человеку предлагают в панели действий и в каком порядке |
 | `Assets/Scripts/Mahjong/Compat/` | Полифилл `IsExternalInit` — без него `record`/`init` не собираются в Unity |
 | `Assets/Scripts/MahjongView/` | Unity-слой: 3D-тайлы, панель действий, сборка стола, ввод мышью |
-| `Assets/Tests/Editor/` | Обёртка над `RulesSelfTest` + `ActionPromptTests` (панель без Play mode) |
+| `Assets/Tests/Editor/` | Обёртка над `RulesSelfTest`, `ActionPromptTests`, `FansTableTests` (таблица фан из `rule.pdf`) |
 | `Assets/Tests/PlayMode/` | PlayMode-проверки сцены: тайлы, шрифты, порядок руки, панель и попадание лучом |
 | `Assets/Editor/PrototypeCapture.cs` | Прогон прототипа из CLI: Play, скриншоты Game view, коды выхода |
 | `Assets/Editor/ActionBarPreview.cs` | Скриншот панели действий на заданном наборе кнопок |
@@ -83,7 +83,7 @@ $env:MAHJONG_SHOT_DIR="D:\Temprary\shots"
   -executeMethod Mahjong.EditorTools.ActionBarPreview.CaptureAndExit
 ```
 
-Проверено на 2026-11-02: `RulesCheck` — 26 групп, 68 188 проверок; EditMode 10/10; PlayMode 5/5.
+Проверено на 2026-11-02: `RulesCheck` — 26 групп, 68 188 проверок; EditMode 13/13; PlayMode 5/5.
 
 ## Архитектура
 ```text
