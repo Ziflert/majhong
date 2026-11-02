@@ -10,8 +10,11 @@
 | `Assets/Scripts/Mahjong/Rules/` | Ядро правил: кости, рука, стена, кубики, разбор руки, подсчёт, состояние руки |
 | `Assets/Scripts/Mahjong/Diagnostics/` | `RulesSelfTest` — проверки ядра, общие для Unity и headless |
 | `Assets/Scripts/Mahjong/Bots/` | `HeuristicBot` — бот уровня 1, `BotTable` — прогон сессии между ботами |
+| `Assets/Scripts/Mahjong/Compat/` | Полифилл `IsExternalInit` — без него `record`/`init` не собираются в Unity |
 | `Assets/Scripts/MahjongView/` | Unity-слой: 3D-тайлы из примитивов, сборка стола, ввод мышью |
 | `Assets/Tests/Editor/` | Обёртка Unity Test Framework над `RulesSelfTest` |
+| `Assets/Tests/PlayMode/` | PlayMode-проверки сцены: тайлы, шрифты, порядок руки, ход |
+| `Assets/Editor/PrototypeCapture.cs` | Прогон прототипа из CLI: Play, скриншоты Game view, коды выхода |
 | `Tools/RulesCheck/` | Консольный прогон проверок без Unity (`dotnet run`) |
 | `docs/unity-layer.md` | Как запустить 3D-прототип и что он умеет |
 
@@ -48,22 +51,22 @@ dotnet run --project Tools/RulesCheck
 # сборка проверок
 dotnet build Tools/RulesCheck/RulesCheck.csproj
 ```
-Unity: открыть проект, Test Runner → EditMode; для игры — Play (см. `docs/unity-layer.md`).
 
-## Установленный движок
-| Что | Где |
-|---|---|
-| Unity Hub 3.22.5 | `D:\Software\Unity\Hub\Unity Hub.exe` |
-| Редактор Unity 6.0 LTS 6000.0.85f1 | `D:\Software\Unity\6000.0.85f1\Editor\Unity.exe` |
-| Кэш/скачанные установщики (можно удалять) | `D:\Temprary\unity-download` |
+Unity 6.0 LTS 6000.0.85f1 установлена в `D:\Software\Unity\6000.0.85f1\Editor\Unity.exe`,
+Hub 3.22.5 — в `D:\Software\Unity\Hub`. Версия проекта закреплена в `ProjectSettings/ProjectVersion.txt`.
 
 ```bash
-# открыть проект в редакторе
+# открыть проект
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game"
 
-# прогон EditMode-тестов без GUI
-"D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -batchmode -nographics -projectPath "D:\Temprary\game" \
-  -runTests -testPlatform EditMode -testResults "D:\Temprary\unity-download\editmode.xml" -logFile -
+# тесты в редакторе
+"D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -batchmode -projectPath "D:\Temprary\game" \
+  -runTests -testPlatform EditMode -testResults D:\temp\editmode.xml -logFile -
+
+# прототип с GUI + скриншоты Game view (0 — успех, 2 — сцена не поднялась, 3 — пустой стол)
+$env:MAHJONG_SHOT_DIR="D:\Temprary\shots"
+"D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game" \
+  -executeMethod Mahjong.EditorTools.PrototypeCapture.CaptureAndExit
 ```
 
 ## Архитектура
@@ -73,6 +76,8 @@ Assets/Scripts/Mahjong/Bots          боты поверх LegalAction
 Assets/Scripts/Mahjong/Diagnostics   самопроверки, без UnityEngine
 Assets/Scripts/MahjongView           MonoBehaviour: TileObject, TileLabel, MahjongGame (asmdef `Mahjong.View`)
 Assets/Tests/Editor                  NUnit-обёртка над RulesSelfTest (asmdef `Mahjong.Tests`)
+Assets/Tests/PlayMode                PlayMode-проверки сцены (asmdef `Mahjong.PlayTests`)
+Assets/Editor                        инструменты редактора (`PrototypeCapture`)
 Tools/RulesCheck                     консольный раннер тех же проверок
 ```
 

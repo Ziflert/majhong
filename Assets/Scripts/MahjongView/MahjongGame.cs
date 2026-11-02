@@ -18,6 +18,15 @@ namespace Mahjong.Unity
         [SerializeField] private float botDelay = 0.45f;
         [SerializeField] private int randomSeed = 12345;
 
+        /// <summary>
+        /// The HUD line. Exposed so tests and tools can read the state of the table without a screen;
+        /// the mesh itself is parented to the camera and is not part of the game object hierarchy.
+        /// </summary>
+        public TextMesh Status => status;
+
+        /// <summary>Tiles rest on the table top, which sits at y = -0.005.</summary>
+        private const float TileY = 0.01f;
+
         private readonly Dictionary<int, TileObject> handTiles = new();
         private readonly List<TileObject> discardTiles = new();
         private readonly List<TileObject> meldTiles = new();
@@ -27,6 +36,7 @@ namespace Mahjong.Unity
         private IMahjongBot[] bots = null!;
         private TextMesh status = null!;
         private Transform table = null!;
+        private Transform board = null!;
         private float nextBotAction;
         private float nextHandAt;
         private bool waitingForNextHand;
@@ -34,7 +44,7 @@ namespace Mahjong.Unity
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
-            if (FindObjectOfType<MahjongGame>() != null) return;
+            if (FindAnyObjectByType<MahjongGame>() != null) return;
             var host = new GameObject("Mahjong");
             host.AddComponent<MahjongGame>();
         }
@@ -57,15 +67,19 @@ namespace Mahjong.Unity
 
         private void BuildScene()
         {
-            if (Camera.main == null)
+            // The scene is generated code-first, so the camera is configured even when the open
+            // scene already has one (a fresh untitled scene ships with its own Main Camera).
+            var camera = Camera.main;
+            if (camera == null)
             {
-                var cameraObject = new GameObject("Main Camera") { tag = "MainCamera" };
-                var camera = cameraObject.AddComponent<Camera>();
-                camera.transform.position = new Vector3(0f, 0.75f, -0.95f);
-                camera.transform.rotation = Quaternion.Euler(38f, 0f, 0f);
-                camera.clearFlags = CameraClearFlags.SolidColor;
-                camera.backgroundColor = new Color(0.08f, 0.09f, 0.11f);
+                camera = new GameObject("Main Camera") { tag = "MainCamera" }.AddComponent<Camera>();
             }
+
+            camera.transform.position = new Vector3(0f, 1.15f, -1.45f);
+            camera.transform.rotation = Quaternion.Euler(40f, 0f, 0f);
+            camera.fieldOfView = 34f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.08f, 0.09f, 0.11f);
 
             var lightObject = new GameObject("Sun");
             var sun = lightObject.AddComponent<Light>();
@@ -80,15 +94,23 @@ namespace Mahjong.Unity
             tableObject.GetComponent<Renderer>().material.color = new Color(0.09f, 0.32f, 0.20f);
             table = tableObject.transform;
 
+            // The table cube is scaled non-uniformly; tiles live in an unscaled container so they
+            // keep the size given by TileObject instead of inheriting the table's squash.
+            var boardObject = new GameObject("Board");
+            boardObject.transform.SetParent(transform, false);
+            board = boardObject.transform;
+
             var statusObject = new GameObject("Status");
-            statusObject.transform.SetParent(transform, false);
-            statusObject.transform.position = new Vector3(0f, 0.55f, 0.62f);
-            statusObject.transform.rotation = Quaternion.Euler(35f, 0f, 0f);
+            // HUD text follows the camera: anchored to the table it leaves the frame as soon as the
+            // camera is pitched down onto the board.
+            statusObject.transform.SetParent(camera.transform, false);
+            statusObject.transform.localPosition = new Vector3(0f, 0.13f, 0.5f);
+            statusObject.transform.localRotation = Quaternion.identity;
             status = statusObject.AddComponent<TextMesh>();
             status.anchor = TextAnchor.UpperCenter;
             status.alignment = TextAlignment.Center;
             status.fontSize = 64;
-            status.characterSize = 0.012f;
+            status.characterSize = 0.0016f;
             status.color = Color.white;
         }
 
@@ -257,9 +279,9 @@ namespace Mahjong.Unity
             var sorted = hand.Concealed.OrderBy(t => t.Type.Suit).ThenBy(t => t.Type.Rank).ToList();
             for (var i = 0; i < sorted.Count; i++)
             {
-                var tile = TileObject.Create(table, "hand");
+                var tile = TileObject.Create(board, "hand");
                 tile.Bind(sorted[i].Type);
-                tile.SetPosition(new Vector3(-0.36f + i * 0.057f, 0.03f, -0.52f), 0f);
+                tile.SetPosition(new Vector3(-0.40f + i * 0.062f, TileY, -0.52f), 0f);
                 handTiles[sorted[i].InstanceId] = tile;
             }
 
@@ -268,9 +290,9 @@ namespace Mahjong.Unity
                 var meld = hand.Melds[i];
                 for (var k = 0; k < meld.Tiles.Count; k++)
                 {
-                    var tile = TileObject.Create(table, "meld");
+                    var tile = TileObject.Create(board, "meld");
                     tile.Bind(meld.Tiles[k].Type);
-                    tile.SetPosition(new Vector3(-0.36f + k * 0.05f, 0.03f, -0.38f - i * 0.05f), 0f);
+                    tile.SetPosition(new Vector3(-0.40f + k * 0.062f, TileY, -0.41f - i * 0.078f), 0f);
                     meldTiles.Add(tile);
                 }
             }
@@ -280,10 +302,10 @@ namespace Mahjong.Unity
                 var discards = state.Discards.Where(d => d.Player == player).Select(d => d.Tile).ToList();
                 for (var i = 0; i < discards.Count; i++)
                 {
-                    var tile = TileObject.Create(table, "discard");
+                    var tile = TileObject.Create(board, "discard");
                     tile.Bind(discards[i].Type);
-                    var (origin, rowDirection) = DiscardOrigin(player);
-                    tile.SetPosition(origin + rowDirection * (i % 6) + new Vector3(0f, 0f, 0.05f * (i / 6)), player * 90f);
+                    var (origin, rowDirection, rowStep) = DiscardOrigin(player);
+                    tile.SetPosition(origin + rowDirection * (i % 6) + rowStep * (i / 6), player * 90f);
                     discardTiles.Add(tile);
                 }
 
@@ -291,10 +313,10 @@ namespace Mahjong.Unity
                 var count = state.Players[player].Concealed.Count;
                 for (var i = 0; i < count; i++)
                 {
-                    var tile = TileObject.Create(table, "opponent");
+                    var tile = TileObject.Create(board, "opponent");
                     tile.BindBack();
                     var (origin, direction) = OpponentRow(player);
-                    tile.SetPosition(origin + direction * i + new Vector3(0f, 0.02f, 0f), player * 90f);
+                    tile.SetPosition(origin + direction * i, player * 90f);
                     opponentTiles.Add(tile);
                 }
             }
@@ -303,14 +325,15 @@ namespace Mahjong.Unity
             status.text = DescribeState();
         }
 
-        private (Vector3 Origin, Vector3 Direction) DiscardOrigin(int player)
+        /// <summary>Discard blocks sit in the four quadrants of the table centre, one per player.</summary>
+        private (Vector3 Origin, Vector3 Direction, Vector3 RowStep) DiscardOrigin(int player)
         {
             return player switch
             {
-                0 => (new Vector3(-0.14f, 0.03f, -0.12f), new Vector3(1f, 0f, 0f)),
-                1 => (new Vector3(0.20f, 0.03f, -0.10f), new Vector3(0f, 0f, 1f)),
-                2 => (new Vector3(-0.10f, 0.03f, 0.22f), new Vector3(-1f, 0f, 0f)),
-                _ => (new Vector3(-0.24f, 0.03f, -0.10f), new Vector3(0f, 0f, 1f))
+                0 => (new Vector3(-0.19f, TileY, -0.24f), new Vector3(0.062f, 0f, 0f), new Vector3(0f, 0f, 0.078f)),
+                1 => (new Vector3(0.30f, TileY, -0.19f), new Vector3(0f, 0f, 0.062f), new Vector3(0.078f, 0f, 0f)),
+                2 => (new Vector3(-0.19f, TileY, 0.30f), new Vector3(0.062f, 0f, 0f), new Vector3(0f, 0f, -0.078f)),
+                _ => (new Vector3(-0.30f, TileY, -0.19f), new Vector3(0f, 0f, 0.062f), new Vector3(-0.078f, 0f, 0f))
             };
         }
 
@@ -318,9 +341,9 @@ namespace Mahjong.Unity
         {
             return player switch
             {
-                1 => (new Vector3(0.74f, 0.03f, -0.30f), new Vector3(0f, 0f, 0.055f)),
-                2 => (new Vector3(-0.30f, 0.03f, 0.74f), new Vector3(0.055f, 0f, 0f)),
-                _ => (new Vector3(-0.74f, 0.03f, -0.30f), new Vector3(0f, 0f, 0.055f))
+                1 => (new Vector3(0.60f, TileY, -0.32f), new Vector3(0f, 0f, 0.062f)),
+                2 => (new Vector3(-0.40f, TileY, 0.70f), new Vector3(0.062f, 0f, 0f)),
+                _ => (new Vector3(-0.60f, TileY, -0.32f), new Vector3(0f, 0f, 0.062f))
             };
         }
 
@@ -331,7 +354,9 @@ namespace Mahjong.Unity
             var ray = camera.ScreenPointToRay(Input.mousePosition);
             if (!Physics.Raycast(ray, out var hit, 5f)) return null;
 
-            var tile = hit.collider.GetComponent<TileObject>();
+            // the collider sits on the tile root, but the body cube can still be hit while its
+            // own collider is being destroyed, so look the component up the hierarchy
+            var tile = hit.collider.GetComponentInParent<TileObject>();
             if (tile == null) return null;
 
             foreach (var entry in handTiles)

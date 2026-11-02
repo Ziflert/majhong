@@ -4,14 +4,19 @@ using UnityEngine;
 namespace Mahjong.Unity
 {
     /// <summary>
-    /// A single 3D tile built from primitives: a cube body plus a label on the face.
+    /// A single 3D tile built from primitives: a cube body plus a label on the top face.
     /// No prefabs and no art assets are needed for the prototype.
+    ///
+    /// The tile is an empty root with two children on purpose: the body cube carries a non-uniform
+    /// scale, so parenting the label or the tile itself to a scaled object would squash the text
+    /// and the geometry. The root keeps scale 1 and owns the collider used for mouse picking.
     /// </summary>
     public sealed class TileObject : MonoBehaviour
     {
-        public const float Length = 0.05f;
-        public const float Width = 0.038f;
-        public const float Height = 0.022f;
+        // Sized for a 1.35-wide table: a tile takes about 1/19 of it, close to a real set.
+        public const float Length = 0.072f;
+        public const float Width = 0.052f;
+        public const float Height = 0.028f;
 
         private TextMesh label = null!;
         private Renderer body = null!;
@@ -21,13 +26,21 @@ namespace Mahjong.Unity
 
         public static TileObject Create(Transform parent, string name)
         {
-            var root = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            root.name = name;
+            var root = new GameObject(name);
             root.transform.SetParent(parent, false);
-            root.transform.localScale = new Vector3(Width, Height, Length);
+
+            var bodyObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            bodyObject.name = "body";
+            bodyObject.transform.SetParent(root.transform, false);
+            bodyObject.transform.localScale = new Vector3(Width, Height, Length);
+            // picking is done through the root collider, which has the same box
+            Object.Destroy(bodyObject.GetComponent<Collider>());
+
+            var box = root.AddComponent<BoxCollider>();
+            box.size = new Vector3(Width, Height, Length);
 
             var tile = root.AddComponent<TileObject>();
-            tile.body = root.GetComponent<Renderer>();
+            tile.body = bodyObject.GetComponent<Renderer>();
             tile.label = CreateLabel(root.transform);
             return tile;
         }
@@ -36,15 +49,20 @@ namespace Mahjong.Unity
         {
             var labelObject = new GameObject("label");
             labelObject.transform.SetParent(parent, false);
-            labelObject.transform.localPosition = new Vector3(0f, 0.55f, 0f);
-            labelObject.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            labelObject.transform.localScale = Vector3.one;
+            // sit just above the top face; the root is unscaled, so these are world units
+            labelObject.transform.localPosition = new Vector3(0f, Height * 0.5f + 0.0015f, 0f);
+            // Lay the label flat and face up: LookRotation maps the text normal to world up and the
+            // glyph tops away from the camera. Measured on screen that reads upside down, so the
+            // text is turned 180 degrees around its own normal (a pure in-plane rotation).
+            labelObject.transform.localRotation =
+                Quaternion.LookRotation(Vector3.up, Vector3.forward) * Quaternion.Euler(0f, 0f, 180f);
 
             var mesh = labelObject.AddComponent<TextMesh>();
             mesh.anchor = TextAnchor.MiddleCenter;
             mesh.alignment = TextAlignment.Center;
             mesh.fontSize = 64;
-            mesh.characterSize = 0.06f;
+            // TextMesh world height follows characterSize; 0.005 is about a third of the tile width
+            mesh.characterSize = 0.005f;
             mesh.text = string.Empty;
             return mesh;
         }

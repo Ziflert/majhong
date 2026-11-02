@@ -6,7 +6,8 @@
 ## Сборка и запуск
 - Движок: Unity; объёмные 3D-тайлы и стол.
 - Логика: C#-модули в `Assets/Scripts/Mahjong/Rules`, не зависящие от Unity API.
-- Тесты: Unity Test Framework в `Assets/Tests/Editor` (обёртка над `RulesSelfTest`).
+- Тесты: Unity Test Framework — `Assets/Tests/Editor` (обёртка над `RulesSelfTest`) и `Assets/Tests/PlayMode` (сцена 3D-прототипа).
+- Прогон прототипа со скриншотами: `-executeMethod Mahjong.EditorTools.PrototypeCapture.CaptureAndExit` (см. `docs/unity-layer.md`).
 - Быстрая проверка ядра без Unity: `dotnet run --project Tools/RulesCheck`.
 - Локальный .NET SDK лежит вне репозитория: `D:/Temprary/dotnet-sdk/dotnet.exe`.
 

@@ -1,0 +1,120 @@
+using System.Collections;
+using System.Linq;
+using Mahjong.Unity;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
+
+namespace Mahjong.PlayTests
+{
+    /// <summary>
+    /// Runs the 3D prototype for a few frames in play mode and checks the things that
+    /// compilation cannot check: scene bootstrap, generated table, tile meshes, text labels
+    /// and the fact that the session actually reaches the human turn.
+    /// </summary>
+    public sealed class PrototypeSmokeTests
+    {
+        [UnityTest]
+        public IEnumerator TableIsBuiltAndSessionStarts()
+        {
+            var game = Object.FindAnyObjectByType<MahjongGame>();
+            if (game == null) game = new GameObject("MahjongTestHost").AddComponent<MahjongGame>();
+
+            // one frame for Start(), one more for the first Update()
+            yield return null;
+            yield return null;
+
+            var camera = Camera.main;
+            Assert.IsNotNull(camera, "Camera.main is missing: nothing will render.");
+            Assert.IsNotNull(camera!.GetComponent<Camera>(), "MainCamera has no Camera component.");
+
+            Assert.IsNotNull(GameObject.Find("Table"), "The table cube was not created.");
+            Assert.IsNotNull(Object.FindAnyObjectByType<Light>(), "No light in the scene.");
+
+            var tiles = Object.FindObjectsByType<TileObject>(FindObjectsSortMode.None);
+            Assert.GreaterOrEqual(tiles.Length, 50,
+                $"Expected the human hand, three opponent hands and the wall-facing tiles, got {tiles.Length}.");
+
+            var faceUp = tiles.Where(tile => tile.IsFaceUp).ToList();
+            var faceDown = tiles.Where(tile => !tile.IsFaceUp).ToList();
+            Assert.GreaterOrEqual(faceUp.Count, 13, "The human hand is not laid out.");
+            Assert.GreaterOrEqual(faceDown.Count, 39, "Opponent tiles are not drawn face down.");
+
+            var label = faceUp[0].GetComponentInChildren<TextMesh>();
+            Assert.IsNotNull(label, "A face-up tile has no TextMesh label.");
+            Assert.IsNotNull(label!.font,
+                "TextMesh has no font, so no tile label will be visible on screen.");
+            Assert.IsNotEmpty(label.text, "A face-up tile label is empty.");
+            StringAssert.AreEqualIgnoringCase(TileLabel.Short(faceUp[0].Type), label.text,
+                "Tile label text does not match the tile type.");
+
+            var status = game.Status;
+            Assert.IsNotNull(status, "The status line was not created.");
+            Assert.IsNotNull(status!.font, "The status TextMesh has no font.");
+            StringAssert.Contains("Wall:", status.text, "Status text does not describe the session.");
+            StringAssert.Contains("Points:", status.text, "Status text does not show points.");
+
+            Debug.Log("[smoke] status:\n" + status.text);
+            Debug.Log($"[smoke] tiles: {tiles.Length} (face up {faceUp.Count}, face down {faceDown.Count})");
+
+            // the hand row on screen must follow the engine order: suit first, then rank
+            var handRow = tiles
+                .Where(tile => tile.gameObject.name == "hand")
+                .OrderBy(tile => tile.transform.position.x)
+                .Select(tile => tile.Type)
+                .ToList();
+            Assert.IsNotEmpty(handRow, "The human hand row is empty.");
+            var labels = string.Join(" ", handRow.Select(TileLabel.Short));
+            Debug.Log("[smoke] hand left to right: " + labels);
+            for (var i = 1; i < handRow.Count; i++)
+            {
+                var previous = handRow[i - 1];
+                var current = handRow[i];
+                var ordered = previous.Suit < current.Suit
+                              || (previous.Suit == current.Suit && previous.Rank <= current.Rank);
+                Assert.IsTrue(ordered,
+                    $"Hand is out of order at position {i}: {TileLabel.Short(previous)} before {TileLabel.Short(current)} ({labels}).");
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator BotsPlayUntilTheHumanTurn()
+        {
+            var previousScale = Time.timeScale;
+            var game = Object.FindAnyObjectByType<MahjongGame>();
+            if (game == null) game = new GameObject("MahjongTestHost").AddComponent<MahjongGame>();
+
+            // botDelay is 0.45 s per action; speed time up so several turns happen quickly
+            Time.timeScale = 6f;
+            yield return null;
+
+            var status = game.Status;
+            var wallAtStart = ParseWall(status.text);
+            Assert.Greater(wallAtStart, 0, "The wall count was not parsed from the status line.");
+
+            var reachedHuman = false;
+            var frames = 0;
+            while (frames++ < 240 && !reachedHuman)
+            {
+                yield return null;
+                var text = status.text;
+                reachedHuman = text.Contains("Your turn") || text.Contains("Waiting for player");
+                if (reachedHuman) break;
+            }
+
+            Time.timeScale = previousScale;
+
+            Assert.IsTrue(reachedHuman,
+                "After two simulated seconds the table is still not in a turn: the game loop is stuck.");
+            Debug.Log($"[smoke] reached a turn, wall at start {wallAtStart}, wall now {ParseWall(status.text)}"
+                      + "\n" + status.text);
+        }
+
+        private static int ParseWall(string statusText)
+        {
+            var line = statusText.Split('\n').FirstOrDefault(part => part.StartsWith("Wall:"));
+            if (line == null) return -1;
+            return int.TryParse(line.Substring("Wall:".Length).Trim(), out var remaining) ? remaining : -1;
+        }
+    }
+}
