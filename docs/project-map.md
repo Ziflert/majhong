@@ -3,24 +3,50 @@
 ## Директории и файлы
 | Путь | Назначение |
 |---|---|
-| `rule.pdf` | Русский перевод правил спортивного маджонга WMCC/WMO; источник требований |
-| `Assets/Scripts/Mahjong/Rules/` | Независимое от Unity ядро правил и состояния партии |
-| `Tests/Editor/` | Тесты ядра правил через Unity Test Framework |
-| `AGENTS.md` | Правила работы с проектом |
-| `docs/journal.md` | Контрольные точки проекта |
-| `docs/project-map.md` | Карта проекта |
+| `rule.pdf` | Русский перевод правил спортивного маджонга WMCC/WMO; исходный документ |
+| `docs/rule-text.md` | Извлечённый текст правил для поиска и сверки (UTF-8) |
+| `docs/rules-status.md` | Что реализовано, какие упрощения и что осталось по правилам |
+| `Assets/Scripts/Mahjong/Rules/` | Ядро правил: кости, рука, стена, кубики, разбор руки, подсчёт, состояние руки |
+| `Assets/Scripts/Mahjong/Diagnostics/` | `RulesSelfTest` — проверки ядра, общие для Unity и headless |
+| `Tests/Editor/` | Обёртка Unity Test Framework над `RulesSelfTest` |
+| `Tools/RulesCheck/` | Консольный прогон проверок без Unity (`dotnet run`) |
+
+## Ключевые файлы ядра
+| Файл | Назначение |
+|---|---|
+| `Tile.cs` | `TileType`, `Tile`, каталог 34 лиц, признаки (зелёные, симметричные, терминальные) |
+| `Meld.cs` | `Meld`, `MeldKind` (Chow / Pung / OpenKong / AddedKong / ClosedKong) |
+| `PlayerHand.cs` | Закрытые кости, комбинации, цветы, сносы, размер руки |
+| `Wall.cs` | Стена 144 костей, разрыв, добор с головы и замены с конца |
+| `Dice.cs` | Два броска, определение бросающего и места разрыва |
+| `HandSolver.cs` | Разбор на 4 комбинации + пара, Семь пар, Семь смещённых пар, Тринадцать сирот, ожидания |
+| `Scoring.cs` | `ScoringContext`, оценка фанов, матрица исключений, порог 8 очков |
+| `Fans.cs` | Каталог 81 фана |
+| `GameState.cs` | Машина состояния руки: раздача, добор, снос, заявки, конги, победа, ничья |
 
 ## Точки входа
-Unity-сцена и MonoBehaviour-слой будут добавлены после стабилизации ядра правил. Текущая программная точка входа — `GameState.StartHand()` и `GameState.Apply()`.
+- `new GameState().StartHand(dealer, seed)` — начать руку.
+- `state.GetLegalActions(player)` — все допустимые действия с описанием.
+- `state.Apply(action)` — применить действие.
+- `state.CloseClaimWindow()` / `state.CloseKongWindow()` — разрешить окно заявок.
+- `state.Result` — результат победы с разбивкой по фанам.
 
 ## Команды
-- Unity Editor: открыть проект и запустить тесты через Test Runner.
-- `GameState.StartHand()` — создать раздачу.
-- `GameState.GetLegalActions()` / `Apply()` — получить и применить действие.
+```bash
+# проверки ядра без Unity
+dotnet run --project Tools/RulesCheck
+
+# сборка проверок
+dotnet build Tools/RulesCheck/RulesCheck.csproj
+```
+Unity: открыть проект, Test Runner → EditMode.
 
 ## Архитектура
-Планируется разделение на четыре слоя:
-1. `Rules/Core` — чистая модель тайлов, стены, раздачи, хода, побед и подсчёта очков.
-2. `Game/Application` — сценарии партии, состояния матча, сохранения и настройки.
-3. `Presentation/UI` — стол, рука игрока, меню, подсказки и доступность.
-4. `Platform/AI` — ввод, звук, локальные боты и, при необходимости, сетевой режим.
+```text
+Mahjong.Rules          чистая логика, без UnityEngine
+Mahjong.Rules.Diagnostics  самопроверки, без UnityEngine
+Tools/RulesCheck       консольный раннер тех же проверок
+Unity-слой (план)      MahjongTableView, TileView, GameController
+```
+
+Правило: Unity-слой только отображает состояние и передаёт действия. Вся логика руки живёт в `Mahjong.Rules`.

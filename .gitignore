@@ -6,6 +6,8 @@
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
 *.csproj
+!Tools/**/*.csproj
+bin/
 *.sln
 *.user
 *.pidb
