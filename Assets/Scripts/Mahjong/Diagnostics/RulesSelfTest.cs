@@ -391,10 +391,11 @@ namespace Mahjong.Rules.Diagnostics
 
         private static void ScoreGoldenInterpretationBoundaries(SelfTestReport report)
         {
-            // MCR interpretation: Four Concealed Pungs suppresses Single Wait.
-            var fourPungs = Score(Hand("1c 1c 1c 3c 3c 3c 5d 5d 5d 7b 7b 7b 9d 9d"), null, ClaimSource.Discard);
+            // Rule 3.8.1 explicitly excludes Concealed Hand and All Pungs, but does not
+            // exclude Single Wait. Keep Single Wait when the winning decomposition has it.
+            var fourPungs = Score(Hand("1c 1c 1c 3c 3c 3c 5d 5d 5d 7b 7b 7b 9d"), ParseTile("9d"), ClaimSource.Discard);
             report.Check(Has(fourPungs, Fans.FourConcealedPungs), "golden: four concealed pungs");
-            report.Check(!Has(fourPungs, Fans.SingleWait), "golden: four concealed pungs suppresses single wait");
+            report.Check(Has(fourPungs, Fans.SingleWait), "golden: four concealed pungs may combine with single wait");
 
             // The fourth visible copy includes the winning discard, which earns Last Tile.
             var last = Hand("1c 2c 3c 4c 5c 6c 7c 8c 9c 1d 2d 5d 5d");
