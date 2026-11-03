@@ -127,6 +127,12 @@ namespace Mahjong.Unity
             body.material.color = highlighted ? Color.Lerp(colour, Color.yellow, 0.45f) : colour;
         }
 
+        /// <summary>Persistent victory colour used while the hand-result screen is shown.</summary>
+        public void SetVictoryHighlight()
+        {
+            body.material.color = Color.Lerp(TileLabel.Face(Type), Color.yellow, 0.7f);
+        }
+
         /// <summary>Moves the tile to a place at once; used at the deal and by tests.</summary>
         public void SetPosition(Vector3 position, float rotationY)
         {

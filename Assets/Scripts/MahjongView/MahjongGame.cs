@@ -88,6 +88,7 @@ namespace Mahjong.Unity
 
         private string clockKey = string.Empty;
         private bool humanDiscardedThisHand;
+        private bool resultPresented;
 
         private long claimCheckVersion = -1;
         private bool humanHasRealClaim;
@@ -185,6 +186,7 @@ namespace Mahjong.Unity
         {
             waitingForNextHand = false;
             humanDiscardedThisHand = false;
+            resultPresented = false;
             stateVersion++;
             claimCheckVersion = -1;
             clock.Stop();
@@ -225,7 +227,7 @@ namespace Mahjong.Unity
                     ClosePrompt();
                     StopClock();
                     session.CompleteHand();
-                    status.text = DescribeResult();
+                    PresentResult();
                 }
                 else if (Time.time >= nextHandAt)
                 {
@@ -512,6 +514,22 @@ namespace Mahjong.Unity
             Rebuild();
         }
 
+        /// <summary>Shows the settled winning hand and gives its tiles a clear result-state highlight.</summary>
+        private void PresentResult()
+        {
+            if (resultPresented) return;
+            resultPresented = true;
+            Rebuild();
+            var result = session.State!.Result;
+            if (result != null)
+            {
+                foreach (var tile in tilesById.Values)
+                    if (result.Score.IsValidWin && result.PlayerIndex == humanSeat && tile.IsFaceUp)
+                        tile.SetVictoryHighlight();
+            }
+            status.text = DescribeResult();
+        }
+
         // ---------------------------------------------------------------- view
 
         private void ClearViews()
@@ -704,7 +722,8 @@ namespace Mahjong.Unity
             if (session.LastSettlement == null) return "Hand finished";
             var settlement = session.LastSettlement;
             if (settlement.WinnerPlayer < 0) return "Draw: the wall is empty";
-            return $"Player {settlement.WinnerPlayer} wins\n{settlement.Explanation}\nPaid: {settlement.TotalPaid}";
+            var winner = settlement.WinnerPlayer == humanSeat ? "You win" : $"Player {settlement.WinnerPlayer} wins";
+            return $"{winner}\n{settlement.Explanation}\nPaid: {settlement.TotalPaid}";
         }
     }
 }
