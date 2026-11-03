@@ -153,6 +153,7 @@ namespace Mahjong.Rules
                 if (shape.Pattern != WinningPattern.KnittedTiles && closed && isSelfDraw)
                     Add(Fans.FullyConcealed, "closed hand won by self-draw");
                 if (isSelfDraw) Add(Fans.SelfDrawn, "won from the wall");
+                AddCompositionFans(context, Add);
                 return ApplyExclusions(fans);
             }
 
@@ -299,7 +300,7 @@ namespace Mahjong.Rules
                 Add(Fans.AllChows, "four chows, no honors");
             if (isTileHog(context))
                 Add(Fans.TileHog, "four identical tiles outside a kong");
-            if (isDoublePung(pungs))
+            for (var pair = 0; pair < countDoublePungs(pungs); pair++)
                 Add(Fans.DoublePung, "two pungs of the same rank in different suits");
             if (concealedPungs.Count == 2)
                 Add(Fans.TwoConcealedPungs, "two concealed pungs");
@@ -316,7 +317,7 @@ namespace Mahjong.Rules
             foreach (var pung in pungs.Where(p => p.Base.IsTerminal || p.Base.IsWind))
                 Add(Fans.PungOfTerminalsOrHonors, $"pung of {pung.Base}");
             foreach (var kong in kongs.Where(k => !k.IsConcealed)) Add(Fans.MeldedKong, $"melded kong of {kong.Base}");
-            if (numberedSuits.Count == 2 && hasHonors)
+            if (numberedSuits.Count == 2)
                 Add(Fans.OneVoidedSuit, $"only two of the three suits: {string.Join(",", numberedSuits)}");
             if (!hasHonors && numberedSuits.Count > 0)
                 Add(Fans.NoHonors, "no honors");
@@ -336,6 +337,40 @@ namespace Mahjong.Rules
 
         // ------------------------------------------------------------ predicates
 
+        /// <summary>
+        /// Fans that depend only on which tiles the hand is made of, not on how they split into
+        /// sets. Special patterns (seven pairs, orphans, knitted) have no sets at all, so without
+        /// this they would lose the tile-composition fans they legitimately earn.
+        /// </summary>
+        private static void AddCompositionFans(ScoringContext context, System.Action<Fan, string> add)
+        {
+            var tiles = context.Hand.Concealed.Select(t => t.Type).ToList();
+            if (context.WinningTile.HasValue) tiles.Add(context.WinningTile.Value);
+            foreach (var meld in context.Hand.Melds) tiles.AddRange(meld.Types);
+            if (tiles.Count == 0) return;
+
+            var numberedSuits = tiles.Where(t => t.IsNumbered).Select(t => t.Suit).Distinct().ToList();
+            var hasHonors = tiles.Any(t => t.IsHonor);
+
+            if (tiles.All(t => t.IsGreen)) add(Fans.AllGreen, "only green tiles");
+            if (tiles.All(t => t.IsTerminal)) add(Fans.AllTerminals, "only 1s and 9s");
+            if (tiles.All(t => t.IsHonor)) add(Fans.AllHonors, "only honor tiles");
+            if (tiles.All(t => t.IsTerminalOrHonor)) add(Fans.AllTerminalsAndHonors, "only terminals and honors");
+            if (numberedSuits.Count == 1 && !hasHonors)
+                add(Fans.FullFlush, $"all tiles in {numberedSuits[0]}");
+            if (hasOnlyRankRange(tiles, 7, 9)) add(Fans.UpperTiles, "only 7, 8 and 9");
+            if (hasOnlyRankRange(tiles, 4, 6)) add(Fans.MiddleTiles, "only 4, 5 and 6");
+            if (hasOnlyRankRange(tiles, 1, 3)) add(Fans.LowerTiles, "only 1, 2 and 3");
+            if (hasOnlyRankRange(tiles, 6, 9)) add(Fans.UpperFour, "only 6 to 9");
+            if (hasOnlyRankRange(tiles, 1, 4)) add(Fans.LowerFour, "only 1 to 4");
+            if (tiles.All(t => t.IsReversible)) add(Fans.ReversibleTiles, "only reversible tiles");
+            if (hasHonors && numberedSuits.Count == 1)
+                add(Fans.HalfFlush, $"one suit plus honors ({numberedSuits[0]})");
+            if (tiles.All(t => t.IsSimple)) add(Fans.AllSimples, "no terminals and no honors");
+            if (numberedSuits.Count == 2)
+                add(Fans.OneVoidedSuit, $"only two of the three suits: {string.Join(",", numberedSuits)}");
+            if (!hasHonors && numberedSuits.Count > 0) add(Fans.NoHonors, "no honors");
+        }
         private static void EvaluateKnittedTiles(ScoringContext context, System.Action<Fan, string> add)
         {
             var tiles = context.Hand.Concealed.Select(t => t.Type).ToList();
@@ -377,32 +412,52 @@ namespace Mahjong.Rules
 
         private static bool isFourPureShiftedPungs(List<ShapeGroup> pungs) => isPureShiftedPungs(pungs, 4);
 
-        private static bool isPureShiftedPungs(List<ShapeGroup> pungs, int count = 3)
+        /// <summary>
+        /// Rules 24 and 15: pungs of one suit shifted by one rank. Honours carry no rank, so four
+        /// wind pungs or three dragon pungs must never read as shifted pungs.
+        /// </summary>
+        private static bool isPureShiftedPungs(List<ShapeGroup> pungs, int count = 3) =>
+            pungs.Where(p => p.Base.IsNumbered)
+                .GroupBy(p => p.Base.Suit)
+                .Any(oneSuit => hasConsecutiveRun(oneSuit.Select(p => p.Base.Rank).ToList(), count));
+
+        private static bool hasConsecutiveRun(List<int> ranks, int count)
         {
-            if (pungs.Count != count) return false;
-            if (pungs.Select(p => p.Base.Suit).Distinct().Count() != 1) return false;
-            var ranks = pungs.Select(p => p.Base.Rank).OrderBy(r => r).ToList();
-            for (var i = 1; i < ranks.Count; i++)
-                if (ranks[i] != ranks[i - 1] + 1) return false;
-            return true;
+            var distinct = ranks.Distinct().OrderBy(r => r).ToList();
+            for (var i = 0; i + count <= distinct.Count; i++)
+            {
+                var run = true;
+                for (var j = 1; j < count; j++)
+                    if (distinct[i + j] != distinct[i + j - 1] + 1) { run = false; break; }
+                if (run) return true;
+            }
+            return false;
         }
 
         private static bool isFourPureShiftedChows(List<ShapeGroup> chows) => isPureShiftedChows(chows, 4);
 
+        /// <summary>Rules 25 and 16: three or four chows of one suit shifted by one or two ranks.</summary>
         private static bool isPureShiftedChows(List<ShapeGroup> chows, int count = 3)
         {
-            if (chows.Count != count) return false;
-            if (chows.Select(c => c.Base.Suit).Distinct().Count() != 1) return false;
-            var starts = chows.Select(c => c.Base.Rank).OrderBy(r => r).ToList();
-            var steps = new HashSet<int>();
-            for (var i = 1; i < starts.Count; i++) steps.Add(starts[i] - starts[i - 1]);
-            return steps.Count == 1 && (steps.First() == 1 || steps.First() == 2);
+            foreach (var oneSuit in chows.GroupBy(c => c.Base.Suit))
+            {
+                var starts = oneSuit.Select(c => c.Base.Rank).Distinct().ToList();
+                foreach (var step in new[] { 1, 2 })
+                    for (var i = 0; i < starts.Count; i++)
+                    {
+                        var chain = 1;
+                        for (var next = starts[i] + step; chain < count && starts.Contains(next); next += step)
+                            chain++;
+                        if (chain >= count) return true;
+                    }
+            }
+            return false;
         }
 
+        /// <summary>Rule 28: 123, 456 and 789 of one and the same suit.</summary>
         private static bool hasPureStraight(List<ShapeGroup> chows) =>
-            chows.Select(c => (c.Base.Suit, c.Base.Rank)).Distinct().Count(g => g.Rank is 1 or 4 or 7) >= 3
-            && new[] { 1, 4, 7 }.All(start => chows.Any(c => c.Base.Rank == start)
-                && chows.Any(c => c.Base.Suit == chows.First(x => x.Base.Rank == start).Base.Suit));
+            chows.GroupBy(c => c.Base.Suit)
+                .Any(oneSuit => new[] { 1, 4, 7 }.All(start => oneSuit.Any(c => c.Base.Rank == start)));
 
         private static bool isThreeSuitedTerminalChows(List<ShapeGroup> chows, Shape shape)
         {
@@ -428,23 +483,38 @@ namespace Mahjong.Rules
         private static bool isTriplePung(List<ShapeGroup> pungs) =>
             pungs.GroupBy(p => p.Base.Rank).Any(g => g.Select(p => p.Base.Suit).Distinct().Count() == 3);
 
-        private static bool isDoublePung(List<ShapeGroup> pungs) =>
-            pungs.GroupBy(p => p.Base.Rank).Any(g => g.Select(p => p.Base.Suit).Distinct().Count() >= 2);
+        /// <summary>
+        /// Rule 65: two pungs of the same rank in two different suits. A hand can hold two such
+        /// pairs at once (rule 8 lists "Double Pung, twice"), so the number of pairs is returned
+        /// rather than a flag. Honour pungs share rank numbers across winds and dragons and must
+        /// never pair up, hence the numbered filter.
+        /// </summary>
+        private static int countDoublePungs(List<ShapeGroup> pungs) =>
+            pungs.Where(p => p.Base.IsNumbered)
+                .GroupBy(p => p.Base.Rank)
+                .Sum(g => g.Select(p => p.Base.Suit).Distinct().Count() / 2);
 
+        /// <summary>Rule 51: one pung per suit, each one rank above the previous.</summary>
         private static bool isMixedShiftedPungs(List<ShapeGroup> pungs)
         {
-            if (pungs.Count != 3) return false;
-            if (pungs.Select(p => p.Base.Suit).Distinct().Count() != 3) return false;
-            var ranks = pungs.Select(p => p.Base.Rank).OrderBy(r => r).ToList();
-            return ranks[1] == ranks[0] + 1 && ranks[2] == ranks[1] + 1;
+            var numbered = pungs.Where(p => p.Base.IsNumbered).ToList();
+            foreach (var low in numbered)
+                foreach (var middle in numbered.Where(p => p.Base.Rank == low.Base.Rank + 1 && p.Base.Suit != low.Base.Suit))
+                    if (numbered.Any(p => p.Base.Rank == middle.Base.Rank + 1
+                                          && p.Base.Suit != low.Base.Suit && p.Base.Suit != middle.Base.Suit))
+                        return true;
+            return false;
         }
 
+        /// <summary>Rule 51: three chows, one per suit, with consecutive starting ranks.</summary>
         private static bool isMixedShiftedChows(List<ShapeGroup> chows)
         {
-            if (chows.Count != 3) return false;
-            if (chows.Select(c => c.Base.Suit).Distinct().Count() != 3) return false;
-            var starts = chows.Select(c => c.Base.Rank).OrderBy(r => r).ToList();
-            return starts[1] == starts[0] + 1 && starts[2] == starts[1] + 1;
+            foreach (var low in chows)
+                foreach (var middle in chows.Where(c => c.Base.Rank == low.Base.Rank + 1 && c.Base.Suit != low.Base.Suit))
+                    if (chows.Any(c => c.Base.Rank == middle.Base.Rank + 1
+                                       && c.Base.Suit != low.Base.Suit && c.Base.Suit != middle.Base.Suit))
+                        return true;
+            return false;
         }
 
         private static bool isAllTypes(IReadOnlyList<ShapeGroup> groups, Shape shape)
@@ -486,7 +556,11 @@ namespace Mahjong.Rules
         private static int visibleCopies(ScoringContext context)
         {
             var type = context.WinningTile!.Value;
+            // The winning tile is not part of Hand.Concealed when the caller supplies it
+            // separately. Count it explicitly; otherwise a win on the fourth visible copy can
+            // never satisfy the Last Tile fan.
             var count = context.Hand.AllTypes().Count(t => t == type)
+                        + (context.WinningTile == type ? 1 : 0)
                         + context.DiscardPile.Count(t => t == type)
                         + context.OtherMelds.SelectMany(m => m.Types).Count(t => t == type);
             return count;
@@ -523,11 +597,11 @@ namespace Mahjong.Rules
             ["four-kongs"] = new[] { "single-wait", "three-kongs" },
             ["seven-shifted-pairs"] = new[] { "full-flush", "concealed-hand", "single-wait" },
             ["seven-pairs"] = new[] { "concealed-hand", "single-wait" },
-            ["thirteen-orphans"] = new[] { "concealed-hand", "all-types", "single-wait" },
-            ["all-terminals"] = new[] { "no-honors", "all-pungs", "outside-hand", "pung-of-terminals-or-honors" },
+            ["thirteen-orphans"] = new[] { "concealed-hand", "all-types", "single-wait", "all-terminals-and-honors" },
+            ["all-terminals"] = new[] { "no-honors", "all-pungs", "outside-hand", "pung-of-terminals-or-honors", "all-terminals-and-honors" },
             ["little-four-winds"] = new[] { "big-three-winds", "pung-of-terminals-or-honors" },
             ["little-three-dragons"] = new[] { "two-dragon-pungs", "dragon-pung" },
-            ["all-honors"] = new[] { "all-pungs", "outside-hand", "pung-of-terminals-or-honors" },
+            ["all-honors"] = new[] { "all-pungs", "outside-hand", "pung-of-terminals-or-honors", "all-terminals-and-honors" },
             ["four-concealed-pungs"] = new[] { "concealed-hand", "all-pungs", "three-concealed-pungs", "two-concealed-pungs" },
             ["four-terminal-chows"] = new[] { "full-flush", "all-chows", "seven-pairs", "pure-double-chow", "mixed-double-chow", "two-terminal-chows" },
             ["quadruple-chow"] = new[] { "pure-double-chow", "pure-triple-chow", "tile-hog", "pure-shifted-pungs" },
@@ -544,7 +618,7 @@ namespace Mahjong.Rules
             ["upper-tiles"] = new[] { "no-honors" },
             ["middle-tiles"] = new[] { "no-honors" },
             ["lower-tiles"] = new[] { "no-honors" },
-            ["pure-straight"] = new[] { "short-straight" },
+            ["pure-straight"] = new[] { "short-straight", "two-terminal-chows" },
             ["three-suited-terminal-chows"] = new[] { "all-chows", "two-terminal-chows", "mixed-double-chow", "pure-double-chow" },
             ["all-fives"] = new[] { "all-simples" },
             ["triple-pung"] = new[] { "double-pung" },
@@ -567,6 +641,7 @@ namespace Mahjong.Rules
             ["two-melded-kongs"] = new[] { "melded-kong" },
             ["concealed-and-melded-kong"] = new[] { "concealed-kong", "melded-kong" },
             ["last-tile"] = new[] { "robbing-kong" },
+            ["all-simples"] = new[] { "no-honors" },
             ["all-chows"] = new[] { "no-honors" }
         };
 

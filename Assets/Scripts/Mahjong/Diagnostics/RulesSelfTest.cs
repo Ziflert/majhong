@@ -251,7 +251,7 @@ namespace Mahjong.Rules.Diagnostics
             var result = Score(hand, null, ClaimSource.SelfDraw);
             report.Check(result.IsValidWin, $"seven pairs must win: {result.Error}");
             report.Check(Has(result, Fans.SevenPairs), "seven pairs fan");
-            report.Equal(28, result.HandPoints, "24 seven pairs + 4 fully concealed, self-draw does not stack");
+            report.Equal(29, result.HandPoints, "24 seven pairs + 4 fully concealed + 1 no honors (rules 19, 76)");
         }
 
         private static void ScoreThirteenOrphans(SelfTestReport report)
