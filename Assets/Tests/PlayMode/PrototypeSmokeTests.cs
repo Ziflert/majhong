@@ -24,6 +24,14 @@ namespace Mahjong.PlayTests
             yield return null;
             yield return null;
 
+            // Tiles slide out of the wall into their places, so nothing is where it belongs yet. The
+            // board is animated in scaled time and batch mode runs very fast, hence the boost.
+            var previousScale = Time.timeScale;
+            Time.timeScale = 30f;
+            var settleFrames = 0;
+            while (settleFrames++ < 600 && Settled() == false) yield return null;
+            Time.timeScale = previousScale;
+
             var camera = Camera.main;
             Assert.IsNotNull(camera, "Camera.main is missing: nothing will render.");
             Assert.IsNotNull(camera!.GetComponent<Camera>(), "MainCamera has no Camera component.");
@@ -31,7 +39,9 @@ namespace Mahjong.PlayTests
             Assert.IsNotNull(GameObject.Find("Table"), "The table cube was not created.");
             Assert.IsNotNull(Object.FindAnyObjectByType<Light>(), "No light in the scene.");
 
+            // Queried after the settle loop: a rebuild can destroy a tile while the test holds the array.
             var tiles = Object.FindObjectsByType<TileObject>(FindObjectsSortMode.None);
+            Assert.IsTrue(tiles.All(tile => tile.IsSettled), "The table did not settle.");
             Assert.GreaterOrEqual(tiles.Length, 50,
                 $"Expected the human hand, three opponent hands and the wall-facing tiles, got {tiles.Length}.");
 
@@ -63,7 +73,7 @@ namespace Mahjong.PlayTests
             Debug.Log($"[smoke] tiles: {tiles.Length} (face up {faceUp.Count}, face down {faceDown.Count})");
 
             // the hand row on screen must follow the engine order: suit first, then rank
-            var handRow = tiles
+            var handRow = Object.FindObjectsByType<TileObject>(FindObjectsSortMode.None)
                 .Where(tile => tile.gameObject.name == "hand")
                 .OrderBy(tile => tile.transform.position.x)
                 .Select(tile => tile.Type)
@@ -114,6 +124,9 @@ namespace Mahjong.PlayTests
             Debug.Log($"[smoke] reached a turn, wall at start {wallAtStart}, wall now {ParseWall(status.text)}"
                       + "\n" + status.text);
         }
+
+        private static bool Settled() =>
+            !Object.FindObjectsByType<TileObject>(FindObjectsSortMode.None).Any(tile => !tile.IsSettled);
 
         private static string LabelOf(TileObject tile)
         {

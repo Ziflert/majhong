@@ -35,7 +35,7 @@ namespace Mahjong.Unity
         public PlayClock HandClock => clock;
 
         /// <summary>How many tiles lie in the discard piles; a timed-out turn adds one.</summary>
-        public int DiscardTileCount => discardTiles.Count;
+        public int DiscardTileCount => session?.State?.Discards.Count ?? 0;
 
         /// <summary>Phase of the hand that is being played. Exposed for tests and tools.</summary>
         public GamePhase Phase => session?.State?.Phase ?? GamePhase.NotStarted;
@@ -65,10 +65,11 @@ namespace Mahjong.Unity
         /// <summary>Tiles rest on the table top, which sits at y = -0.005.</summary>
         private const float TileY = 0.01f;
 
+        /// <summary>One view per engine tile, keyed by instance id: identity is what makes slides possible.</summary>
+        private readonly Dictionary<int, TileObject> tilesById = new();
+
+        /// <summary>Tiles of the human hand, keyed the same way; this is what a click can pick.</summary>
         private readonly Dictionary<int, TileObject> handTiles = new();
-        private readonly List<TileObject> discardTiles = new();
-        private readonly List<TileObject> meldTiles = new();
-        private readonly List<TileObject> opponentTiles = new();
 
         private GameSession session = null!;
         private IMahjongBot[] bots = null!;
@@ -515,46 +516,50 @@ namespace Mahjong.Unity
 
         private void ClearViews()
         {
-            foreach (var tile in handTiles.Values) Destroy(tile.gameObject);
+            foreach (var tile in tilesById.Values)
+                if (tile != null) Destroy(tile.gameObject);
+            tilesById.Clear();
             handTiles.Clear();
-            foreach (var tile in discardTiles) Destroy(tile.gameObject);
-            discardTiles.Clear();
-            foreach (var tile in meldTiles) Destroy(tile.gameObject);
-            meldTiles.Clear();
-            foreach (var tile in opponentTiles) Destroy(tile.gameObject);
-            opponentTiles.Clear();
         }
 
+        /// <summary>
+        /// Highlights the hand when it is the human turn. Every face-up tile is reset first: a tile that
+        /// left the hand has to lose the highlight instead of carrying it into the discard pile.
+        /// </summary>
         private void HighlightHand(bool on)
         {
-            foreach (var tile in handTiles.Values) tile.SetHighlight(on);
+            foreach (var tile in tilesById.Values)
+            {
+                if (!tile.IsFaceUp) continue;
+                tile.SetHighlight(on && handTiles.ContainsValue(tile));
+            }
         }
 
+        /// <summary>
+        /// Lays the table out from the engine state. Tiles are not rebuilt: each one keeps its view
+        /// object by instance id, so a tile that moves from the hand to the discard pile or into a meld
+        /// slides there on its own (see <see cref="TileObject.Update"/>). Tiles that left the game are
+        /// destroyed, new ones come out of the wall and glide into place.
+        /// </summary>
         private void Rebuild()
         {
-            ClearViews();
             var state = session.State!;
             var hand = state.Players[humanSeat];
+            var used = new HashSet<int>();
+            handTiles.Clear();
 
             var sorted = hand.Concealed.OrderBy(t => t.Type.Suit).ThenBy(t => t.Type.Rank).ToList();
             for (var i = 0; i < sorted.Count; i++)
             {
-                var tile = TileObject.Create(board, "hand");
-                tile.Bind(sorted[i].Type);
-                tile.SetPosition(new Vector3(-0.40f + i * 0.062f, TileY, -0.52f), 0f);
-                handTiles[sorted[i].InstanceId] = tile;
+                var view = Place(sorted[i], used, "hand", new Vector3(-0.40f + i * 0.062f, TileY, -0.52f), 0f);
+                handTiles[sorted[i].InstanceId] = view;
             }
 
             for (var i = 0; i < hand.Melds.Count; i++)
             {
                 var meld = hand.Melds[i];
                 for (var k = 0; k < meld.Tiles.Count; k++)
-                {
-                    var tile = TileObject.Create(board, "meld");
-                    tile.Bind(meld.Tiles[k].Type);
-                    tile.SetPosition(new Vector3(-0.40f + k * 0.062f, TileY, -0.41f - i * 0.078f), 0f);
-                    meldTiles.Add(tile);
-                }
+                    Place(meld.Tiles[k], used, "meld", new Vector3(-0.40f + k * 0.062f, TileY, -0.41f - i * 0.078f), 0f);
             }
 
             for (var player = 0; player < 4; player++)
@@ -562,23 +567,22 @@ namespace Mahjong.Unity
                 var discards = state.Discards.Where(d => d.Player == player).Select(d => d.Tile).ToList();
                 for (var i = 0; i < discards.Count; i++)
                 {
-                    var tile = TileObject.Create(board, "discard");
-                    tile.Bind(discards[i].Type);
                     var (origin, rowDirection, rowStep) = DiscardOrigin(player);
-                    tile.SetPosition(origin + rowDirection * (i % 6) + rowStep * (i / 6), player * 90f);
-                    discardTiles.Add(tile);
+                    Place(discards[i], used, "discard",
+                        origin + rowDirection * (i % 6) + rowStep * (i / 6), player * 90f);
                 }
 
                 if (player == humanSeat) continue;
-                var count = state.Players[player].Concealed.Count;
-                for (var i = 0; i < count; i++)
-                {
-                    var tile = TileObject.Create(board, "opponent");
-                    tile.BindBack();
-                    var (origin, direction) = OpponentRow(player);
-                    tile.SetPosition(origin + direction * i, player * 90f);
-                    opponentTiles.Add(tile);
-                }
+                var concealed = state.Players[player].Concealed;
+                var (row, direction) = OpponentRow(player);
+                for (var i = 0; i < concealed.Count; i++)
+                    Place(concealed[i], used, "opponent", row + direction * i, player * 90f, faceUp: false);
+            }
+
+            foreach (var stale in tilesById.Keys.Where(id => !used.Contains(id)).ToList())
+            {
+                Destroy(tilesById[stale].gameObject);
+                tilesById.Remove(stale);
             }
 
             HighlightHand(state.CurrentPlayer == humanSeat && state.Phase == GamePhase.AwaitingDiscard);
@@ -587,12 +591,36 @@ namespace Mahjong.Unity
 
         /// <summary>
         /// Rebuilds the HUD only when its text changes: the countdown makes it change once a second,
-        /// which is cheap, but rebuilding every frame would allocate a string per frame for nothing.
+        /// which is cheap, but rebuilding it every frame would allocate a string per frame for nothing.
         /// </summary>
         private void RefreshStatus()
         {
             var text = DescribeState();
             if (text != status.text) status.text = text;
+        }
+
+        /// <summary>
+        /// Places one engine tile on the table, reusing its view object. A tile seen for the first time
+        /// appears at the wall and slides to its place, which is the dealing animation as well.
+        /// </summary>
+        private TileObject Place(Tile tile, HashSet<int> used, string name, Vector3 position, float rotationY,
+            bool faceUp = true)
+        {
+            if (!tilesById.TryGetValue(tile.InstanceId, out var view) || view == null)
+            {
+                view = TileObject.Create(board, name);
+                // Spread the spawn points a little, otherwise a fresh hand starts as one cube.
+                var slot = tilesById.Count % 7;
+                view.SpawnAt(new Vector3(-0.18f + slot * 0.06f, TileY, 0.52f));
+                tilesById[tile.InstanceId] = view;
+            }
+
+            view.gameObject.name = name;
+            if (faceUp) view.SetFace(tile.Type);
+            else view.SetBack();
+            view.SetTarget(position, rotationY);
+            used.Add(tile.InstanceId);
+            return view;
         }
 
         /// <summary>Discard blocks sit in the four quadrants of the table centre, one per player.</summary>

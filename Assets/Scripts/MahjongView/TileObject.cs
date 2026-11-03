@@ -18,11 +18,30 @@ namespace Mahjong.Unity
         public const float Width = 0.052f;
         public const float Height = 0.028f;
 
+        /// <summary>How fast a tile slides to its new place, in table units per second.</summary>
+        public const float SlideSpeed = 1.8f;
+
+        /// <summary>How fast a tile turns to its new orientation, in degrees per second.</summary>
+        public const float TurnSpeed = 720f;
+
         private TextMesh label = null!;
         private Renderer body = null!;
 
+        /// <summary>A fresh tile shows neither face nor back until one of them is bound.</summary>
+        private bool faceSet;
+
         public TileType Type { get; private set; }
         public bool IsFaceUp { get; private set; }
+
+        /// <summary>Where the tile is heading; the engine lays out the table and the tiles follow.</summary>
+        public Vector3 TargetPosition { get; private set; }
+
+        public float TargetRotationY { get; private set; }
+
+        /// <summary>True once the tile has arrived: the position is reached and the turn is done.</summary>
+        public bool IsSettled =>
+            (transform.position - TargetPosition).sqrMagnitude < 1e-8f
+            && Mathf.Abs(Mathf.DeltaAngle(transform.rotation.eulerAngles.y, TargetRotationY)) < 0.5f;
 
         public static TileObject Create(Transform parent, string name)
         {
@@ -72,6 +91,7 @@ namespace Mahjong.Unity
         {
             Type = type;
             IsFaceUp = true;
+            faceSet = true;
             label.text = TileLabel.Short(type);
             label.color = TileLabel.Text(type);
             body.material.color = TileLabel.Face(type);
@@ -81,9 +101,24 @@ namespace Mahjong.Unity
         public void BindBack()
         {
             IsFaceUp = false;
+            faceSet = true;
             label.text = string.Empty;
             body.material.color = new Color(0.25f, 0.45f, 0.3f);
             label.gameObject.SetActive(false);
+        }
+
+        /// <summary>Shows a face, doing nothing when the tile already shows it.</summary>
+        public void SetFace(TileType type)
+        {
+            if (faceSet && IsFaceUp && Type == type) return;
+            Bind(type);
+        }
+
+        /// <summary>Turns the tile face down, doing nothing when it already is.</summary>
+        public void SetBack()
+        {
+            if (faceSet && !IsFaceUp) return;
+            BindBack();
         }
 
         public void SetHighlight(bool highlighted)
@@ -92,10 +127,44 @@ namespace Mahjong.Unity
             body.material.color = highlighted ? Color.Lerp(colour, Color.yellow, 0.45f) : colour;
         }
 
+        /// <summary>Moves the tile to a place at once; used at the deal and by tests.</summary>
         public void SetPosition(Vector3 position, float rotationY)
         {
+            SetTarget(position, rotationY);
+            Snap();
+        }
+
+        /// <summary>Sets where the tile has to go; the next frames slide and turn it there.</summary>
+        public void SetTarget(Vector3 position, float rotationY)
+        {
+            TargetPosition = position;
+            TargetRotationY = rotationY;
+        }
+
+        /// <summary>Puts the tile at its target without animating.</summary>
+        public void Snap()
+        {
+            transform.position = TargetPosition;
+            transform.rotation = Quaternion.Euler(0f, TargetRotationY, 0f);
+        }
+
+        public void SpawnAt(Vector3 position)
+        {
             transform.position = position;
-            transform.rotation = Quaternion.Euler(0f, rotationY, 0f);
+        }
+
+        /// <summary>
+        /// The whole animation of the table: every tile glides towards the place the engine gave it.
+        /// Tiles keep their identity between rebuilds, so a discard travels from the hand to the pile
+        /// instead of jumping there as a new object.
+        /// </summary>
+        private void Update()
+        {
+            if (IsSettled) return;
+
+            transform.position = Vector3.MoveTowards(transform.position, TargetPosition, SlideSpeed * Time.deltaTime);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation,
+                Quaternion.Euler(0f, TargetRotationY, 0f), TurnSpeed * Time.deltaTime);
         }
 
         public void SetFaceDownRotation()
