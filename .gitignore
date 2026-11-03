@@ -29,3 +29,9 @@ sysinfo.txt
 # Prototype screenshot runs
 Screenshots/
 __pycache__/
+
+# Reference-scoring workspaces
+node_modules/
+.tmpcmp/
+*-out.json
+probe*.json
