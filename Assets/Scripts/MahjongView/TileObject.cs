@@ -40,10 +40,17 @@ namespace Mahjong.Unity
 
         public float TargetRotationY { get; private set; }
 
+        private Vector3 animationStartPosition;
+        private Quaternion animationStartRotation;
+        private float animationElapsed;
+        private float animationDuration;
+        private float animationDelay;
+        private float animationArc;
+        private bool hasTarget;
+        private bool animating;
+
         /// <summary>True once the tile has arrived: the position is reached and the turn is done.</summary>
-        public bool IsSettled =>
-            (transform.position - TargetPosition).sqrMagnitude < 1e-8f
-            && Mathf.Abs(Mathf.DeltaAngle(transform.rotation.eulerAngles.y, TargetRotationY)) < 0.5f;
+        public bool IsSettled => hasTarget && !animating;
 
         public static TileObject Create(Transform parent, string name)
         {
@@ -187,11 +194,28 @@ namespace Mahjong.Unity
             Snap();
         }
 
-        /// <summary>Sets where the tile has to go; the next frames slide and turn it there.</summary>
+        /// <summary>Sets where the tile has to go; the next frames animate it with a short hop.</summary>
         public void SetTarget(Vector3 position, float rotationY)
         {
+            var destinationRotation = Quaternion.Euler(0f, rotationY, 0f);
             TargetPosition = position;
             TargetRotationY = rotationY;
+            hasTarget = true;
+
+            var distance = Vector3.Distance(transform.position, position);
+            var angle = Mathf.Abs(Mathf.DeltaAngle(transform.rotation.eulerAngles.y, rotationY));
+            animationStartPosition = transform.position;
+            animationStartRotation = transform.rotation;
+            animationElapsed = 0f;
+            animationDelay = distance > 0.2f ? 0.025f : 0f;
+            animationDuration = Mathf.Clamp(Mathf.Max(distance / SlideSpeed, angle / TurnSpeed), 0.08f, 0.42f);
+            animationArc = distance > 0.12f ? Mathf.Clamp(distance * 0.22f, 0.012f, 0.045f) : 0f;
+            animating = distance > 0.0001f || angle > 0.5f;
+            if (!animating)
+            {
+                transform.position = position;
+                transform.rotation = destinationRotation;
+            }
         }
 
         /// <summary>Puts the tile at its target without animating.</summary>
@@ -199,11 +223,14 @@ namespace Mahjong.Unity
         {
             transform.position = TargetPosition;
             transform.rotation = Quaternion.Euler(0f, TargetRotationY, 0f);
+            animating = false;
         }
 
         public void SpawnAt(Vector3 position)
         {
             transform.position = position;
+            hasTarget = false;
+            animating = false;
         }
 
         /// <summary>
@@ -213,11 +240,25 @@ namespace Mahjong.Unity
         /// </summary>
         private void Update()
         {
-            if (IsSettled) return;
+            if (!animating) return;
 
-            transform.position = Vector3.MoveTowards(transform.position, TargetPosition, SlideSpeed * Time.deltaTime);
-            transform.rotation = Quaternion.RotateTowards(transform.rotation,
-                Quaternion.Euler(0f, TargetRotationY, 0f), TurnSpeed * Time.deltaTime);
+            animationElapsed += Time.deltaTime;
+            if (animationElapsed < animationDelay) return;
+
+            var t = Mathf.Clamp01((animationElapsed - animationDelay) / animationDuration);
+            // Smooth-step gives the move a deliberate ease-in/ease-out instead of robotic constant speed.
+            var eased = t * t * (3f - 2f * t);
+            transform.position = Vector3.LerpUnclamped(animationStartPosition, TargetPosition, eased);
+            transform.position += Vector3.up * (Mathf.Sin(t * Mathf.PI) * animationArc);
+            transform.rotation = Quaternion.Slerp(animationStartRotation,
+                Quaternion.Euler(0f, TargetRotationY, 0f), eased);
+
+            if (t >= 1f)
+            {
+                transform.position = TargetPosition;
+                transform.rotation = Quaternion.Euler(0f, TargetRotationY, 0f);
+                animating = false;
+            }
         }
 
         public void SetFaceDownRotation()

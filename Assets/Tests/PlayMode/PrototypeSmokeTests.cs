@@ -55,7 +55,9 @@ namespace Mahjong.PlayTests
             Assert.IsTrue(faceDown.All(tile => string.IsNullOrEmpty(LabelOf(tile))),
                 "A face-down tile shows its face label.");
 
-            var label = faceUp[0].GetComponentInChildren<TextMesh>();
+            // The atlas is the visible face in the normal build; keep checking the TextMesh fallback
+            // as well, including when it is inactive behind the atlas.
+            var label = faceUp[0].GetComponentInChildren<TextMesh>(true);
             Assert.IsNotNull(label, "A face-up tile has no TextMesh label.");
             Assert.IsNotNull(label!.font,
                 "TextMesh has no font, so no tile label will be visible on screen.");
