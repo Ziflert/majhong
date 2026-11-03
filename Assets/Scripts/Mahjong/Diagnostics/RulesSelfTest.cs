@@ -78,6 +78,7 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "claims: priority of Hu, kong, pung, chow and seat order", () => ClaimPriorityRules(report));
             Run(report, "bots: the danger read follows the tiles on the table", () => DangerReads(report));
             Run(report, "bots: the cautious level throws safer tiles without wrecking shape", () => BotDefense(report));
+            Run(report, "bots: the strategic level values the hand and the match", () => BotStrategy(report));
             Run(report, "state: every mechanic is reachable in random play", () => RandomPlayInvariants(report));
 
             return report;
@@ -1249,6 +1250,68 @@ namespace Mahjong.Rules.Diagnostics
             var rest = new List<TileType>(tiles);
             rest.Remove(discarded);
             return HandShape.Shanten(rest, meldCount);
+        }
+
+        private static void BotStrategy(SelfTestReport report)
+        {
+            // The waiting hand is read with the real scorer, not with a hand-made table:
+            // a full flush pays, a mixed chicken hand does not even reach the eight-point minimum.
+            var nineGates = Tiles("1d 1d 1d 2d 3d 4d 5d 6d 7d 8d 9d 9d 9d").Select(tile => tile.Type).ToList();
+            var flushWait = WaitQuality.Of(nineGates, Array.Empty<Meld>());
+            report.Check(flushWait.Waits == 9, $"nine gates wait on every dot, got {flushWait.Waits}");
+            report.Check(flushWait.AveragePoints >= 24,
+                $"a full flush must be valued as a full flush, got {flushWait.AveragePoints:0.0}");
+            report.Check(flushWait.LiveCopies > 0, "the wait must count the copies that are still unseen");
+
+            // A wait nobody can serve is worth less than a live one.
+            var blocked = WaitQuality.Of(nineGates, Array.Empty<Meld>(), Wind.East, Wind.East,
+                face => face == ParseTile("5d") ? 4 : 0);
+            report.Check(blocked.LiveCopies < flushWait.LiveCopies,
+                $"a wait on a face the table has shown four times must lose value ({blocked.LiveCopies} vs {flushWait.LiveCopies})");
+
+            var cheapWait = WaitQuality.Of(Tiles("1c 2c 3c 4d 5d 6d 7b 8b 9b 5c 6c 5c 5c").Select(tile => tile.Type).ToList(),
+                Array.Empty<Meld>());
+            report.Check(cheapWait.Value < flushWait.Value,
+                $"a mixed hand must read cheaper than a flush ({cheapWait.Value:0.0} vs {flushWait.Value:0.0})");
+
+            var notWaiting = WaitQuality.Of(Tiles("1c 4c 7c 2d 5d 8d 3b 6b 9b E S W N").Select(tile => tile.Type).ToList(),
+                Array.Empty<Meld>());
+            report.Equal(0, notWaiting.Waits, "a scattered hand has no waits");
+            report.Equal(0.0, notWaiting.AveragePoints, "a hand without waits is worth nothing");
+
+            // Match position: behind means push more, ahead means fold earlier.
+            var even = HeuristicBot.PushWeight(20, 2);
+            report.Check(HeuristicBot.PushWeight(20, 2, 80) > even, "a seat far behind must take more risk");
+            report.Check(HeuristicBot.PushWeight(20, 2, -80) < even, "a seat in front must take less risk");
+            report.Check(HeuristicBot.PushWeight(20, 0, 80) < 0.3,
+                "a tenpai hand pushes on its own, match position only trims the risk");
+
+            // On a tenpai hand the strategic bot keeps the wait that pays: same shape, better value.
+            var state = new GameState();
+            var hand = Tiles("1d 1d 1d 2d 3d 4d 5d 6d 7d 8d 9d 9d 9d 1c");
+            foreach (var tile in hand) state.Players[0].AddConcealed(tile);
+
+            var options = state.Players[0].Concealed
+                .Select(tile => new LegalAction(ActionKind.Discard, 0, tile, Array.Empty<Tile>(), $"Discard {tile.Type}"))
+                .ToList();
+
+            var strategic = new HeuristicBot(3, BotLevel.Strategic) { PointsBehind = 0 };
+            var discard = strategic.Choose(state, 0, options);
+            report.Check(discard.Kind == ActionKind.Discard, "a strategic bot still discards");
+            report.Equal(ParseTile("1c"), discard.Tile!.Value.Type,
+                "the odd tile of another suit goes before a full flush is broken");
+
+            // A session of strategic bots: same guarantees as the other levels.
+            var bots = new IMahjongBot[]
+            {
+                new HeuristicBot(41, BotLevel.Strategic),
+                new HeuristicBot(42, BotLevel.Strategic),
+                new HeuristicBot(43, BotLevel.Strategic),
+                new HeuristicBot(44, BotLevel.Strategic)
+            };
+            var session = BotTable.PlaySession(7, bots);
+            report.Equal(GameSession.TotalHands, session.HandsPlayed, "a strategic session plays sixteen hands");
+            report.Equal(0, session.Scores.Sum(), "strategic bot payments are zero-sum");
         }
 
         private static LegalAction Choose(IReadOnlyList<LegalAction> options, Random random, PlayerHand hand)

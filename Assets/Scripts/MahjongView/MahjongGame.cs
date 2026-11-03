@@ -19,6 +19,9 @@ namespace Mahjong.Unity
         [SerializeField] private float botDelay = 0.45f;
         [SerializeField] private int randomSeed = 12345;
 
+        /// <summary>Strength of the three bots: 1 tiles only, 2 reads danger, 3 also values waits.</summary>
+        [SerializeField] [Range(1, 3)] private int botLevel = 3;
+
         /// <summary>
         /// The HUD line. Exposed so tests and tools can read the state of the table without a screen;
         /// the mesh itself is parented to the camera and is not part of the game object hierarchy.
@@ -116,17 +119,34 @@ namespace Mahjong.Unity
         private void Start()
         {
             var random = new System.Random(randomSeed);
+            var level = BotDifficulty();
             bots = new IMahjongBot[]
             {
-                new HeuristicBot(random.Next()),
-                new HeuristicBot(random.Next()),
-                new HeuristicBot(random.Next()),
-                new HeuristicBot(random.Next())
+                new HeuristicBot(random.Next(), level),
+                new HeuristicBot(random.Next(), level),
+                new HeuristicBot(random.Next(), level),
+                new HeuristicBot(random.Next(), level)
             };
 
             BuildScene();
             session = new GameSession(SessionTimeLimit());
             StartHand(random.Next());
+        }
+
+        /// <summary>
+        /// Bot strength as a setting: the inspector value, overridable by MAHJONG_BOT_LEVEL
+        /// so a capture run can compare the levels without touching the scene.
+        /// </summary>
+        private BotLevel BotDifficulty()
+        {
+            var raw = System.Environment.GetEnvironmentVariable("MAHJONG_BOT_LEVEL");
+            var chosen = int.TryParse(raw, out var parsed) ? parsed : botLevel;
+            return chosen switch
+            {
+                1 => BotLevel.Fast,
+                2 => BotLevel.Cautious,
+                _ => BotLevel.Strategic
+            };
         }
 
         /// <summary>
@@ -205,6 +225,7 @@ namespace Mahjong.Unity
             clockKey = string.Empty;
             ClosePrompt();
             session.StartNextHand(seed);
+            BotTable.UpdateMatchContext(session, bots);
             announcedMelds.Clear();
             ClearViews();
             Rebuild();

@@ -10,7 +10,7 @@
 | `docs/scoring-golden.md` | Эталонные руки, принятые трактовки подсчёта и расхождения с независимым MCR-анализатором |
 | `Assets/Scripts/Mahjong/Rules/` | Ядро правил: кости, рука, стена, кубики, разбор руки, подсчёт, состояние руки |
 | `Assets/Scripts/Mahjong/Diagnostics/` | `RulesSelfTest` — проверки ядра, общие для Unity и headless |
-| `Assets/Scripts/Mahjong/Bots/` | `HeuristicBot` — бот уровней 1–2 (`BotLevel`), `DangerModel` — чтение стола, `BotTable` — прогон сессии между ботами |
+| `Assets/Scripts/Mahjong/Bots/` | `HeuristicBot` — бот уровней 1–3 (`BotLevel`), `DangerModel` — чтение стола, `WaitQuality` — оценка ожиданий через `Scoring`, `BotTable` — прогон сессии и передача отставания по очкам |
 | `Assets/Scripts/Mahjong/Controls/` | `ActionPrompt` — что человеку предлагают в панели действий и в каком порядке |
 | `Assets/Scripts/Mahjong/Compat/` | Полифилл `IsExternalInit` — без него `record`/`init` не собираются в Unity |
 | `Assets/Scripts/MahjongView/` | Unity-слой: 3D-тайлы, панель действий, сборка стола, ввод мышью |
@@ -24,6 +24,7 @@
 | `Tools/GoldenCompare/` | Эталонные руки и сверка с независимым MCR-анализатором (`python Tools/GoldenCompare/compare.py`) |
 | `Tools/mcr-ref/` | Обёртка над `miaoda-game-mcr-mahjong-analysis-core` для эталонного прогона |
 | `Tools/Tiles/build_atlas.py` | Сборка `tile-atlas.png` из SVG-исходников (Skia, `python Tools/Tiles/build_atlas.py`) |
+| `.github/workflows/rules.yml` | CI: `Tools/RulesCheck` на push и pull request |
 | `docs/unity-layer.md` | Как запустить 3D-прототип и что он умеет |
 | `Tiles/` + `Assets/Resources/Tiles/` | SVG-исходники лиц и собранный атлас `tile-atlas.png` |
 

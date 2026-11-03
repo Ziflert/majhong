@@ -111,22 +111,30 @@ namespace Mahjong.Bots
         Fast = 1,
 
         /// <summary>Shape plus the danger model: avoids feeding a ready opponent.</summary>
-        Cautious = 2
+        Cautious = 2,
+
+        /// <summary>Cautious reading plus what the hand is worth and what the match needs.</summary>
+        Strategic = 3
     }
 
     /// <summary>
-    /// Level one bot: keeps the hand connected, claims only what shortens the distance
-    /// to a win and always takes a legal Hu.
+    /// A bot built on three layers that it turns on with its level:
     ///
-    /// At <see cref="BotLevel.Cautious"/> the same shape reading is kept, but a discard is also
-    /// weighed against the danger model: among equally good tiles the safest goes out, and a hand
-    /// still far from a win is allowed to give up a little shape to stay safe.
+    /// 1. <see cref="BotLevel.Fast"/> — shape only: keeps the hand connected, claims only what
+    ///    shortens the distance to a win, always takes a legal Hu.
+    /// 2. <see cref="BotLevel.Cautious"/> — adds the <see cref="DangerModel"/>: among equally good
+    ///    tiles the safest goes out, and a hand still far from a win gives up a little shape
+    ///    to stay safe.
+    /// 3. <see cref="BotLevel.Strategic"/> — adds <see cref="HandValue"/> when claiming (a dragon
+    ///    pung is not the same as a chow) and shifts between push and fold according to how far
+    ///    behind it is on the score sheet (<see cref="PointsBehind"/>).
     /// </summary>
     public sealed class HeuristicBot : IMahjongBot
     {
         private const int ShantenWeight = 1000;
         private const int ShapeWeight = 10;
         private const int DangerWeight = 500;
+        private const int WaitWeight = 150;
 
         private readonly Random random;
 
@@ -137,6 +145,9 @@ namespace Mahjong.Bots
         }
 
         public BotLevel Level { get; }
+
+        /// <summary>How many game points this seat is behind the table leader; set per hand.</summary>
+        public int PointsBehind { get; set; }
 
         public LegalAction Choose(GameState state, int player, IReadOnlyList<LegalAction> options)
         {
@@ -150,14 +161,15 @@ namespace Mahjong.Bots
             var claim = options
                 .Where(option => option.Kind is ActionKind.Pung or ActionKind.Chow or ActionKind.OpenKong
                                  or ActionKind.ClosedKong or ActionKind.AddedKong)
-                .OrderBy(option => ClaimValue(option, hand))
+                .OrderByDescending(option => ClaimValue(option, hand))
                 .FirstOrDefault(option => ImprovesShanten(option, hand, baseShanten));
 
             if (claim != null && random.Next(100) < 85) return claim;
 
             var discard = options.FirstOrDefault(option => option.Kind == ActionKind.Discard);
             if (discard != null)
-                return ChooseDiscard(options, tiles, hand, Level == BotLevel.Cautious ? DangerModel.Read(state, player) : null);
+                return ChooseDiscard(options, tiles, hand, state, player,
+                    Level == BotLevel.Fast ? null : DangerModel.Read(state, player));
 
             if (options.Any(option => option.Kind == ActionKind.Draw))
                 return options.First(option => option.Kind == ActionKind.Draw);
@@ -169,7 +181,7 @@ namespace Mahjong.Bots
         {
             var tile = option.Tile?.Type;
             if (!tile.HasValue) return 0;
-            return -HandShape.Connect(tile.Value, hand.Concealed.Select(t => t.Type).ToList());
+            return HandShape.Connect(tile.Value, hand.Concealed.Select(t => t.Type).ToList());
         }
 
         private bool ImprovesShanten(LegalAction option, PlayerHand hand, int baseShanten)
@@ -183,7 +195,7 @@ namespace Mahjong.Bots
         }
 
         private LegalAction ChooseDiscard(IReadOnlyList<LegalAction> options, List<TileType> tiles,
-            PlayerHand hand, DangerModel? danger)
+            PlayerHand hand, GameState state, int player, DangerModel? danger)
         {
             var best = options[0];
             var bestScore = double.MinValue;
@@ -194,13 +206,22 @@ namespace Mahjong.Bots
                 var rest = new List<TileType>(tiles);
                 rest.Remove(type);
                 var shanten = HandShape.Shanten(rest, hand.Melds.Count);
-                var push = danger == null ? 0.0 : PushWeight(danger!.Turn, shanten);
+                var push = danger == null ? 0.0 : PushWeight(danger!.Turn, shanten, PointsBehind);
                 double score = -shanten * ShantenWeight * (1 - 0.6 * push)
                             - HandShape.Connect(type, tiles) * ShapeWeight
                             + random.Next(9);
 
                 if (danger != null)
                     score -= push * danger.Danger(type) * DangerWeight;
+
+                // A strategic bot also asks what the hand will pay: a wide wait on a full flush is
+                // worth keeping, a wait that never reaches eight points is worth breaking.
+                if (Level == BotLevel.Strategic && shanten == 0)
+                {
+                    var quality = WaitQuality.Of(rest, hand.Melds, state.SeatWindOf(player), state.RoundWind,
+                        danger == null ? null : (Func<TileType, int>)(face => danger.VisibleCopies(face)));
+                    score += Math.Min(WaitWeight, quality.Value);
+                }
 
                 if (score > bestScore) { bestScore = score; best = option; }
             }
@@ -210,8 +231,9 @@ namespace Mahjong.Bots
         /// <summary>
         /// How much the bot is willing to risk. A hand one tile away from a win pushes almost
         /// regardless; a hand still two or more steps out folds once the table is warm.
+        /// A seat far behind on the score sheet pushes harder, a seat in front folds earlier.
         /// </summary>
-        public static double PushWeight(int turn, int shantenAfterDiscard)
+        public static double PushWeight(int turn, int shantenAfterDiscard, int pointsBehind = 0)
         {
             var progress = Math.Min(1.0, turn / 30.0);
             var byDistance = shantenAfterDiscard switch
@@ -220,7 +242,8 @@ namespace Mahjong.Bots
                 1 => 0.55,
                 _ => 1.0
             };
-            return byDistance * (0.5 + 0.5 * progress);
+            var byMatch = 1.0 + Math.Clamp(pointsBehind / 80.0, -0.3, 0.3);
+            return Math.Min(1.0, byDistance * (0.5 + 0.5 * progress) * byMatch);
         }
     }
 
@@ -235,10 +258,20 @@ namespace Mahjong.Bots
             for (var handIndex = 0; handIndex < GameSession.TotalHands; handIndex++)
             {
                 session.StartNextHand(random.Next());
+                UpdateMatchContext(session, bots);
                 PlayHand(session.State!, bots, random);
                 session.CompleteHand();
             }
             return session;
+        }
+
+        /// <summary>Tells every heuristic bot how far behind it is, so it can push or fold accordingly.</summary>
+        public static void UpdateMatchContext(GameSession session, IReadOnlyList<IMahjongBot> bots)
+        {
+            var leader = session.Scores.Max();
+            for (var seat = 0; seat < bots.Count && seat < session.Scores.Count; seat++)
+                if (bots[seat] is HeuristicBot heuristic)
+                    heuristic.PointsBehind = leader - session.Scores[seat];
         }
 
         public static void PlayHand(GameState state, IReadOnlyList<IMahjongBot> bots, Random random)

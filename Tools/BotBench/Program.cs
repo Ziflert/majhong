@@ -7,11 +7,14 @@ using Mahjong.Rules;
 namespace Mahjong.BotBench
 {
     /// <summary>
-    /// Plays many sessions with mixed bot levels and reports what the levels are worth:
-    /// game points, hands won and hands dealt into. Used to tune the danger weights and to
-    /// keep the threshold of the regression test honest.
+    /// Plays many sessions with mixed bot levels and reports what each level is worth: game points,
+    /// hands won and hands dealt into. Used to tune the danger weights and to keep the thresholds of
+    /// the regression tests honest.
     ///
     ///   dotnet run --project Tools/BotBench -- [sessions]
+    ///
+    /// Points are zero-sum and swing with one big hand, so the interesting columns are wins and
+    /// deals-ins; points are printed as a sanity check only.
     /// </summary>
     public static class Program
     {
@@ -21,27 +24,28 @@ namespace Mahjong.BotBench
         {
             var sessions = args.Length > 0 ? int.Parse(args[0]) : 40;
 
-            Console.WriteLine($"Cautious bots on seats 0 and 2, fast bots on seats 1 and 3 ({sessions} sessions)");
-            var mixed = Run(sessions, new[] { BotLevel.Cautious, BotLevel.Fast, BotLevel.Cautious, BotLevel.Fast });
-            Report(mixed);
+            var matches = new (string Label, BotLevel[] Levels)[]
+            {
+                ("cautious (0,2) vs fast (1,3)", new[] { BotLevel.Cautious, BotLevel.Fast, BotLevel.Cautious, BotLevel.Fast }),
+                ("strategic (0,2) vs fast (1,3)", new[] { BotLevel.Strategic, BotLevel.Fast, BotLevel.Strategic, BotLevel.Fast }),
+                ("strategic (0,2) vs cautious (1,3)", new[] { BotLevel.Strategic, BotLevel.Cautious, BotLevel.Strategic, BotLevel.Cautious }),
+                ("every seat fast (baseline)", new[] { BotLevel.Fast, BotLevel.Fast, BotLevel.Fast, BotLevel.Fast })
+            };
 
-            Console.WriteLine();
-            Console.WriteLine($"Every seat plays fast ({sessions} sessions) — baseline");
-            var baseline = Run(sessions, new[] { BotLevel.Fast, BotLevel.Fast, BotLevel.Fast, BotLevel.Fast });
-            Report(baseline);
+            foreach (var (label, levels) in matches)
+            {
+                Console.WriteLine($"{label} — {sessions} sessions");
+                Report(Run(sessions, levels));
+                Console.WriteLine();
+            }
 
-            Console.WriteLine();
-            var cautiousPoints = mixed.Where(r => r.Level == BotLevel.Cautious).Sum(r => r.Points);
-            var fastPoints = mixed.Where(r => r.Level == BotLevel.Fast).Sum(r => r.Points);
-            Console.WriteLine($"cautious vs fast: points {cautiousPoints} : {fastPoints} " +
-                              $"(ratio {(fastPoints == 0 ? 0 : (double)cautiousPoints / fastPoints):0.00})");
             return 0;
         }
 
         private static List<SeatResult> Run(int sessions, BotLevel[] levels)
         {
             var totals = Enumerable.Range(0, 4)
-                .Select(seat => new SeatResult(seat, levels[seat], 0, 0, 0, 0))
+                .Select(seat => new SeatResult(seat, levels[seat], 0, 0, 0))
                 .ToList();
 
             for (var sessionIndex = 0; sessionIndex < sessions; sessionIndex++)
@@ -55,6 +59,7 @@ namespace Mahjong.BotBench
                 for (var hand = 0; hand < HandsPerSession; hand++)
                 {
                     session.StartNextHand(random.Next());
+                    BotTable.UpdateMatchContext(session, bots);
                     BotTable.PlayHand(session.State!, bots, random);
 
                     var result = session.State!.Result;
@@ -79,10 +84,17 @@ namespace Mahjong.BotBench
         private static void Report(List<SeatResult> results)
         {
             foreach (var result in results)
-                Console.WriteLine($"  seat {result.Seat} {result.Level,-8} points {result.Points,7}  " +
+                Console.WriteLine($"  seat {result.Seat} {result.Level,-10} points {result.Points,7}  " +
                                   $"wins {result.Wins,4}  dealt in {result.DealtIn,4}");
+
+            foreach (var level in results.Select(r => r.Level).Distinct())
+            {
+                var seats = results.Where(r => r.Level == level).ToList();
+                Console.WriteLine($"  {level,-10} total wins {seats.Sum(r => r.Wins),4}  " +
+                                  $"dealt in {seats.Sum(r => r.DealtIn),4}  points {seats.Sum(r => r.Points),7}");
+            }
         }
 
-        private sealed record SeatResult(int Seat, BotLevel Level, int Points, int Wins, int DealtIn, int Unused);
+        private sealed record SeatResult(int Seat, BotLevel Level, int Points, int Wins, int DealtIn);
     }
 }
