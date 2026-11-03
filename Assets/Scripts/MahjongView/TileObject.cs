@@ -26,6 +26,8 @@ namespace Mahjong.Unity
 
         private TextMesh label = null!;
         private Renderer body = null!;
+        private Renderer atlasFace = null!;
+        private static readonly Texture2D TileAtlas = Resources.Load<Texture2D>("Tiles/tile-atlas");
 
         /// <summary>A fresh tile shows neither face nor back until one of them is bound.</summary>
         private bool faceSet;
@@ -60,8 +62,29 @@ namespace Mahjong.Unity
 
             var tile = root.AddComponent<TileObject>();
             tile.body = bodyObject.GetComponent<Renderer>();
+            tile.atlasFace = CreateAtlasFace(root.transform);
             tile.label = CreateLabel(root.transform);
             return tile;
+        }
+
+        private static Renderer CreateAtlasFace(Transform parent)
+        {
+            var face = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            face.name = "atlas-face";
+            face.transform.SetParent(parent, false);
+            face.transform.localPosition = new Vector3(0f, Height * 0.5f + 0.0018f, 0f);
+            face.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+            face.transform.localScale = new Vector3(Width * 0.92f, Length * 0.92f, 1f);
+            Object.Destroy(face.GetComponent<Collider>());
+            var renderer = face.GetComponent<Renderer>();
+            if (TileAtlas != null)
+            {
+                var material = new Material(Shader.Find("Unlit/Transparent"));
+                material.mainTexture = TileAtlas;
+                renderer.material = material;
+            }
+            face.SetActive(TileAtlas != null);
+            return renderer;
         }
 
         private static TextMesh CreateLabel(Transform parent)
@@ -95,7 +118,13 @@ namespace Mahjong.Unity
             label.text = TileLabel.Short(type);
             label.color = TileLabel.Text(type);
             body.material.color = TileLabel.Face(type);
-            label.gameObject.SetActive(true);
+            label.gameObject.SetActive(TileAtlas == null);
+            if (TileAtlas != null)
+            {
+                atlasFace.material.mainTextureScale = AtlasScale(type);
+                atlasFace.material.mainTextureOffset = AtlasOffset(type);
+                atlasFace.gameObject.SetActive(true);
+            }
         }
 
         public void BindBack()
@@ -105,6 +134,7 @@ namespace Mahjong.Unity
             label.text = string.Empty;
             body.material.color = new Color(0.25f, 0.45f, 0.3f);
             label.gameObject.SetActive(false);
+            atlasFace.gameObject.SetActive(false);
         }
 
         /// <summary>Shows a face, doing nothing when the tile already shows it.</summary>
@@ -119,6 +149,23 @@ namespace Mahjong.Unity
         {
             if (faceSet && !IsFaceUp) return;
             BindBack();
+        }
+
+        private static Vector2 AtlasScale(TileType type) => new(1f / 9f, 1f / 5f);
+
+        private static Vector2 AtlasOffset(TileType type)
+        {
+            var column = 0;
+            var row = 0;
+            if (type.IsNumbered)
+            {
+                column = type.Rank - 1;
+                row = type.Suit switch { TileSuit.Characters => 4, TileSuit.Dots => 3, _ => 2 };
+            }
+            else if (type.IsWind) { column = type.Rank; row = 1; }
+            else if (type.IsDragon) { column = 4 + type.Rank; row = 1; }
+            else { column = type.Rank; row = 0; }
+            return new Vector2(column / 9f, (4 - row) / 5f);
         }
 
         public void SetHighlight(bool highlighted)
