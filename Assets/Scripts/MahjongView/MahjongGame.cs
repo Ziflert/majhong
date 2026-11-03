@@ -65,6 +65,18 @@ namespace Mahjong.Unity
         /// <summary>Tiles rest on the table top, which sits at y = -0.005.</summary>
         private const float TileY = 0.01f;
 
+        /// <summary>Extra start time per freshly created tile, so an opening hand is dealt in order.</summary>
+        private const float DealStagger = 0.014f;
+
+        /// <summary>Ceiling for the deal stagger: a wall of new tiles must not crawl in forever.</summary>
+        private const float MaxDealDelay = 0.35f;
+
+        /// <summary>Index of the fresh tile being placed in the current rebuild; reset by <see cref="Rebuild"/>.</summary>
+        private int dealIndex;
+
+        /// <summary>Meld signatures already shown, so a kong hops only once when it is declared.</summary>
+        private readonly HashSet<string> announcedMelds = new();
+
         /// <summary>One view per engine tile, keyed by instance id: identity is what makes slides possible.</summary>
         private readonly Dictionary<int, TileObject> tilesById = new();
 
@@ -193,6 +205,7 @@ namespace Mahjong.Unity
             clockKey = string.Empty;
             ClosePrompt();
             session.StartNextHand(seed);
+            announcedMelds.Clear();
             ClearViews();
             Rebuild();
         }
@@ -565,6 +578,7 @@ namespace Mahjong.Unity
             var hand = state.Players[humanSeat];
             var used = new HashSet<int>();
             handTiles.Clear();
+            dealIndex = 0;
 
             var sorted = hand.Concealed.OrderBy(t => t.Type.Suit).ThenBy(t => t.Type.Rank).ToList();
             for (var i = 0; i < sorted.Count; i++)
@@ -576,7 +590,8 @@ namespace Mahjong.Unity
             // Melds get their own horizontal slots. Previously every meld started at the same x
             // coordinate, so the second declared combination slid on top of the first one. A claimed
             // tile is turned sideways: this is both the conventional mahjong marking and an explicit
-            // visual phase for an open claim. Closed-kong centre tiles remain face down.
+            // visual phase for an open claim. A closed kong shows its outer tiles face down and the
+            // middle pair face up, which is how a concealed kong is marked on a real table.
             for (var i = 0; i < hand.Melds.Count; i++)
             {
                 var meld = hand.Melds[i];
@@ -584,11 +599,13 @@ namespace Mahjong.Unity
                 for (var k = 0; k < meld.Tiles.Count; k++)
                 {
                     var tile = meld.Tiles[k];
-                    var faceUp = meld.Kind != MeldKind.ClosedKong || (k != 1 && k != 2);
+                    var faceUp = meld.Kind != MeldKind.ClosedKong || (k == 1 || k == 2);
                     var sideways = IsMeldMarker(meld, k) ? 90f : 0f;
                     Place(tile, used, "meld", new Vector3(originX + k * 0.062f, TileY, -0.41f), sideways, faceUp);
                 }
             }
+
+            AnnounceKongs(hand.Melds);
 
             for (var player = 0; player < 4; player++)
             {
@@ -628,6 +645,27 @@ namespace Mahjong.Unity
         }
 
         /// <summary>
+        /// A declared kong gets a visible beat of its own: its tiles hop once they have landed in the
+        /// meld slot. The engine says nothing about "this is new", so a meld is remembered by the
+        /// instance ids of its tiles; anything not seen before is the declaration of this very action.
+        /// </summary>
+        private void AnnounceKongs(IReadOnlyList<Meld> melds)
+        {
+            foreach (var meld in melds)
+            {
+                var key = $"{meld.Kind}:" + string.Join(",", meld.Tiles.Select(t => t.InstanceId));
+                if (!announcedMelds.Add(key)) continue;
+                if (!meld.IsKong) continue;
+
+                foreach (var tile in meld.Tiles)
+                {
+                    if (tilesById.TryGetValue(tile.InstanceId, out var view) && view != null)
+                        view.Pulse(height: 0.045f, duration: 0.26f, delay: view.LandingDelay);
+                }
+            }
+        }
+
+        /// <summary>
         /// Places one engine tile on the table, reusing its view object. A tile seen for the first time
         /// appears at the wall and slides to its place, which is the dealing animation as well.
         /// </summary>
@@ -643,6 +681,7 @@ namespace Mahjong.Unity
         private TileObject Place(Tile tile, HashSet<int> used, string name, Vector3 position, float rotationY,
             bool faceUp = true)
         {
+            var isNew = false;
             if (!tilesById.TryGetValue(tile.InstanceId, out var view) || view == null)
             {
                 view = TileObject.Create(board, name);
@@ -650,12 +689,18 @@ namespace Mahjong.Unity
                 var slot = tilesById.Count % 7;
                 view.SpawnAt(new Vector3(-0.18f + slot * 0.06f, TileY, 0.52f));
                 tilesById[tile.InstanceId] = view;
+                isNew = true;
             }
 
             view.gameObject.name = name;
             if (faceUp) view.SetFace(tile.Type);
             else view.SetBack();
-            view.SetTarget(position, rotationY);
+
+            // A whole opening hand appears in one frame. Giving every fresh tile a slightly later
+            // start turns that into a dealt sequence; a single replacement tile (index 0 here) starts
+            // at once, and the stagger is capped so a wall of new tiles does not crawl.
+            var delay = isNew ? Mathf.Min(dealIndex++ * DealStagger, MaxDealDelay) : 0f;
+            view.SetTarget(position, rotationY, delay);
             used.Add(tile.InstanceId);
             return view;
         }

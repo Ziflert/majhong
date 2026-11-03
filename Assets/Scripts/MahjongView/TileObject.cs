@@ -49,8 +49,21 @@ namespace Mahjong.Unity
         private bool hasTarget;
         private bool animating;
 
-        /// <summary>True once the tile has arrived: the position is reached and the turn is done.</summary>
-        public bool IsSettled => hasTarget && !animating;
+        /// <summary>Where the slide ends; the hop of <see cref="Pulse"/> is added on top of it.</summary>
+        private Vector3 basePosition;
+
+        private float pulseElapsed;
+        private float pulseDelay;
+        private float pulseDuration;
+        private float pulseHeight;
+        private float pulseOffset;
+        private bool pulsing;
+
+        /// <summary>How long the tile still needs before it lands; a hop waits for this.</summary>
+        public float LandingDelay => animating ? Mathf.Max(0f, animationDelay + animationDuration - animationElapsed) : 0f;
+
+        /// <summary>True once the tile has arrived: the position is reached, the turn is done and no hop is left.</summary>
+        public bool IsSettled => hasTarget && !animating && !pulsing;
 
         public static TileObject Create(Transform parent, string name)
         {
@@ -194,70 +207,121 @@ namespace Mahjong.Unity
             Snap();
         }
 
-        /// <summary>Sets where the tile has to go; the next frames animate it with a short hop.</summary>
-        public void SetTarget(Vector3 position, float rotationY)
+        /// <summary>
+        /// Sets where the tile has to go; the next frames animate it with a short hop. An extra delay
+        /// lets the caller deal the table in sequence instead of moving every tile on the same frame.
+        /// </summary>
+        public void SetTarget(Vector3 position, float rotationY, float extraDelay = 0f)
         {
             var destinationRotation = Quaternion.Euler(0f, rotationY, 0f);
             TargetPosition = position;
             TargetRotationY = rotationY;
             hasTarget = true;
 
-            var distance = Vector3.Distance(transform.position, position);
+            var distance = Vector3.Distance(basePosition, position);
             var angle = Mathf.Abs(Mathf.DeltaAngle(transform.rotation.eulerAngles.y, rotationY));
-            animationStartPosition = transform.position;
+            animationStartPosition = basePosition;
             animationStartRotation = transform.rotation;
             animationElapsed = 0f;
-            animationDelay = distance > 0.2f ? 0.025f : 0f;
+            animationDelay = Mathf.Max(0f, extraDelay) + (distance > 0.2f ? 0.025f : 0f);
             animationDuration = Mathf.Clamp(Mathf.Max(distance / SlideSpeed, angle / TurnSpeed), 0.08f, 0.42f);
             animationArc = distance > 0.12f ? Mathf.Clamp(distance * 0.22f, 0.012f, 0.045f) : 0f;
             animating = distance > 0.0001f || angle > 0.5f;
             if (!animating)
             {
-                transform.position = position;
+                basePosition = position;
                 transform.rotation = destinationRotation;
             }
+
+            transform.position = basePosition + Vector3.up * pulseOffset;
+        }
+
+        /// <summary>
+        /// A short upward hop, used to mark a declared kong. The hop is an offset on top of the slide
+        /// target, so it can be scheduled while the tile is still travelling and never fights with it.
+        /// </summary>
+        public void Pulse(float height = 0.03f, float duration = 0.24f, float delay = 0f)
+        {
+            pulseElapsed = 0f;
+            pulseDelay = Mathf.Max(0f, delay);
+            pulseDuration = Mathf.Max(0.05f, duration);
+            pulseHeight = height;
+            pulsing = true;
         }
 
         /// <summary>Puts the tile at its target without animating.</summary>
         public void Snap()
         {
-            transform.position = TargetPosition;
+            hasTarget = true;
+            basePosition = TargetPosition;
             transform.rotation = Quaternion.Euler(0f, TargetRotationY, 0f);
             animating = false;
+            pulsing = false;
+            pulseOffset = 0f;
+            transform.position = basePosition;
         }
 
         public void SpawnAt(Vector3 position)
         {
+            basePosition = position;
             transform.position = position;
             hasTarget = false;
             animating = false;
+            pulsing = false;
+            pulseOffset = 0f;
         }
 
         /// <summary>
-        /// The whole animation of the table: every tile glides towards the place the engine gave it.
-        /// Tiles keep their identity between rebuilds, so a discard travels from the hand to the pile
-        /// instead of jumping there as a new object.
+        /// The whole animation of the table: every tile glides towards the place the engine gave it
+        /// and can hop on top of that. Tiles keep their identity between rebuilds, so a discard travels
+        /// from the hand to the pile instead of jumping there as a new object.
         /// </summary>
         private void Update()
+        {
+            UpdateSlide();
+            UpdatePulse();
+            transform.position = basePosition + Vector3.up * pulseOffset;
+        }
+
+        private void UpdateSlide()
         {
             if (!animating) return;
 
             animationElapsed += Time.deltaTime;
-            if (animationElapsed < animationDelay) return;
-
             var t = Mathf.Clamp01((animationElapsed - animationDelay) / animationDuration);
             // Smooth-step gives the move a deliberate ease-in/ease-out instead of robotic constant speed.
             var eased = t * t * (3f - 2f * t);
-            transform.position = Vector3.LerpUnclamped(animationStartPosition, TargetPosition, eased);
-            transform.position += Vector3.up * (Mathf.Sin(t * Mathf.PI) * animationArc);
+            basePosition = Vector3.LerpUnclamped(animationStartPosition, TargetPosition, eased);
+            var arc = Vector3.up * (Mathf.Sin(t * Mathf.PI) * animationArc);
+            basePosition += arc;
             transform.rotation = Quaternion.Slerp(animationStartRotation,
                 Quaternion.Euler(0f, TargetRotationY, 0f), eased);
 
             if (t >= 1f)
             {
-                transform.position = TargetPosition;
+                basePosition = TargetPosition;
                 transform.rotation = Quaternion.Euler(0f, TargetRotationY, 0f);
                 animating = false;
+            }
+        }
+
+        private void UpdatePulse()
+        {
+            if (!pulsing) return;
+
+            pulseElapsed += Time.deltaTime;
+            if (pulseElapsed < pulseDelay)
+            {
+                pulseOffset = 0f;
+                return;
+            }
+
+            var t = Mathf.Clamp01((pulseElapsed - pulseDelay) / pulseDuration);
+            pulseOffset = Mathf.Sin(t * Mathf.PI) * pulseHeight;
+            if (t >= 1f)
+            {
+                pulsing = false;
+                pulseOffset = 0f;
             }
         }
 
