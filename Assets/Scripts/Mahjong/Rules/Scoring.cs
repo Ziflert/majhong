@@ -602,7 +602,7 @@ namespace Mahjong.Rules
             ["little-four-winds"] = new[] { "big-three-winds", "pung-of-terminals-or-honors" },
             ["little-three-dragons"] = new[] { "two-dragon-pungs", "dragon-pung" },
             ["all-honors"] = new[] { "all-pungs", "outside-hand", "pung-of-terminals-or-honors", "all-terminals-and-honors" },
-            ["four-concealed-pungs"] = new[] { "concealed-hand", "all-pungs", "three-concealed-pungs", "two-concealed-pungs" },
+            ["four-concealed-pungs"] = new[] { "concealed-hand", "all-pungs", "three-concealed-pungs", "two-concealed-pungs", "single-wait" },
             ["four-terminal-chows"] = new[] { "full-flush", "all-chows", "seven-pairs", "pure-double-chow", "mixed-double-chow", "two-terminal-chows" },
             ["quadruple-chow"] = new[] { "pure-double-chow", "pure-triple-chow", "tile-hog", "pure-shifted-pungs" },
             ["four-pure-shifted-pungs"] = new[] { "pure-double-chow", "pure-triple-chow", "tile-hog", "pure-shifted-pungs" },

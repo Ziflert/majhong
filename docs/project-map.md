@@ -7,6 +7,7 @@
 | `docs/rule-text.md` | Извлечённый текст правил для поиска и сверки (UTF-8) |
 | `docs/plan.md` | План, статус задач и затупы — главный файл для «что дальше» |
 | `docs/rules-status.md` | Что реализовано, какие упрощения и что осталось по правилам |
+| `docs/scoring-golden.md` | Эталонные руки, принятые трактовки подсчёта и расхождения с независимым MCR-анализатором |
 | `Assets/Scripts/Mahjong/Rules/` | Ядро правил: кости, рука, стена, кубики, разбор руки, подсчёт, состояние руки |
 | `Assets/Scripts/Mahjong/Diagnostics/` | `RulesSelfTest` — проверки ядра, общие для Unity и headless |
 | `Assets/Scripts/Mahjong/Bots/` | `HeuristicBot` — бот уровня 1, `BotTable` — прогон сессии между ботами |

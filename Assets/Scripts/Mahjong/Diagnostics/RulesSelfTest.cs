@@ -63,6 +63,7 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "hand: seven pairs may use four of a kind as two pairs", () => SevenPairsWithQuad(report));
             Run(report, "score: knitted tiles (lesser and greater)", () => ScoreKnittedTiles(report));
             Run(report, "score: knitted straight hand", () => ScoreKnittedStraight(report));
+            Run(report, "score: golden interpretation boundaries", () => ScoreGoldenInterpretationBoundaries(report));
             Run(report, "settlement: self-draw and discard payments", () => SettlementPayments(report));
             Run(report, "session: sixteen hands, dealer rotation and table points", () => SessionFlow(report));
             Run(report, "penalties: catalogue, escalation and doubling", () => PenaltyEscalation(report));
@@ -386,6 +387,27 @@ namespace Mahjong.Rules.Diagnostics
             var result = Score(hand, null, ClaimSource.SelfDraw);
             report.Check(result.IsValidWin, $"knitted straight must reach the minimum: {result.Error}");
             report.Check(Has(result, Fans.KnittedStraight), $"expected knitted straight, got [{Ids(result)}]");
+        }
+
+        private static void ScoreGoldenInterpretationBoundaries(SelfTestReport report)
+        {
+            // MCR interpretation: Four Concealed Pungs suppresses Single Wait.
+            var fourPungs = Score(Hand("1c 1c 1c 3c 3c 3c 5d 5d 5d 7b 7b 7b 9d 9d"), null, ClaimSource.Discard);
+            report.Check(Has(fourPungs, Fans.FourConcealedPungs), "golden: four concealed pungs");
+            report.Check(!Has(fourPungs, Fans.SingleWait), "golden: four concealed pungs suppresses single wait");
+
+            // The fourth visible copy includes the winning discard, which earns Last Tile.
+            var last = Hand("1c 2c 3c 4c 5c 6c 7c 8c 9c 1d 2d 5d 5d");
+            var winning = ParseTile("3d");
+            var discardPile = new[] { ParseTile("3d"), ParseTile("3d"), ParseTile("3d") };
+            var lastResult = Scoring.Evaluate(new ScoringContext
+            {
+                Hand = last,
+                WinningTile = winning,
+                Source = ClaimSource.Discard,
+                DiscardPile = discardPile
+            });
+            report.Check(Has(lastResult, Fans.LastTile), "golden: winning tile completes the fourth visible copy");
         }
 
         private static void SettlementPayments(SelfTestReport report)
