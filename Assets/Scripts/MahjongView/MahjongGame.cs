@@ -573,11 +573,21 @@ namespace Mahjong.Unity
                 handTiles[sorted[i].InstanceId] = view;
             }
 
+            // Melds get their own horizontal slots. Previously every meld started at the same x
+            // coordinate, so the second declared combination slid on top of the first one. A claimed
+            // tile is turned sideways: this is both the conventional mahjong marking and an explicit
+            // visual phase for an open claim. Closed-kong centre tiles remain face down.
             for (var i = 0; i < hand.Melds.Count; i++)
             {
                 var meld = hand.Melds[i];
+                var originX = -0.57f + i * 0.285f;
                 for (var k = 0; k < meld.Tiles.Count; k++)
-                    Place(meld.Tiles[k], used, "meld", new Vector3(-0.40f + k * 0.062f, TileY, -0.41f - i * 0.078f), 0f);
+                {
+                    var tile = meld.Tiles[k];
+                    var faceUp = meld.Kind != MeldKind.ClosedKong || (k != 1 && k != 2);
+                    var sideways = IsMeldMarker(meld, k) ? 90f : 0f;
+                    Place(tile, used, "meld", new Vector3(originX + k * 0.062f, TileY, -0.41f), sideways, faceUp);
+                }
             }
 
             for (var player = 0; player < 4; player++)
@@ -621,6 +631,15 @@ namespace Mahjong.Unity
         /// Places one engine tile on the table, reusing its view object. A tile seen for the first time
         /// appears at the wall and slides to its place, which is the dealing animation as well.
         /// </summary>
+        private static bool IsMeldMarker(Meld meld, int tileIndex)
+        {
+            // For a discard claim, the claimed tile is the last tile in the engine's meld list.
+            // Added kongs likewise mark the fourth tile; a closed kong has no exposed marker.
+            if (meld.Kind == MeldKind.ClosedKong) return false;
+            if (meld.Kind == MeldKind.AddedKong) return tileIndex == meld.Tiles.Count - 1;
+            return meld.ClaimedFromPlayer.HasValue && tileIndex == meld.Tiles.Count - 1;
+        }
+
         private TileObject Place(Tile tile, HashSet<int> used, string name, Vector3 position, float rotationY,
             bool faceUp = true)
         {
