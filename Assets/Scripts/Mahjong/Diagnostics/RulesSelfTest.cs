@@ -76,6 +76,8 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "clock: three, ten and twenty-second windows", () => HandClockRules(report));
             Run(report, "clock: silence becomes a pass or a discard, never a Hu", () => ClockExpiryRules(report));
             Run(report, "claims: priority of Hu, kong, pung, chow and seat order", () => ClaimPriorityRules(report));
+            Run(report, "bots: the danger read follows the tiles on the table", () => DangerReads(report));
+            Run(report, "bots: the cautious level throws safer tiles without wrecking shape", () => BotDefense(report));
             Run(report, "state: every mechanic is reachable in random play", () => RandomPlayInvariants(report));
 
             return report;
@@ -1109,6 +1111,144 @@ namespace Mahjong.Rules.Diagnostics
 
             report.Equal(1, ClaimPriority.Distance(1, 0), "the next seat is one step away");
             report.Equal(1, ClaimPriority.Distance(0, 3), "the round wraps from North to East");
+        }
+
+        private static void DangerReads(SelfTestReport report)
+        {
+            // A table built by hand: seat 1 threw 5c and holds an open pung of 3b,
+            // seat 2 threw 1c. Nothing else is public.
+            var state = new GameState();
+            state.Players[1].AddDiscard(new Tile(ParseTile("5c"), 1));
+            state.Players[1].AddMeld(new Meld(MeldKind.Pung, Tiles("3b 3b 3b"), 0));
+            state.Players[2].AddDiscard(new Tile(ParseTile("1c"), 2));
+
+            var model = DangerModel.Read(state, 0);
+
+            report.Equal(0.0, model.Pressure(0), "a player is not a threat to itself");
+            report.Check(model.Turn == 2, $"two discards should be on the table, got {model.Turn}");
+            report.Check(model.VisibleCopies(ParseTile("3b")) == 3, "a meld makes its three tiles visible");
+
+            var ownDiscard = model.FaceDanger(ParseTile("5c"), 1);
+            var freshFace = model.FaceDanger(ParseTile("5d"), 1);
+            report.Check(ownDiscard < freshFace,
+                $"a face the opponent already threw must read safer than a fresh one ({ownDiscard:0.00} vs {freshFace:0.00})");
+            report.Check(ownDiscard > 0.0,
+                "MCR has no furiten, so an opponent's own discard is unlikely but never impossible");
+
+            var melded = model.Danger(ParseTile("3b"));
+            report.Check(melded < model.Danger(ParseTile("4b")),
+                $"a face locked in an opponent's meld is safer than a fresh neighbour ({melded:0.00} vs {model.Danger(ParseTile("4b")):0.00})");
+
+            report.Check(model.Danger(ParseTile("1d")) < model.Danger(ParseTile("5d")),
+                "terminals wait on fewer shapes than middle tiles");
+            // Three copies of an honour are on the table: no pung and no pair wait is possible.
+            var honourState = new GameState();
+            honourState.Players[1].AddDiscard(new Tile(ParseTile("Rd"), 10));
+            honourState.Players[2].AddDiscard(new Tile(ParseTile("Rd"), 11));
+            honourState.Players[3].AddMeld(new Meld(MeldKind.Pung, Tiles("Rd Rd Rd"), 1));
+            var honourModel = DangerModel.Read(honourState, 0);
+            report.Check(honourModel.Danger(ParseTile("Rd")) < 0.1,
+                $"three visible copies of an honour leave nothing to wait on, got {honourModel.Danger(ParseTile("Rd")):0.00}");
+            report.Check(honourModel.Danger(ParseTile("Gd")) > honourModel.Danger(ParseTile("Rd")),
+                "a dragon nobody has shown is more dangerous than one that is exhausted");
+
+            // The same face gets worse as the table warms up: more melds, more discards.
+            var warmState = new GameState();
+            for (var index = 0; index < 12; index++)
+                warmState.Players[index % 4].AddDiscard(new Tile(new TileType(TileSuit.Dots, index % 9 + 1), 100 + index));
+            warmState.Players[1].AddMeld(new Meld(MeldKind.Chow, Tiles("1d 2d 3d"), 0));
+            warmState.Players[1].AddMeld(new Meld(MeldKind.Pung, Tiles("7d 7d 7d"), 0));
+            var warm = DangerModel.Read(warmState, 0);
+            report.Check(warm.Pressure(1) > model.Pressure(1),
+                $"melds and discards must raise the pressure (warm {warm.Pressure(1):0.00}, cold {model.Pressure(1):0.00})");
+            report.Check(warm.Pressure(1) <= 1.0, "pressure stays inside zero to one");
+
+            // Copies in the own hand cut the danger: fewer copies are left for a wait.
+            var ownState = new GameState();
+            ownState.Players[0].AddConcealed(new Tile(ParseTile("6d"), 20));
+            ownState.Players[0].AddConcealed(new Tile(ParseTile("6d"), 21));
+            var holding = DangerModel.Read(ownState, 0).Danger(ParseTile("6d"));
+            var notHolding = DangerModel.Read(ownState, 1).Danger(ParseTile("6d"));
+            report.Check(holding < notHolding,
+                $"two copies in the own hand make a face safer ({holding:0.00} vs {notHolding:0.00})");
+        }
+
+        private static void BotDefense(SelfTestReport report)
+        {
+            var dangerFast = 0.0;
+            var dangerCautious = 0.0;
+            var shantenFast = 0.0;
+            var shantenCautious = 0.0;
+            var decisions = 0;
+
+            for (var handIndex = 0; handIndex < 6; handIndex++)
+            {
+                var state = new GameState();
+                state.StartHand(handIndex % 4, 5000 + handIndex);
+                var bots = Enumerable.Range(0, 4)
+                    .Select(seat => (Cautious: new HeuristicBot(handIndex * 7 + seat, BotLevel.Cautious),
+                        Fast: new HeuristicBot(handIndex * 14 + seat * 2, BotLevel.Fast)))
+                    .ToArray();
+                var random = new Random(handIndex);
+                var steps = 0;
+
+                while (state.Phase != GamePhase.HandFinished && steps++ < 2000)
+                {
+                    if (state.Phase is GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)
+                    {
+                        for (var player = 0; player < 4; player++)
+                        {
+                            var options = state.GetLegalActions(player);
+                            if (options.Count == 0) continue;
+                            state.Apply(bots[player].Fast.Choose(state, player, options));
+                            if (state.Phase is not (GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)) break;
+                        }
+                        continue;
+                    }
+
+                    var actor = state.CurrentPlayer;
+                    var current = state.GetLegalActions(actor);
+                    if (current.Count == 0) break;
+
+                    if (current.Any(option => option.Kind == ActionKind.Discard))
+                    {
+                        var model = DangerModel.Read(state, actor);
+                        var tiles = state.Players[actor].Concealed.Select(tile => tile.Type).ToList();
+
+                        var cautious = bots[actor].Cautious.Choose(state, actor, current);
+                        var fast = bots[actor].Fast.Choose(state, actor, current);
+                        if (cautious.Kind == ActionKind.Discard && fast.Kind == ActionKind.Discard)
+                        {
+                            decisions++;
+                            dangerCautious += model.Danger(cautious.Tile!.Value.Type);
+                            dangerFast += model.Danger(fast.Tile!.Value.Type);
+                            shantenCautious += ShantenAfter(tiles, cautious.Tile!.Value.Type, state.Players[actor].Melds.Count);
+                            shantenFast += ShantenAfter(tiles, fast.Tile!.Value.Type, state.Players[actor].Melds.Count);
+                        }
+                    }
+
+                    state.Apply(bots[state.CurrentPlayer].Fast.Choose(state, state.CurrentPlayer, current));
+                }
+
+                report.Check(true, "a hand with the cautious bot reaches the end");
+            }
+
+            report.Check(decisions > 200, $"the comparison should see many discards, got {decisions}");
+            var avgCautious = dangerCautious / Math.Max(1, decisions);
+            var avgFast = dangerFast / Math.Max(1, decisions);
+            var shantenCost = (shantenCautious - shantenFast) / Math.Max(1, decisions);
+
+            report.Check(avgCautious < avgFast * 0.9,
+                $"the cautious level must throw safer tiles (cautious {avgCautious:0.000}, fast {avgFast:0.000})");
+            report.Check(shantenCost < 0.1,
+                $"safety must not cost much shape, average shanten cost was {shantenCost:0.000}");
+        }
+
+        private static int ShantenAfter(List<TileType> tiles, TileType discarded, int meldCount)
+        {
+            var rest = new List<TileType>(tiles);
+            rest.Remove(discarded);
+            return HandShape.Shanten(rest, meldCount);
         }
 
         private static LegalAction Choose(IReadOnlyList<LegalAction> options, Random random, PlayerHand hand)

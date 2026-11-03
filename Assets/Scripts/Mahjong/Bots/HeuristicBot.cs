@@ -104,15 +104,39 @@ namespace Mahjong.Bots
         LegalAction Choose(GameState state, int player, IReadOnlyList<LegalAction> options);
     }
 
+    /// <summary>How much of the table the bot reads when it chooses a discard.</summary>
+    public enum BotLevel
+    {
+        /// <summary>Tiles only: shape of the own hand, no danger read.</summary>
+        Fast = 1,
+
+        /// <summary>Shape plus the danger model: avoids feeding a ready opponent.</summary>
+        Cautious = 2
+    }
+
     /// <summary>
     /// Level one bot: keeps the hand connected, claims only what shortens the distance
-    /// to a win and always takes a legal Hu. It does not track danger yet.
+    /// to a win and always takes a legal Hu.
+    ///
+    /// At <see cref="BotLevel.Cautious"/> the same shape reading is kept, but a discard is also
+    /// weighed against the danger model: among equally good tiles the safest goes out, and a hand
+    /// still far from a win is allowed to give up a little shape to stay safe.
     /// </summary>
     public sealed class HeuristicBot : IMahjongBot
     {
+        private const int ShantenWeight = 1000;
+        private const int ShapeWeight = 10;
+        private const int DangerWeight = 500;
+
         private readonly Random random;
 
-        public HeuristicBot(int seed = 0) => random = new Random(seed);
+        public HeuristicBot(int seed = 0, BotLevel level = BotLevel.Fast)
+        {
+            random = new Random(seed);
+            Level = level;
+        }
+
+        public BotLevel Level { get; }
 
         public LegalAction Choose(GameState state, int player, IReadOnlyList<LegalAction> options)
         {
@@ -132,7 +156,8 @@ namespace Mahjong.Bots
             if (claim != null && random.Next(100) < 85) return claim;
 
             var discard = options.FirstOrDefault(option => option.Kind == ActionKind.Discard);
-            if (discard != null) return ChooseDiscard(options, tiles);
+            if (discard != null)
+                return ChooseDiscard(options, tiles, hand, Level == BotLevel.Cautious ? DangerModel.Read(state, player) : null);
 
             if (options.Any(option => option.Kind == ActionKind.Draw))
                 return options.First(option => option.Kind == ActionKind.Draw);
@@ -157,21 +182,45 @@ namespace Mahjong.Bots
             return HandShape.Shanten(remaining, melds) <= baseShanten;
         }
 
-        private LegalAction ChooseDiscard(IReadOnlyList<LegalAction> options, List<TileType> tiles)
+        private LegalAction ChooseDiscard(IReadOnlyList<LegalAction> options, List<TileType> tiles,
+            PlayerHand hand, DangerModel? danger)
         {
             var best = options[0];
-            var bestScore = int.MinValue;
+            var bestScore = double.MinValue;
 
             foreach (var option in options.Where(o => o.Kind == ActionKind.Discard))
             {
                 var type = option.Tile!.Value.Type;
                 var rest = new List<TileType>(tiles);
                 rest.Remove(type);
-                var shanten = HandShape.Shanten(rest, 0);
-                var score = -shanten * 1000 - HandShape.Connect(type, tiles) * 10 + random.Next(9);
+                var shanten = HandShape.Shanten(rest, hand.Melds.Count);
+                var push = danger == null ? 0.0 : PushWeight(danger!.Turn, shanten);
+                double score = -shanten * ShantenWeight * (1 - 0.6 * push)
+                            - HandShape.Connect(type, tiles) * ShapeWeight
+                            + random.Next(9);
+
+                if (danger != null)
+                    score -= push * danger.Danger(type) * DangerWeight;
+
                 if (score > bestScore) { bestScore = score; best = option; }
             }
             return best;
+        }
+
+        /// <summary>
+        /// How much the bot is willing to risk. A hand one tile away from a win pushes almost
+        /// regardless; a hand still two or more steps out folds once the table is warm.
+        /// </summary>
+        public static double PushWeight(int turn, int shantenAfterDiscard)
+        {
+            var progress = Math.Min(1.0, turn / 30.0);
+            var byDistance = shantenAfterDiscard switch
+            {
+                0 => 0.15,
+                1 => 0.55,
+                _ => 1.0
+            };
+            return byDistance * (0.5 + 0.5 * progress);
         }
     }
 
