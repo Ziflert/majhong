@@ -25,3 +25,7 @@ Recordings/
 *.mdb.meta
 crashlytics-build.properties
 sysinfo.txt
+
+# Prototype screenshot runs
+Screenshots/
+__pycache__/

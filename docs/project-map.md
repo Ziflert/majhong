@@ -18,7 +18,9 @@
 | `Assets/Editor/PrototypeCapture.cs` | Прогон прототипа из CLI: Play, скриншоты Game view, коды выхода |
 | `Assets/Editor/ActionBarPreview.cs` | Скриншот панели действий на заданном наборе кнопок |
 | `Tools/RulesCheck/` | Консольный прогон проверок без Unity (`dotnet run`) |
+| `Tools/Tiles/build_atlas.py` | Сборка `tile-atlas.png` из SVG-исходников (Skia, `python Tools/Tiles/build_atlas.py`) |
 | `docs/unity-layer.md` | Как запустить 3D-прототип и что он умеет |
+| `Tiles/` + `Assets/Resources/Tiles/` | SVG-исходники лиц и собранный атлас `tile-atlas.png` |
 
 ## Ключевые файлы ядра
 | Файл | Назначение |
@@ -103,6 +105,7 @@ Assets/Tests/Editor                  NUnit-обёртка над RulesSelfTest (
 Assets/Tests/PlayMode                PlayMode-проверки сцены (asmdef `Mahjong.PlayTests`)
 Assets/Editor                        инструменты редактора (`PrototypeCapture`)
 Tools/RulesCheck                     консольный раннер тех же проверок
+Tools/Tiles                          сборка атласа лиц из SVG (Python + skia-python)
 ```
 
 Ассамблеи разделены через `.asmdef`: правка `MahjongView` не перекомпилирует ядро правил, а ядро

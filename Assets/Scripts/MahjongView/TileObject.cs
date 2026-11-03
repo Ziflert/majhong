@@ -93,7 +93,10 @@ namespace Mahjong.Unity
             face.name = "atlas-face";
             face.transform.SetParent(parent, false);
             face.transform.localPosition = new Vector3(0f, Height * 0.5f + 0.0018f, 0f);
-            face.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);
+            // A Quad's normal points along -Z, so -90 about X would turn it face down and the
+            // single-sided Unlit/Transparent shader would cull it from the top view. +90 lifts the
+            // normal to +Y, the same orientation the text label uses.
+            face.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
             face.transform.localScale = new Vector3(Width * 0.92f, Length * 0.92f, 1f);
             Object.Destroy(face.GetComponent<Collider>());
             var renderer = face.GetComponent<Renderer>();
