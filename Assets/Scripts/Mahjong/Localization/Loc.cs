@@ -94,10 +94,13 @@ namespace Mahjong.Localization
             // ----------------------------------------------------------------- HUD
             Add("hud.header", "Рука {0} из {1} · Раунд {2} · Место {3}", "Hand {0}/{1} · Round {2} · Seat {3}");
             Add("hud.yourTurn", "Ваш ход: щёлкните кость для сноса", "Your turn: click a tile to discard");
-            Add("hud.keys", "1–9 — действие, R — правила, F — свободная игра, V — просмотр партии, F5 — сохранить, F9 — продолжить",
-                "1-9 — an action, R — rules, F — free play, V — review, F5 — save, F9 — resume");
+            Add("hud.keys",
+                "1–9 — действие, R — правила, F — свободная игра, V — просмотр, Esc — меню, F5 — сохранить, F9 — продолжить",
+                "1-9 — an action, R — rules, F — free play, V — review, Esc — menu, F5 — save, F9 — resume");
             Add("hud.waiting", "Ход игрока {0}", "Waiting for player {0}");
             Add("hud.wall", "В стене: {0}", "Wall: {0}");
+            Add("hud.dice", "Кубики {0}, бросал {1} · разрыв после {2}-й стопки",
+                "Dice {0}, thrown by {1} · break after stack {2}");
             Add("hud.points", "Очки: {0}", "Points: {0}");
             Add("hud.clock", "Часы: {0} / {1}", "Clock: {0} / {1}");
             Add("hud.timeUp", "время истекло", "time is up");
@@ -193,6 +196,25 @@ namespace Mahjong.Localization
 
             // -------------------------------------------------------------- session
             Add("session.resumed", "Партия продолжена: рук {0}, ходов {1}", "Game resumed: {0} hand(s), {1} move(s)");
+
+            // ----------------------------------------------------------------- menu
+            Add("menu.title", "Меню · партия на паузе", "Menu · the game is paused");
+            Add("menu.hint",
+                "↑ ↓ — строка, ← → — значение, Enter — выбрать, Esc — за стол",
+                "Up/down a row, left/right a value, Enter picks, Esc returns");
+            Add("menu.language", "Язык", "Language");
+            Add("menu.speed", "Темп ботов", "Bot speed");
+            Add("menu.level", "Сила ботов", "Bot strength");
+            Add("menu.save", "Сохранить партию", "Save the game");
+            Add("menu.resume", "Продолжить сохранённую", "Resume the saved game");
+            Add("menu.review", "Просмотр партии", "Review a saved game");
+            Add("menu.rules", "Правила", "Rules");
+            Add("menu.close", "Вернуться за стол", "Back to the table");
+            Add("menu.value.ru", "Русский", "Russian");
+            Add("menu.value.en", "Английский", "English");
+            Add("menu.value.fast", "Быстрый", "Fast");
+            Add("menu.value.cautious", "Осторожный", "Cautious");
+            Add("menu.value.strategic", "Стратег", "Strategic");
 
             return table;
         }

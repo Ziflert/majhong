@@ -40,6 +40,18 @@ namespace Mahjong.Unity
         /// <summary>The free-play table that opens with F. Exposed for tests and tools.</summary>
         public FreePlayTable FreePlay => free;
 
+        /// <summary>The menu that opens with Esc: settings, saving, review. Exposed for tests and tools.</summary>
+        public MenuPanel MenuPanel => menu;
+
+        /// <summary>The menu model: rows, cursor, what a step and a pick mean. Exposed for tests.</summary>
+        public GameMenu Menu => gameMenu;
+
+        /// <summary>True while the menu holds the table and the hand is paused.</summary>
+        public bool IsMenuOpen => menu != null && menu.IsOpen;
+
+        /// <summary>Language, bot strength and bot speed as they are set right now.</summary>
+        public GameSettings Settings => settings;
+
         /// <summary>The review of a saved game, while V has it open. Exposed for tests and tools.</summary>
         public ReplayCursor Replay => replay;
 
@@ -65,6 +77,18 @@ namespace Mahjong.Unity
 
         /// <summary>Tiles left in the wall; the HUD prints it and the tests read it.</summary>
         public int WallRemaining => session?.State?.Wall.Remaining ?? 0;
+
+        /// <summary>The two dice on the table; the tests read what they show.</summary>
+        public DiceTray Dice => dice;
+
+        /// <summary>The opening of the current hand: dice throws, the break and the deal.</summary>
+        public HandOpening Opening => opening;
+
+        /// <summary>The marker that shows where the wall was broken; the tests read its place.</summary>
+        public Transform BreakMarker => breakMarker;
+
+        /// <summary>The live hand's state; the tests read the wall and the dice from it.</summary>
+        public GameState State => session.State!;
 
         /// <summary>Language the interface is drawn in.</summary>
         public Language UiLanguage => Loc.Current;
@@ -110,14 +134,14 @@ namespace Mahjong.Unity
             }
         }
 
-        /// <summary>Tiles rest on the table top, which sits at y = -0.005.</summary>
-        private const float TileY = 0.01f;
+        /// <summary>Tiles rest on the table top; the wall and the hands all sit at this height.</summary>
+        private const float TileY = TableLayout.TileY;
 
-        /// <summary>Extra start time per freshly created tile, so an opening hand is dealt in order.</summary>
+        /// <summary>Extra start time per tile of the opening deal, so the wall empties stack by stack.</summary>
         private const float DealStagger = 0.014f;
 
-        /// <summary>Ceiling for the deal stagger: a wall of new tiles must not crawl in forever.</summary>
-        private const float MaxDealDelay = 0.35f;
+        /// <summary>A replacement tile waits for the deal to finish before it leaves the other end.</summary>
+        private const float ReplacementDelay = 0.85f;
 
         /// <summary>Corner of the HUD in camera space: the text hangs half a metre away.</summary>
         private const float HudZ = 0.5f;
@@ -125,7 +149,7 @@ namespace Mahjong.Unity
         private const float HudTop = 0.145f;
 
         /// <summary>Seat plates stand just above the felt, clear of the tiles behind them.</summary>
-        private const float SeatPlateY = 0.02f;
+        private const float SeatPlateY = 0.062f;
 
         /// <summary>Size of the dark plate under the HUD, in camera space at half a metre.</summary>
         private const float HudPlateWidth = 0.30f;
@@ -179,8 +203,14 @@ namespace Mahjong.Unity
                 HudZ + 0.02f);
         }
 
-        /// <summary>Index of the fresh tile being placed in the current rebuild; reset by <see cref="Rebuild"/>.</summary>
-        private int dealIndex;
+        /// <summary>
+        /// Delay each tile of the fresh wall waits before it leaves for a hand: its place in the
+        /// deal, counted from the break. Cleared by every rebuild and refilled only for a new wall.
+        /// </summary>
+        private readonly Dictionary<int, float> dealDelays = new();
+
+        /// <summary>The dice, the break and the deal as they are shown at the start of a hand.</summary>
+        private HandOpening opening = HandOpening.Finished();
 
         /// <summary>Whether the scored tiles are on screen; free play hides them.</summary>
         private bool tilesVisible = true;
@@ -190,6 +220,13 @@ namespace Mahjong.Unity
 
         /// <summary>Dark plate under the HUD; resized with the frame.</summary>
         private Transform hudPlate = null!;
+
+        /// <summary>Two dice in the middle of the table and the marker of the break in the wall.</summary>
+        private DiceTray dice = null!;
+        private Transform breakMarker = null!;
+
+        /// <summary>Whether the dice belong on the table: a resumed hand is not thrown again.</summary>
+        private bool diceVisible;
 
         /// <summary>Meld signatures already shown, so a kong hops only once when it is declared.</summary>
         private readonly HashSet<string> announcedMelds = new();
@@ -205,6 +242,7 @@ namespace Mahjong.Unity
         private TextMesh status = null!;
         private ActionBar bar = null!;
         private RulesPanel rules = null!;
+        private MenuPanel menu = null!;
         private FreePlayTable free = null!;
         private Transform table = null!;
         private Transform board = null!;
@@ -216,6 +254,9 @@ namespace Mahjong.Unity
 
         private ReplayCursor replay = null!;
         private bool replayOpen;
+        private GameSettings settings = null!;
+        private GameMenu gameMenu = null!;
+        private BotLevel botsLevel;
         private string sessionSavePath;
 
         /// <summary>A one-line notice under the HUD: "game saved", "game resumed".</summary>
@@ -249,40 +290,39 @@ namespace Mahjong.Unity
 
         private void Start()
         {
-            // The interface language comes from MAHJONG_LANG and defaults to Russian; everything below
-            // builds its captions from Loc, so it has to be set before the scene is generated.
-            Loc.Current = Loc.PreferredLanguage;
+            // Language, bot strength and bot speed have one place where they are parsed (GameSettings);
+            // everything below builds its captions from Loc, so the language is set before the scene.
+            settings = GameSettings.FromEnvironment(InspectorLevel());
+            Loc.Current = settings.Language;
+            gameMenu = new GameMenu(settings);
+            bots = CreateBots(settings.Level);
 
+            BuildScene();
+            session = new GameSession(SessionTimeLimit());
+            if (!ResumeFromEnvironment()) StartHand(new System.Random(randomSeed).Next());
+        }
+
+        /// <summary>The three bots at the requested strength; their seeds stay tied to the inspector seed.</summary>
+        private IMahjongBot[] CreateBots(BotLevel level)
+        {
+            botsLevel = level;
             var random = new System.Random(randomSeed);
-            var level = BotDifficulty();
-            bots = new IMahjongBot[]
+            return new IMahjongBot[]
             {
                 new HeuristicBot(random.Next(), level),
                 new HeuristicBot(random.Next(), level),
                 new HeuristicBot(random.Next(), level),
                 new HeuristicBot(random.Next(), level)
             };
-
-            BuildScene();
-            session = new GameSession(SessionTimeLimit());
-            if (!ResumeFromEnvironment()) StartHand(random.Next());
         }
 
-        /// <summary>
-        /// Bot strength as a setting: the inspector value, overridable by MAHJONG_BOT_LEVEL
-        /// so a capture run can compare the levels without touching the scene.
-        /// </summary>
-        private BotLevel BotDifficulty()
+        /// <summary>Bot strength from the inspector slider; MAHJONG_BOT_LEVEL overrides it (see GameSettings).</summary>
+        private BotLevel InspectorLevel() => botLevel switch
         {
-            var raw = System.Environment.GetEnvironmentVariable("MAHJONG_BOT_LEVEL");
-            var chosen = int.TryParse(raw, out var parsed) ? parsed : botLevel;
-            return chosen switch
-            {
-                1 => BotLevel.Fast,
-                2 => BotLevel.Cautious,
-                _ => BotLevel.Strategic
-            };
-        }
+            1 => BotLevel.Fast,
+            2 => BotLevel.Cautious,
+            _ => BotLevel.Strategic
+        };
 
         /// <summary>
         /// Rule 3.5.6 gives a session 150 minutes. The prototype can shorten that with
@@ -310,8 +350,8 @@ namespace Mahjong.Unity
 
             // The eye sits far enough back that the whole table fits with a margin above it: the top
             // of the screen belongs to the HUD, and the far hand must not disappear behind that text.
-            var eye = new Vector3(0f, 1.78f, -1.70f);
-            var lookAt = new Vector3(0f, 0f, 0.08f);
+            var eye = new Vector3(0f, 2.70f, -2.60f);
+            var lookAt = new Vector3(0f, 0f, 0.18f);
             camera.transform.position = eye;
             camera.transform.rotation = Quaternion.LookRotation(lookAt - eye, Vector3.up);
             camera.fieldOfView = 34f;
@@ -327,10 +367,14 @@ namespace Mahjong.Unity
             // The table is a dark wooden frame with a felt inset, so the playing surface reads as a
             // table and not as a green slab: the frame is the first "Table" object, the felt sits on
             // top of it and the tiles rest on the felt.
+            // The felt has to hold the whole square of walls plus a hand row on every side, so its
+            // size is not a matter of taste: it comes from the wall layout in TableLayout.
+            var feltSide = TableLayout.FeltHalf * 2f;
+            var tableSide = feltSide + 0.16f;
             var tableObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
             tableObject.name = "Table";
-            tableObject.transform.position = new Vector3(0f, -0.045f, 0.08f);
-            tableObject.transform.localScale = new Vector3(1.47f, 0.05f, 1.47f);
+            tableObject.transform.position = new Vector3(0f, -0.045f, 0f);
+            tableObject.transform.localScale = new Vector3(tableSide, 0.05f, tableSide);
             tableObject.GetComponent<Renderer>().material.color = new Color(0.20f, 0.13f, 0.08f);
             table = tableObject.transform;
 
@@ -338,15 +382,17 @@ namespace Mahjong.Unity
             feltObject.name = "Felt";
             feltObject.transform.SetParent(table, false);
             feltObject.transform.localPosition = new Vector3(0f, 0.58f, 0f);
-            feltObject.transform.localScale = new Vector3(0.925f, 0.25f, 0.925f);
+            feltObject.transform.localScale = new Vector3(feltSide / tableSide, 0.25f, feltSide / tableSide);
             feltObject.GetComponent<Renderer>().material.color = new Color(0.09f, 0.32f, 0.20f);
 
             // A slightly lighter square in the middle marks the well where the discards go.
+            var wellSide = 0.66f;
             var wellObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
             wellObject.name = "Well";
             wellObject.transform.SetParent(table, false);
             wellObject.transform.localPosition = new Vector3(0f, 0.83f, 0f);
-            wellObject.transform.localScale = new Vector3(0.52f, 0.03f, 0.52f);
+            wellObject.transform.localScale =
+                new Vector3(wellSide / tableSide, 0.03f, wellSide / tableSide);
             wellObject.GetComponent<Renderer>().material.color = new Color(0.07f, 0.26f, 0.16f);
             well = wellObject;
 
@@ -376,7 +422,10 @@ namespace Mahjong.Unity
 
             bar = ActionBar.Create(camera.transform);
             rules = RulesPanel.Create(camera.transform);
+            menu = MenuPanel.Create(camera.transform);
             free = FreePlayTable.Create(board, randomSeed);
+            dice = DiceTray.Create(board);
+            breakMarker = BuildBreakMarker();
 
             BuildSeatPlates(camera.transform);
         }
@@ -389,13 +438,12 @@ namespace Mahjong.Unity
         /// </summary>
         private void BuildSeatPlates(Transform cameraTransform)
         {
-            var sides = new[]
+            var sides = new Vector3[4];
+            for (var seat = 0; seat < 4; seat++)
             {
-                new Vector3(0f, SeatPlateY, -0.63f),
-                new Vector3(0.665f, SeatPlateY, -0.42f),
-                new Vector3(0f, SeatPlateY, 0.72f),
-                new Vector3(-0.665f, SeatPlateY, -0.42f)
-            };
+                var plate = TableLayout.PlatePosition(seat);
+                sides[seat] = new Vector3(plate.x, SeatPlateY, plate.z);
+            }
 
             for (var seat = 0; seat < 4; seat++)
             {
@@ -459,6 +507,7 @@ namespace Mahjong.Unity
             var dealt = session.State!;
             moveLog.BeginHand(dealt.Dealer, seed, dealt.RoundWind);
             BotTable.UpdateMatchContext(session, bots);
+            BeginOpening();
             BeginHandView();
         }
 
@@ -487,6 +536,15 @@ namespace Mahjong.Unity
 
             FaceSeatPlates(Camera.main != null ? Camera.main.transform : transform);
             SyncInterfaceVisibility();
+
+            // The dice, the break and the deal come before the first decision of a hand: the engine
+            // has already dealt, so the table waits for the show to finish before it asks for a tile.
+            if (!IsMenuOpen && !rules.IsOpen) TickOpening();
+            if (opening.IsRunning)
+            {
+                RefreshStatus();
+                return;
+            }
 
             // The rulebook and the free table own the screen: while either is open the hand is
             // paused, so a player can read a rule or move tiles without losing his turn.
@@ -559,6 +617,13 @@ namespace Mahjong.Unity
         /// </summary>
         private bool HandleInterfaceKeys()
         {
+            // The menu owns the screen while it is open; everything else is paused behind it.
+            if (menu != null && menu.IsOpen)
+            {
+                HandleMenuKeys();
+                return true;
+            }
+
             if (Input.GetKeyDown(KeyCode.L))
             {
                 ToggleLanguage();
@@ -605,6 +670,12 @@ namespace Mahjong.Unity
                 return true;
             }
 
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                OpenMenu();
+                return true;
+            }
+
             if (Input.GetKeyDown(KeyCode.F5))
             {
                 var saved = SaveReplay();
@@ -633,10 +704,23 @@ namespace Mahjong.Unity
             return false;
         }
 
-        /// <summary>Switches the interface language; every caption is rebuilt from the catalogue.</summary>
+        /// <summary>
+        /// Switches the interface language; every caption is rebuilt from the catalogue. The key goes
+        /// through the same setting the menu row shows, otherwise the menu would print a language the
+        /// table is not in and its next step would change nothing.
+        /// </summary>
         public Language ToggleLanguage()
         {
-            Loc.Toggle();
+            if (settings != null)
+            {
+                settings.Language = settings.Language == Language.Ru ? Language.En : Language.Ru;
+                Loc.Current = settings.Language;
+            }
+            else
+            {
+                Loc.Toggle();
+            }
+
             bar.Hide();
             if (replayOpen) status.text = DescribeReplay();
             else if (free.IsOpen) status.text = free.StatusText();
@@ -672,15 +756,16 @@ namespace Mahjong.Unity
         {
             var rulesOpen = rules.IsOpen;
             var freeOpen = free.IsOpen;
+            var menuOpen = menu != null && menu.IsOpen;
 
             // The page covers the middle of the screen; a HUD drawn over it reads as two texts in
             // the same place.
-            var hudWanted = !rulesOpen;
+            var hudWanted = !rulesOpen && !menuOpen;
             if (status != null && status.gameObject.activeSelf != hudWanted)
                 status.gameObject.SetActive(hudWanted);
 
             // Wind plates belong to the scored table.
-            var platesWanted = !rulesOpen && !freeOpen;
+            var platesWanted = !rulesOpen && !freeOpen && !menuOpen;
             foreach (var plate in seatPlates)
                 if (plate != null && plate.gameObject.activeSelf != platesWanted)
                     plate.gameObject.SetActive(platesWanted);
@@ -695,6 +780,9 @@ namespace Mahjong.Unity
             }
 
             if (well != null && well.activeSelf != tilesWanted) well.SetActive(tilesWanted);
+            // Free play covers the middle of the table with its own grid, so the dice step aside
+            // with the rest of the scored layout instead of poking through it.
+            if (dice != null) dice.SetShown(tilesWanted && diceVisible);
 
             var camera = Camera.main;
             if (camera != null) LayoutHud(camera);
@@ -772,7 +860,7 @@ namespace Mahjong.Unity
         private void HandleBotTurn()
         {
             if (Time.time < nextBotAction) return;
-            nextBotAction = Time.time + botDelay;
+            nextBotAction = Time.time + (float)settings.ScaledDelay(botDelay);
 
             var state = session.State!;
             var player = state.CurrentPlayer;
@@ -812,7 +900,7 @@ namespace Mahjong.Unity
         private void RunBotResponses(GameState state)
         {
             if (Time.time < nextBotAction) return;
-            nextBotAction = Time.time + botDelay;
+            nextBotAction = Time.time + (float)settings.ScaledDelay(botDelay);
 
             var phase = state.Phase;
             for (var player = 0; player < 4; player++)
@@ -1141,6 +1229,10 @@ namespace Mahjong.Unity
             moveLog = log;
             BotTable.UpdateMatchContext(session, bots);
             replayOpen = false;
+            // The wall of a resumed hand was broken before the save, so the dice are not replayed.
+            opening.Skip();
+            dice.SetOpen(false);
+            diceVisible = false;
             BeginHandView();
 
             var summary = Loc.Format("session.resumed", outcome.HandsCompleted, outcome.MovesReplayed);
@@ -1181,6 +1273,111 @@ namespace Mahjong.Unity
             if (string.IsNullOrWhiteSpace(raw)) return false;
             var asked = raw.Trim().ToLowerInvariant() is not ("0" or "false" or "no" or "off");
             return asked && ResumeSavedSession();
+        }
+
+        /// <summary>Opens the menu: the hand is paused while the player changes the table.</summary>
+        public void OpenMenu()
+        {
+            ClosePrompt();
+            StopClock();
+            gameMenu = new GameMenu(settings);
+            menu.SetOpen(true);
+            menu.Refresh(gameMenu);
+            SyncInterfaceVisibility();
+            RefreshStatus();
+        }
+
+        /// <summary>Closes the menu and puts the table HUD back the way it was.</summary>
+        public void CloseMenu()
+        {
+            if (menu == null || !menu.IsOpen) return;
+            menu.SetOpen(false);
+            SyncInterfaceVisibility();
+            RefreshStatus();
+        }
+
+        /// <summary>Moves the cursor through the menu rows; the selection wraps.</summary>
+        public void MenuMove(int rows)
+        {
+            if (!menu.IsOpen) return;
+            gameMenu.Move(rows);
+            menu.Refresh(gameMenu);
+        }
+
+        /// <summary>Steps the setting under the cursor and puts it into effect at once.</summary>
+        public bool MenuAdjust(int delta)
+        {
+            if (!menu.IsOpen) return false;
+            var changed = gameMenu.Adjust(delta);
+            if (changed) ApplySettings();
+            menu.Refresh(gameMenu);
+            return changed;
+        }
+
+        /// <summary>Picks the row under the cursor: a setting steps, a command opens its screen.</summary>
+        public void MenuActivate()
+        {
+            if (!menu.IsOpen) return;
+            var command = gameMenu.Activate();
+            ApplySettings();
+            menu.Refresh(gameMenu);
+
+            switch (command)
+            {
+                case MenuCommand.Save:
+                    var saved = SaveReplay();
+                    CloseMenu();
+                    if (saved.Length > 0) RenderStatus(Loc.Format("replay.saved", Path.GetFileName(saved)));
+                    break;
+                case MenuCommand.Resume:
+                    CloseMenu();
+                    ResumeSavedSession();
+                    break;
+                case MenuCommand.Review:
+                    CloseMenu();
+                    OpenReplay();
+                    break;
+                case MenuCommand.Rules:
+                    CloseMenu();
+                    rules.SetOpen(true);
+                    break;
+                case MenuCommand.Close:
+                    CloseMenu();
+                    break;
+            }
+        }
+
+        /// <summary>Puts the settings into effect: language, bot strength and the words on screen.</summary>
+        private void ApplySettings()
+        {
+            Loc.Current = settings.Language;
+            if (bots != null && botsLevel != settings.Level)
+            {
+                bots = CreateBots(settings.Level);
+                if (session != null) BotTable.UpdateMatchContext(session, bots);
+            }
+            if (status != null && !menu.IsOpen && !rules.IsOpen) RefreshStatus();
+        }
+
+        /// <summary>Keys of the menu; the row actions are public, so a test drives them without a keyboard.</summary>
+        private void HandleMenuKeys()
+        {
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                CloseMenu();
+                return;
+            }
+
+            if (Input.GetKeyDown(KeyCode.UpArrow)) MenuMove(-1);
+            else if (Input.GetKeyDown(KeyCode.DownArrow)) MenuMove(1);
+            else if (Input.GetKeyDown(KeyCode.LeftArrow)) MenuAdjust(-1);
+            else if (Input.GetKeyDown(KeyCode.RightArrow)) MenuAdjust(1);
+            else if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) MenuActivate();
+            else if (Input.GetMouseButtonDown(0) && menu.TryPick(MouseRay(), out var row))
+            {
+                MenuMove(row - gameMenu.Index);
+                MenuActivate();
+            }
         }
 
         /// <summary>Returns to the live table exactly where the hand was paused.</summary>
@@ -1376,51 +1573,73 @@ namespace Mahjong.Unity
             var hand = state.Players[humanSeat];
             var used = new HashSet<int>();
             handTiles.Clear();
-            dealIndex = 0;
+            dealDelays.Clear();
+
+            // The wall is laid out first, because a tile that is dealt has to be seen leaving its own
+            // place in the wall: on a real table nothing arrives out of thin air (3.5.7.4).
+            PlaceWall(state, used);
 
             var sorted = hand.Concealed.OrderBy(t => t.Type.Suit).ThenBy(t => t.Type.Rank).ToList();
             for (var i = 0; i < sorted.Count; i++)
             {
-                var view = Place(sorted[i], used, "hand", new Vector3(-0.40f + i * 0.062f, TileY, -0.52f), 0f);
+                var view = Place(sorted[i], used, "hand", TableLayout.HandPosition(humanSeat, i),
+                    TableLayout.HandRotationY(humanSeat));
                 handTiles[sorted[i].InstanceId] = view;
             }
 
-            // Melds get their own horizontal slots. Previously every meld started at the same x
-            // coordinate, so the second declared combination slid on top of the first one. A claimed
-            // tile is turned sideways: this is both the conventional mahjong marking and an explicit
-            // visual phase for an open claim. A closed kong shows its outer tiles face down and the
-            // middle pair face up, which is how a concealed kong is marked on a real table.
-            for (var i = 0; i < hand.Melds.Count; i++)
+            // Every declared meld is exposed, not just the human's: a meld is public information and
+            // it is what a player reads the table from. A claimed tile is turned sideways, which is
+            // both the conventional mahjong marking and an explicit visual phase for an open claim.
+            // A closed kong shows its outer tiles face down and the middle pair face up, which is how
+            // a concealed kong is marked on a real table.
+            var allMelds = new List<Meld>();
+            for (var seat = 0; seat < 4; seat++)
             {
-                var meld = hand.Melds[i];
-                var originX = -0.57f + i * 0.285f;
-                for (var k = 0; k < meld.Tiles.Count; k++)
+                var melds = state.Players[seat].Melds;
+                for (var i = 0; i < melds.Count; i++)
                 {
-                    var tile = meld.Tiles[k];
-                    var faceUp = meld.Kind != MeldKind.ClosedKong || (k == 1 || k == 2);
-                    var sideways = IsMeldMarker(meld, k) ? 90f : 0f;
-                    Place(tile, used, "meld", new Vector3(originX + k * 0.062f, TileY, -0.41f), sideways, faceUp);
+                    var meld = melds[i];
+                    allMelds.Add(meld);
+                    for (var k = 0; k < meld.Tiles.Count; k++)
+                    {
+                        var tile = meld.Tiles[k];
+                        var faceUp = meld.Kind != MeldKind.ClosedKong || (k == 1 || k == 2);
+                        var sideways = IsMeldMarker(meld, k) ? 90f : 0f;
+                        Place(tile, used, "meld", TableLayout.MeldPosition(seat, i, k),
+                            TableLayout.HandRotationY(seat) + sideways, faceUp);
+                    }
                 }
             }
 
-            AnnounceKongs(hand.Melds);
+            AnnounceKongs(allMelds);
 
             for (var player = 0; player < 4; player++)
             {
                 var discards = state.Discards.Where(d => d.Player == player).Select(d => d.Tile).ToList();
                 for (var i = 0; i < discards.Count; i++)
+                    Place(discards[i], used, "discard", TableLayout.DiscardPosition(player, i),
+                        TableLayout.DiscardRotationY(player));
+
+                // A flower is exposed face up beside the player who drew it (3.5.7.6): the tile is
+                // out of the hand, but it is still one of the 144 and it stays on the table.
+                var flowers = state.Players[player].Flowers;
+                for (var i = 0; i < flowers.Count; i++)
                 {
-                    var (origin, rowDirection, rowStep) = DiscardOrigin(player);
-                    Place(discards[i], used, "discard",
-                        origin + rowDirection * (i % 6) + rowStep * (i / 6), player * 90f);
+                    Place(flowers[i], used, "flower", TableLayout.FlowerPosition(player, i),
+                        TableLayout.HandRotationY(player));
                 }
 
                 if (player == humanSeat) continue;
+                // A hand that is not the human's stands outside its own wall, like the human's own.
                 var concealed = state.Players[player].Concealed;
-                var (row, direction) = OpponentRow(player);
                 for (var i = 0; i < concealed.Count; i++)
-                    Place(concealed[i], used, "opponent", row + direction * i, player * 90f, faceUp: false);
+                {
+                    Place(concealed[i], used, "opponent", TableLayout.HandPosition(player, i),
+                        TableLayout.HandRotationY(player), faceUp: false);
+                }
             }
+
+            PlaceBreakMarker(state);
 
             foreach (var stale in tilesById.Keys.Where(id => !used.Contains(id)).ToList())
             {
@@ -1435,6 +1654,103 @@ namespace Mahjong.Unity
             // where the tiles were before this rebuild, and a click on a tile is resolved at its old
             // place.
             Physics.SyncTransforms();
+        }
+
+        /// <summary>
+        /// A short bar on the felt at the break. On a real table the wall is pushed apart there and
+        /// the gap stays visible for the whole hand, which is how everybody sees where the deal
+        /// started and where the replacement tiles come from.
+        /// </summary>
+        private Transform BuildBreakMarker()
+        {
+            var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            marker.name = "BreakMarker";
+            marker.transform.SetParent(board, false);
+            Destroy(marker.GetComponent<Collider>());
+            var renderer = marker.GetComponent<Renderer>();
+            renderer.material = new Material(Shader.Find("Unlit/Color"));
+            renderer.material.color = new Color(0.95f, 0.80f, 0.25f);
+            marker.SetActive(false);
+            return marker.transform;
+        }
+
+        /// <summary>Puts the break marker at the gap the dice opened and hides it once the deal is over.</summary>
+        private void PlaceBreakMarker(GameState state)
+        {
+            if (breakMarker == null) return;
+
+            var slot = WallGeometry.SlotAt(state.Wall.BreakIndex);
+            var position = TableLayout.WallPosition(slot);
+            var inward = slot.Side switch
+            {
+                0 => Vector3.forward,
+                2 => Vector3.back,
+                3 => Vector3.right,
+                _ => Vector3.left
+            };
+
+            breakMarker.position = position + inward * (TileObject.Width * 0.75f) + Vector3.up * 0.001f;
+            breakMarker.localRotation = Quaternion.identity;
+            breakMarker.localScale = slot.Side is 1 or 3
+                ? new Vector3(0.009f, 0.002f, TileObject.Width * 0.9f)
+                : new Vector3(TileObject.Width * 0.9f, 0.002f, 0.009f);
+            breakMarker.gameObject.SetActive(!opening.IsDone);
+        }
+
+        /// <summary>
+        /// Starts the opening of a hand: two dice throws, the break and then the deal, at the table's
+        /// own pace. The engine has already dealt, so this only decides when the tiles may move.
+        /// </summary>
+        private void BeginOpening()
+        {
+            var state = session.State!;
+            opening = new HandOpening(state.DealerRoll, state.BreakRoll, state.DiceThrower, state.BreakStacks)
+            {
+                Pace = OpeningPace()
+            };
+            // A capture run has nobody to watch the dice, and MAHJONG_OPENING_SPEED skips the show.
+            // The dice stay on the table afterwards either way: their numbers are what explains the
+            // gap in the wall for the rest of the hand (3.5.7.5).
+            if (opening.Pace <= 0d) opening.Skip();
+            dice.SetOpen(true);
+            var shown = opening.IsDone ? opening.Second : opening.First;
+            dice.Settle(shown.First, shown.Second);
+            diceVisible = true;
+        }
+
+        /// <summary>
+        /// Opening pace from <c>MAHJONG_OPENING_SPEED</c>: it is a speed, so 2 shows the dice twice as
+        /// fast and 0 skips them (see <see cref="HandOpening.PaceFromSpeed"/>).
+        /// </summary>
+        private static double OpeningPace()
+        {
+            var raw = System.Environment.GetEnvironmentVariable("MAHJONG_OPENING_SPEED");
+            return double.TryParse(raw, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var speed)
+                ? HandOpening.PaceFromSpeed(speed)
+                : 1d;
+        }
+
+        /// <summary>
+        /// The visible opening: the dice tumble, the second throw lands, the break marker lights up and
+        /// then the tiles leave the wall. While it runs the table takes no clicks — the hand tiles are
+        /// still standing in the wall, so a click there would not mean what the player sees.
+        /// </summary>
+        private void TickOpening()
+        {
+            if (opening.IsDone) return;
+
+            if (opening.Advance(System.TimeSpan.FromSeconds(Time.deltaTime).TotalSeconds))
+            {
+                // A beat changed: the deal may start now, so lay the table out again and let the hand
+                // tiles set off from their places in the wall.
+                if (opening.Step == OpeningStep.Deal) Rebuild();
+            }
+
+            dice.Show(opening);
+            // The dice stay where they landed for the rest of the hand: on a real table nobody picks
+            // them up until the hand is over, and the numbers explain the gap in the wall.
+            if (opening.Step == OpeningStep.Break) PlaceBreakMarker(session.State!);
         }
 
         /// <summary>Names the four seats by their wind; the dealer changes every hand.</summary>
@@ -1518,53 +1834,83 @@ namespace Mahjong.Unity
             return meld.ClaimedFromPlayer.HasValue && tileIndex == meld.Tiles.Count - 1;
         }
 
+        /// <summary>
+        /// Lays out the whole wall from the engine: every tile of the set stands in its own slot,
+        /// face down, two tiles high. Tiles that have left the wall are placed by the caller.
+        ///
+        /// On a fresh hand the views do not exist yet, so they are created here, in their slots. That
+        /// is what makes the deal visible: the tile a player takes is already standing in the wall and
+        /// simply slides from there to its place in the hand.
+        /// </summary>
+        private void PlaceWall(GameState state, HashSet<int> used)
+        {
+            var wall = state.Wall;
+            foreach (var tile in wall.TilesInRingOrder)
+            {
+                var ring = wall.RingOf(tile) ?? 0;
+                var slot = WallGeometry.SlotAt(ring);
+                var position = TableLayout.WallPosition(slot);
+                var rotation = TableLayout.WallRotationY(slot);
+
+                if (!tilesById.TryGetValue(tile.InstanceId, out var view) || view == null)
+                {
+                    view = TileObject.Create(board, "wall");
+                    view.SpawnAt(position);
+                    view.SetBack();
+                    tilesById[tile.InstanceId] = view;
+                    // Nobody checks the piles before the deal, but a fresh deal must not look like one
+                    // cube arriving everywhere at once: each tile leaves the wall in its own beat.
+                    dealDelays[tile.InstanceId] = DealDelayOf(ring, wall);
+                }
+
+                if (!wall.IsStanding(tile)) continue;   // it is in a hand or in a pile, placed below
+                view.SetBack();
+                view.gameObject.name = "wall";
+                view.SetTarget(position, rotation);
+                used.Add(tile.InstanceId);
+            }
+        }
+
+        /// <summary>
+        /// How long a tile waits before it leaves the wall. The tiles of a hand are taken in ring
+        /// order from the break, so the distance to the break is the place in the deal; a flower
+        /// replacement comes from the other end of the wall, after everyone has their tiles.
+        /// </summary>
+        private float DealDelayOf(int ring, Wall wall)
+        {
+            const int dealtTiles = 53;
+            var forward = (ring - wall.BreakIndex + WallGeometry.TileCount) % WallGeometry.TileCount;
+            var backward = (wall.BreakIndex - 1 - ring + WallGeometry.TileCount) % WallGeometry.TileCount;
+
+            if (forward < dealtTiles) return forward * DealStagger;
+            if (backward < 24) return ReplacementDelay + backward * DealStagger;
+            return 0f;
+        }
+
         private TileObject Place(Tile tile, HashSet<int> used, string name, Vector3 position, float rotationY,
             bool faceUp = true)
         {
-            var isNew = false;
             if (!tilesById.TryGetValue(tile.InstanceId, out var view) || view == null)
             {
+                // A tile the wall does not know about: the free table and a resumed hand build their
+                // own. It appears in the middle and slides out, there is no place in the wall for it.
                 view = TileObject.Create(board, name);
-                // Spread the spawn points a little, otherwise a fresh hand starts as one cube.
-                var slot = tilesById.Count % 7;
-                view.SpawnAt(new Vector3(-0.18f + slot * 0.06f, TileY, 0.52f));
+                view.SpawnAt(new Vector3(0f, TileY, 0f));
                 tilesById[tile.InstanceId] = view;
-                isNew = true;
             }
 
             view.gameObject.name = name;
             if (faceUp) view.SetFace(tile.Type);
             else view.SetBack();
 
-            // A whole opening hand appears in one frame. Giving every fresh tile a slightly later
-            // start turns that into a dealt sequence; a single replacement tile (index 0 here) starts
-            // at once, and the stagger is capped so a wall of new tiles does not crawl.
-            var delay = isNew ? Mathf.Min(dealIndex++ * DealStagger, MaxDealDelay) : 0f;
+            // A tile that has just left the wall waits its turn in the deal; anything later moves at
+            // once, which is what makes a drawn tile fly straight out of the wall into the hand.
+            var delay = dealDelays.TryGetValue(tile.InstanceId, out var wait)
+                ? wait + (float)opening.TimeUntilDeal
+                : 0f;
             view.SetTarget(position, rotationY, delay);
             used.Add(tile.InstanceId);
             return view;
-        }
-
-        /// <summary>Discard blocks sit in the four quadrants of the table centre, one per player.</summary>
-        private (Vector3 Origin, Vector3 Direction, Vector3 RowStep) DiscardOrigin(int player)
-        {
-            return player switch
-            {
-                0 => (new Vector3(-0.19f, TileY, -0.24f), new Vector3(0.062f, 0f, 0f), new Vector3(0f, 0f, 0.078f)),
-                1 => (new Vector3(0.30f, TileY, -0.19f), new Vector3(0f, 0f, 0.062f), new Vector3(0.078f, 0f, 0f)),
-                2 => (new Vector3(-0.19f, TileY, 0.30f), new Vector3(0.062f, 0f, 0f), new Vector3(0f, 0f, -0.078f)),
-                _ => (new Vector3(-0.30f, TileY, -0.19f), new Vector3(0f, 0f, 0.062f), new Vector3(-0.078f, 0f, 0f))
-            };
-        }
-
-        private (Vector3 Origin, Vector3 Direction) OpponentRow(int player)
-        {
-            return player switch
-            {
-                1 => (new Vector3(0.60f, TileY, -0.32f), new Vector3(0f, 0f, 0.062f)),
-                2 => (new Vector3(-0.40f, TileY, 0.60f), new Vector3(0.062f, 0f, 0f)),
-                _ => (new Vector3(-0.60f, TileY, -0.32f), new Vector3(0f, 0f, 0.062f))
-            };
         }
 
         private int? PickTileUnderMouse()
@@ -1596,6 +1942,8 @@ namespace Mahjong.Unity
                     Text.SeatName(session.RoundWind), Text.SeatName(wind)),
                 IsYourTurn ? Loc.Get("hud.yourTurn") : Loc.Format("hud.waiting", state.CurrentPlayer + 1),
                 Loc.Format("hud.wall", state.Wall.Remaining),
+                Loc.Format("hud.dice", state.DealerRoll.ToString(),
+                    Text.SeatName(state.SeatWindOf(state.DiceThrower)), state.BreakStacks),
                 Loc.Format("hud.points", string.Join("  ",
                     session.Scores.Select((score, player) => $"P{player + 1}={score}"))),
                 Loc.Format("hud.clock", Clock(session.Elapsed), Clock(session.TimeLimit))
@@ -1603,7 +1951,8 @@ namespace Mahjong.Unity
                     : session.IsFinalQuarterHour ? "  " + Loc.Get("hud.lastQuarter") : string.Empty)
             };
 
-            if (IsYourTurn) lines.Add(Loc.Get("hud.keys"));
+            // The key list lives in the menu hint and in the rulebook: on the HUD it was the widest
+            // line by far, and the plate it forced covered the far wall.
 
             if (clock.IsRunning)
                 lines.Add(Loc.Format("hud.seconds", Text.ClockLabel(clock.Window), clock.SecondsLeft));

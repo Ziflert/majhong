@@ -49,10 +49,17 @@ namespace Mahjong.PlayTests
             var faceUp = tiles.Where(tile => tile.IsFaceUp).ToList();
             var faceDown = tiles.Where(tile => !tile.IsFaceUp).ToList();
             Assert.GreaterOrEqual(faceUp.Count, 13, "The human hand is not laid out.");
+
+            // The whole set is on the table: the wall stands as four walls of stacks, and everything
+            // that has been dealt lies in front of a seat. Nothing is created out of thin air, so the
+            // objects on the table plus the tiles of the wall must add up to 144.
+            Assert.AreEqual(144, tiles.Length, "The table does not hold the whole set of 144 tiles.");
             // Three opponents hold thirteen tiles each minus three per opened meld, so the count comes
             // from the engine instead of a hard-coded 39: a bot that claimed a discard holds fewer.
-            Assert.AreEqual(game.OpponentConcealedTileCount, faceDown.Count,
-                "The opponents' concealed tiles are not drawn face down.");
+            // Face down are their concealed tiles and the standing wall.
+            Assert.AreEqual(game.OpponentConcealedTileCount + game.WallRemaining, faceDown.Count,
+                $"The wall and the hidden hands are not drawn face down: "
+                + $"{game.OpponentConcealedTileCount} hidden + {game.WallRemaining} in the wall.");
             Assert.IsTrue(faceDown.All(tile => string.IsNullOrEmpty(LabelOf(tile))),
                 "A face-down tile shows its face label.");
 

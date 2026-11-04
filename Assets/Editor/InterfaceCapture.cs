@@ -28,15 +28,19 @@ namespace Mahjong.EditorTools
         /// explicitly so the shot shows the table the way the check expects to see it, not the way
         /// the game happens to be framed.
         /// </summary>
-        private static readonly (string Name, string Open, Vector3 Eye, Vector3 Look)[] Steps =
+        private static readonly (string Name, string Open, Vector3 Eye, Vector3 Look, double Settle)[] Steps =
         {
-            ("table-overview", "none", new Vector3(0f, 2.15f, -1.85f), new Vector3(0f, 0f, 0.08f)),
-            ("rules-panel", "rules", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f)),
-            ("free-play", "free", new Vector3(0f, 2.15f, -1.85f), new Vector3(0f, 0f, 0.08f)),
+            // The opening runs at the table's own pace, so this shot is taken while it is running:
+            // the dice in the air, the wall still whole, the break not made yet (3.5.7.5).
+            ("opening-dice", "opening", new Vector3(0f, 2.20f, -1.90f), new Vector3(0f, 0f, 0.10f), 1.1),
+            ("table-overview", "none", new Vector3(0f, 2.70f, -2.60f), new Vector3(0f, 0f, 0.18f), SettleSeconds),
+            ("rules-panel", "rules", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f), SettleSeconds),
+            ("free-play", "free", new Vector3(0f, 2.70f, -2.60f), new Vector3(0f, 0f, 0.18f), SettleSeconds),
             // No player sits at a capture run, so this step runs the human windows out and the shot
             // shows the table mid-hand; the review after it then has real moves to step through.
-            ("table-midgame", "burn", new Vector3(0f, 2.15f, -1.85f), new Vector3(0f, 0f, 0.08f)),
-            ("replay-review", "replay", new Vector3(0f, 2.15f, -1.85f), new Vector3(0f, 0f, 0.08f))
+            ("table-midgame", "burn", new Vector3(0f, 2.70f, -2.60f), new Vector3(0f, 0f, 0.18f), SettleSeconds),
+            ("menu-panel", "menu", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f), SettleSeconds),
+            ("replay-review", "replay", new Vector3(0f, 2.70f, -2.60f), new Vector3(0f, 0f, 0.18f), SettleSeconds)
         };
 
         /// <summary>Seconds a step is given before its shot: the deal and the panels need a frame or two.</summary>
@@ -98,7 +102,7 @@ namespace Mahjong.EditorTools
             var waited = now - startedAt;
             if (phase == 0)
             {
-                if (waited < SettleSeconds)
+                if (waited < Steps[step].Settle)
                 {
                     // A capture run has no player: on the preparation step the human windows are run
                     // out, which is exactly what the hand clock does when a turn times out.
@@ -120,7 +124,7 @@ namespace Mahjong.EditorTools
 
         private static void Open(Unity.MahjongGame game, int step)
         {
-            var (_, open, eye, look) = Steps[step];
+            var (_, open, eye, look, _) = Steps[step];
             var camera = Camera.main!;
             camera.transform.position = eye;
             camera.transform.rotation = Quaternion.LookRotation(look - eye, Vector3.up);
@@ -138,6 +142,9 @@ namespace Mahjong.EditorTools
                     game.OpenReplay();
                     game.ReplayToEnd();
                     break;
+                case "menu":
+                    game.OpenMenu();
+                    break;
                 case "burn":
                     break;
             }
@@ -145,7 +152,7 @@ namespace Mahjong.EditorTools
 
         private static void Capture(Unity.MahjongGame game, int step)
         {
-            var (name, open, _, _) = Steps[step];
+            var (name, open, _, _, _) = Steps[step];
             var path = Path.GetFullPath(Path.Combine(SessionState.GetString(DirectoryKey, "Screenshots"),
                 name + ".png"));
             ScreenCapture.CaptureScreenshot(path);
@@ -154,6 +161,9 @@ namespace Mahjong.EditorTools
                 "rules" => $"rulebook page {game.Rules.Page + 1}/{game.Rules.PageCount}: {game.Rules.CurrentTitle}",
                 "free" => $"free play {game.FreePlay.TileViewCount} tiles, seat {game.FreePlay.ActiveSeat}",
                 "replay" => $"review {game.Replay.PositionText}, last {game.Replay.LastMoveText}",
+                "menu" => $"menu {game.MenuPanel.RowCount} rows, on {game.Menu.RowAt(game.Menu.Index)}",
+                "opening" => $"opening {game.Opening.Step}, dice {game.Dice.ShownFirst}+{game.Dice.ShownSecond},"
+                             + $" {game.TableTileCount} tiled views, wall {game.WallRemaining} left",
                 "burn" => $"{game.MoveLog.MoveCount} moves played, phase {game.Phase}",
                 _ => $"hand tiles {game.TableTileCount}"
             };
@@ -172,6 +182,9 @@ namespace Mahjong.EditorTools
                     break;
                 case "replay":
                     game.CloseReplay();
+                    break;
+                case "menu":
+                    game.CloseMenu();
                     break;
             }
         }

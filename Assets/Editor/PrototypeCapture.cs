@@ -34,6 +34,11 @@ namespace Mahjong.EditorTools
             var directory = Environment.GetEnvironmentVariable("MAHJONG_SHOT_DIR") ?? "Screenshots";
             Directory.CreateDirectory(directory);
 
+            // The dice and the break are captured by InterfaceCapture, which owns the opening shot;
+            // this run wants the assembled hand, so the show is skipped unless the caller says otherwise.
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MAHJONG_OPENING_SPEED")))
+                Environment.SetEnvironmentVariable("MAHJONG_OPENING_SPEED", "0");
+
             SessionState.SetString(DirectoryKey, directory);
             SessionState.SetFloat(StartKey, (float)EditorApplication.timeSinceStartup);
             SessionState.SetInt(ShotKey, 0);

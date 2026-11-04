@@ -72,6 +72,9 @@ namespace Mahjong.Rules
         public DiceRoll BreakRoll { get; private set; }
         public int DiceThrower { get; private set; }
 
+        /// <summary>Rule 3.5.7.5: the stacks counted from the second thrower's right end before the break.</summary>
+        public int BreakStacks => Dice.BreakStacks(DealerRoll, BreakRoll);
+
         public Wind SeatWindOf(int player) => (Wind)(((player - Dealer) % 4 + 4) % 4);
         public IReadOnlyList<LegalAction> CurrentPlayerActions => GetLegalActions(CurrentPlayer);
 
@@ -108,7 +111,7 @@ namespace Mahjong.Rules
             DealerRoll = Dice.Roll(random);
             DiceThrower = (dealer + Dice.ThrowerOffset(DealerRoll.Sum)) % 4;
             BreakRoll = Dice.Roll(random);
-            Wall.Break(Dice.BreakStacks(DealerRoll, BreakRoll));
+            Wall.Break(DiceThrower, BreakStacks);
 
             for (var round = 0; round < 3; round++)
                 for (var offset = 0; offset < 4; offset++)

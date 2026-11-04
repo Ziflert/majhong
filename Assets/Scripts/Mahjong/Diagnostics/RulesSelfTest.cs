@@ -44,6 +44,7 @@ namespace Mahjong.Rules.Diagnostics
             var report = new SelfTestReport();
 
             Run(report, "wall: 144 tiles and a break point", () => WallBasics(report));
+            Run(report, "wall: four walls of eighteen stacks, dealt as one ring", () => WallShape(report));
             Run(report, "deal: tile counts and wall left", () => DealBasics(report));
             Run(report, "hand: standard decomposition", () => StandardHand(report));
             Run(report, "hand: seven pairs", () => SevenPairsHand(report));
@@ -88,6 +89,8 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "session: a forfeited player takes no table points", () => ForfeitedRanking(report));
             NetAndUiGroups(report);
             ReplayGroups(report);
+            MenuGroups(report);
+            OpeningGroups(report);
 
             return report;
         }
@@ -207,7 +210,7 @@ namespace Mahjong.Rules.Diagnostics
             var wall = Wall.CreateShuffled(new Random(7));
             report.Equal(144, wall.TotalTiles, "total tiles");
             report.Equal(144, wall.Remaining, "remaining before the deal");
-            wall.Break(17);
+            wall.Break(0, 17);
             report.Equal(144, wall.Remaining, "remaining after the break");
 
             var drawn = new HashSet<int>();
@@ -215,6 +218,110 @@ namespace Mahjong.Rules.Diagnostics
             for (var i = 0; i < 16; i++) drawn.Add(wall.DrawReplacement().InstanceId);
             report.Equal(32, drawn.Count, "live and replacement draws must not overlap");
             report.Equal(112, wall.Remaining, "remaining after 32 draws");
+        }
+
+        /// <summary>
+        /// The wall as the rules build it: four walls of eighteen two-tile stacks in a square, dealt
+        /// as one closed ring that is walked clockwise, so a player's own wall is taken from his right
+        /// end to his left end. The break is counted in stacks from the second thrower's right end.
+        /// </summary>
+        private static void WallShape(SelfTestReport report)
+        {
+            report.Equal(144, WallGeometry.TileCount, "the wall holds the whole set");
+            report.Equal(4, WallGeometry.Sides, "four walls");
+            report.Equal(18, WallGeometry.StacksPerSide, "eighteen stacks in a wall");
+            report.Equal(36, WallGeometry.TilesPerSide, "thirty-six tiles per player (3.5.7.4)");
+
+            // Every ring position names one tile and every tile names its ring position back.
+            var seen = new HashSet<WallSlot>();
+            for (var ring = 0; ring < WallGeometry.TileCount; ring++)
+            {
+                var slot = WallGeometry.SlotAt(ring);
+                report.Check(slot.Side is >= 0 and < 4, $"ring {ring}: side inside the square");
+                report.Check(slot.Stack is >= 0 and < 18, $"ring {ring}: stack inside the wall");
+                report.Check(slot.Level is 0 or 1, $"ring {ring}: the stack is two tiles high");
+                report.Check(seen.Add(slot), $"ring {ring}: {slot} was handed out twice");
+                report.Equal(ring, WallGeometry.RingIndex(slot.Side, slot.Stack, slot.Level),
+                    $"ring {ring}: {slot} leads back to the same place");
+            }
+
+            // Each side owns 36 consecutive positions and the stack is taken top first.
+            for (var side = 0; side < 4; side++)
+            {
+                var start = WallGeometry.RingStart(side);
+                report.Equal(side, WallGeometry.SlotAt(start).Side, $"side {side}: its wall starts on the right end");
+                report.Equal(side, WallGeometry.SlotAt(start + 35).Side, $"side {side}: its wall ends 36 tiles later");
+                report.Equal((side + 3) % 4, WallGeometry.SlotAt(start + 36).Side,
+                    $"side {side}: the deal walks to the wall on the player's left");
+                report.Check(WallGeometry.SlotAt(start).IsTop, $"side {side}: the top tile of a stack comes first");
+                report.Equal(0, WallGeometry.SlotAt(start + 1).Stack, $"side {side}: second tile is the same stack");
+                report.Equal(1, WallGeometry.SlotAt(start + 2).Stack, $"side {side}: the next stack follows");
+            }
+
+            // Ring order walks the square clockwise: near wall right to left, then the left wall.
+            report.Equal(new WallSlot(0, 0, 1), WallGeometry.SlotAt(0), "the ring starts at the near wall's right top");
+            report.Equal(new WallSlot(0, 17, 0), WallGeometry.SlotAt(35), "the near wall ends on its left bottom");
+            report.Equal(new WallSlot(3, 0, 1), WallGeometry.SlotAt(36), "then the left player's wall begins");
+            report.Equal(new WallSlot(1, 17, 0), WallGeometry.SlotAt(143), "and the right player's wall closes the ring");
+
+            // The break is counted in stacks from the thrower's right end and lands in his own wall
+            // for every sum a pair of dice can give, carrying into the next wall only past its end.
+            for (var thrower = 0; thrower < 4; thrower++)
+            {
+                var start = WallGeometry.RingStart(thrower);
+                for (var stacks = 4; stacks <= 17; stacks++)
+                {
+                    var index = WallGeometry.BreakIndex(thrower, stacks);
+                    report.Equal(start + stacks * 2, index, $"thrower {thrower}, {stacks} stacks: break after that stack");
+                    report.Equal(thrower, WallGeometry.SlotAt(index).Side, $"thrower {thrower}, {stacks}: break inside his wall");
+                }
+
+                // A count that reaches or passes the end of his own wall carries on into the next one.
+                foreach (var stacks in new[] { 18, 19, 20, 21, 22, 23, 24 })
+                    report.Equal((thrower + 3) % 4, WallGeometry.SlotAt(WallGeometry.BreakIndex(thrower, stacks)).Side,
+                        $"thrower {thrower}, {stacks} stacks: a long count runs into the next wall");
+            }
+
+            // A real wall: the dealt tiles leave in ring order from the break and nobody takes the
+            // rest, so the leftovers are still standing when the deal is done.
+            var wall = Wall.CreateShuffled(new Random(31));
+            wall.Break(2, 11);
+            var breakSide = WallGeometry.SlotAt(wall.BreakIndex).Side;
+            report.Equal(2, breakSide, "the break stands in the second thrower's wall");
+            report.Equal(144, wall.TilesInRingOrder.Count, "every tile of the set has a place in the wall");
+            report.Equal(144, wall.Remaining, "a broken wall is not a smaller wall");
+
+            var takenSlots = new List<WallSlot>();
+            for (var i = 0; i < 53; i++)
+            {
+                var tile = wall.DrawLive();
+                report.Check(wall.SlotOf(tile).HasValue, $"deal {i}: the drawn tile knows its place in the wall");
+                report.Check(!wall.IsStanding(tile), $"deal {i}: a drawn tile has left the wall");
+                takenSlots.Add(wall.SlotOf(tile)!.Value);
+            }
+
+            report.Equal(91, wall.Remaining, "the deal leaves ninety-one tiles standing");
+            for (var i = 1; i < takenSlots.Count; i++)
+            {
+                var sameStack = takenSlots[i].Side == takenSlots[i - 1].Side
+                                && takenSlots[i].Stack == takenSlots[i - 1].Stack;
+                report.Check(!sameStack || takenSlots[i - 1].IsTop,
+                    $"deal {i}: the bottom of a stack is not taken before its top");
+            }
+
+            var standing = wall.TilesInRingOrder.Count(tile => wall.IsStanding(tile));
+            report.Equal(91, standing, "the standing tiles are exactly what nobody took");
+            report.Equal(53, wall.TilesInRingOrder.Count(tile => wall.SlotOf(tile).HasValue) - standing,
+                "the tiles that left the wall are the dealt ones");
+
+            var replacement = wall.DrawReplacement();
+            var replacementSlot = wall.SlotOf(replacement)!.Value;
+            var liveSlot = WallGeometry.SlotAt(wall.LiveIndex);
+            report.Check(replacementSlot.Side != liveSlot.Side || replacementSlot.Stack > liveSlot.Stack,
+                "a replacement comes from the other end of the wall, not from the live wall");
+            var takenReplacement = WallGeometry.SlotAt(wall.TailIndex + 1);
+            report.Equal(0, takenReplacement.Level,
+                "the replacement end starts with the bottom of the last stack before the break");
         }
 
         private static void DealBasics(SelfTestReport report)
@@ -1620,11 +1727,13 @@ namespace Mahjong.Rules.Diagnostics
         /// Fan 46 and rule 3.6.8: when the kong replacement is the last tile of the wall, the hand
         /// must not stop as a draw — the player may win on that very tile or discard it, and only
         /// that discard can end the hand. The line below (never claim, always discard) burns the
-        /// wall, and seed 1308 of that line reaches a kong with exactly one tile left.
+        /// wall; the first hand that reaches a kong with exactly one tile left is checked, and the
+        /// seed window is wide enough to survive a change in how the wall is dealt (the ring deal
+        /// moved the first such hand from 1308 to 1975).
         /// </summary>
         private static void KongAtWallEnd(SelfTestReport report)
         {
-            for (var seed = 1250; seed < 1350; seed++)
+            for (var seed = 1900; seed < 2150; seed++)
             {
                 var state = new GameState();
                 state.StartHand(seed % 4, seed);
@@ -1666,7 +1775,7 @@ namespace Mahjong.Rules.Diagnostics
                 }
             }
 
-            report.Check(false, "no hand reached a kong on the last wall tile; adjust the seed range if the deal changed");
+            report.Check(false, "no hand reached a kong on the last wall tile");
         }
 
         private static int Usefulness(TileType type, List<TileType> hand)
