@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Mahjong.Controls;
+using Mahjong.Localization;
 using Mahjong.Rules;
 using Mahjong.Unity;
 using NUnit.Framework;
@@ -39,8 +40,8 @@ namespace Mahjong.PlayTests
             var window = game.HandClock.Window;
             Assert.IsTrue(window is ClockWindow.Arrange or ClockWindow.Discard,
                 $"A human turn must be on the discard clock, not on {window}.");
-            StringAssert.Contains(window == ClockWindow.Arrange ? "Arrange your tiles" : "Time to discard",
-                game.Status.text, "The HUD does not show the countdown of the open window:\n" + game.Status.text);
+            StringAssert.Contains(Text.ClockLabel(window), game.Status.text,
+                "The HUD does not show the countdown of the open window:\n" + game.Status.text);
 
             var discardsBefore = game.DiscardTileCount;
             game.AdvanceClock(60);
@@ -53,7 +54,7 @@ namespace Mahjong.PlayTests
             yield return null;
             Debug.Log($"[clock test] forced discard: discards {discardsBefore} -> {game.DiscardTileCount},"
                       + $" phase={game.Phase}, seat={game.CurrentSeat}, window={game.HandClock.Window}");
-            StringAssert.DoesNotContain("Your turn", game.Status.text,
+            Assert.IsFalse(game.IsYourTurn,
                 "The timed-out turn did not end the human turn:\n" + game.Status.text);
         }
 
@@ -92,7 +93,7 @@ namespace Mahjong.PlayTests
 
             var trace = string.Join(" ", poll);
             Assert.IsTrue(observed, "No human claim window appeared within twenty-five seconds of simulated play.\n" + trace);
-            StringAssert.Contains("Time to claim", text,
+            StringAssert.Contains(Text.ClockLabel(ClockWindow.Claim), text,
                 "The HUD does not show the three-second claim window:\n" + text);
             Assert.LessOrEqual(secondsLeft, 3, "A claim window may not last longer than three seconds.");
             Assert.IsTrue(promptOpen, "The claim window is on the clock but the action bar is closed.");

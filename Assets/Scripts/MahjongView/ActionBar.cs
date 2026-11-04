@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Mahjong.Controls;
+using Mahjong.Localization;
 using Mahjong.Rules;
 using UnityEngine;
 
@@ -28,6 +29,9 @@ namespace Mahjong.Unity
 
         /// <summary>Fingerprint of the option set on screen; empty when the bar is hidden.</summary>
         public string Fingerprint { get; private set; } = string.Empty;
+
+        /// <summary>Language the captions were built in; a switch rebuilds the bar.</summary>
+        private Language shownLanguage = Language.En;
 
         public bool IsOpen => buttons.Count > 0;
         public IReadOnlyList<ActionButton> Buttons => buttons;
@@ -63,6 +67,7 @@ namespace Mahjong.Unity
             mesh.characterSize = 0.0018f;
             mesh.color = new Color(0.80f, 0.82f, 0.85f);
             mesh.text = string.Empty;
+            UiFont.Assign(mesh);
             return mesh;
         }
 
@@ -75,10 +80,12 @@ namespace Mahjong.Unity
                 return;
             }
 
-            if (prompt.Fingerprint == Fingerprint && buttons.Count == prompt.Count) return;
+            if (prompt.Fingerprint == Fingerprint && buttons.Count == prompt.Count
+                && shownLanguage == Loc.Current) return;
 
             Clear();
             Fingerprint = prompt.Fingerprint;
+            shownLanguage = Loc.Current;
 
             var slot = Mathf.Min(MaxSlot, MaxWidth / prompt.Count);
             var width = slot - Gap;
@@ -151,6 +158,8 @@ namespace Mahjong.Unity
             foreach (var button in buttons)
                 if (button != null) Destroy(button.gameObject);
             buttons.Clear();
+            // A hidden bar has no captions, so the next Show must rebuild them in the new language.
+            shownLanguage = Loc.Current;
         }
     }
 }

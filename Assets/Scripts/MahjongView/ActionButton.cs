@@ -72,6 +72,7 @@ namespace Mahjong.Unity
             mesh.characterSize = Mathf.Min(height * 0.11f, fitWidth);
             mesh.color = CaptionColour;
             mesh.text = text;
+            UiFont.Assign(mesh);
             return mesh;
         }
 

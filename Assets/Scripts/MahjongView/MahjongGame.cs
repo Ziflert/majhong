@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Mahjong.Bots;
 using Mahjong.Controls;
+using Mahjong.Localization;
 using Mahjong.Rules;
 using UnityEngine;
 
@@ -31,6 +32,23 @@ namespace Mahjong.Unity
         /// <summary>The bar of legal actions offered to the human. Exposed for tests and tools.</summary>
         public ActionBar Bar => bar;
 
+        /// <summary>The Russian rulebook that opens with R. Exposed for tests and tools.</summary>
+        public RulesPanel Rules => rules;
+
+        /// <summary>The free-play table that opens with F. Exposed for tests and tools.</summary>
+        public FreePlayTable FreePlay => free;
+
+        /// <summary>True while the human is to choose a discard: the game is waiting for him.</summary>
+        public bool IsYourTurn =>
+            session?.State != null && session.State.Phase == GamePhase.AwaitingDiscard
+            && session.State.CurrentPlayer == humanSeat;
+
+        /// <summary>Tiles left in the wall; the HUD prints it and the tests read it.</summary>
+        public int WallRemaining => session?.State?.Wall.Remaining ?? 0;
+
+        /// <summary>Language the interface is drawn in.</summary>
+        public Language UiLanguage => Loc.Current;
+
         /// <summary>The choices currently offered to the human; closed when it is not his decision.</summary>
         public ActionPrompt Prompt { get; private set; } = ActionPrompt.Closed;
 
@@ -39,6 +57,13 @@ namespace Mahjong.Unity
 
         /// <summary>How many tiles lie in the discard piles; a timed-out turn adds one.</summary>
         public int DiscardTileCount => session?.State?.Discards.Count ?? 0;
+
+        /// <summary>Tile objects on the scored table: the human hand, the melds, the piles and the backs.</summary>
+        public int TableTileCount => tilesById.Count;
+
+        /// <summary>Scored tiles actually drawn right now; free play hides them all.</summary>
+        public int VisibleTableTileCount =>
+            tilesById.Values.Count(tile => tile != null && tile.gameObject.activeSelf);
 
         /// <summary>Phase of the hand that is being played. Exposed for tests and tools.</summary>
         public GamePhase Phase => session?.State?.Phase ?? GamePhase.NotStarted;
@@ -74,8 +99,77 @@ namespace Mahjong.Unity
         /// <summary>Ceiling for the deal stagger: a wall of new tiles must not crawl in forever.</summary>
         private const float MaxDealDelay = 0.35f;
 
+        /// <summary>Corner of the HUD in camera space: the text hangs half a metre away.</summary>
+        private const float HudZ = 0.5f;
+        private const float HudLeft = -0.295f;
+        private const float HudTop = 0.145f;
+
+        /// <summary>Seat plates stand just above the felt, clear of the tiles behind them.</summary>
+        private const float SeatPlateY = 0.02f;
+
+        /// <summary>Size of the dark plate under the HUD, in camera space at half a metre.</summary>
+        private const float HudPlateWidth = 0.30f;
+        private const float HudPlateHeight = 0.115f;
+
+        /// <summary>How much plate sticks out around the text, so the glyphs do not touch the edge.</summary>
+        private const float HudPlateMargin = 0.006f;
+
+        /// <summary>Nearly opaque: the HUD is read against a busy table, not against the sky.</summary>
+        private static readonly Color HudPlateColour = new(0.05f, 0.07f, 0.09f, 0.88f);
+
+        /// <summary>
+        /// Puts the HUD in the top-left corner of the frame and sizes its plate to it. The corner is
+        /// measured from the camera, so a narrow game view does not push the text off the screen.
+        /// </summary>
+        private void LayoutHud(Camera camera)
+        {
+            if (status == null) return;
+
+            var halfHeight = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f) * HudZ;
+            var halfWidth = halfHeight * camera.aspect;
+
+            var left = -halfWidth + 0.012f;
+            var top = halfHeight - 0.010f;
+            status.transform.localPosition = new Vector3(left, top, HudZ);
+
+            if (hudPlate == null) return;
+            FitHudPlate(camera);
+        }
+
+        /// <summary>
+        /// Sizes the dark plate to the text that is actually there. A fixed plate is either a black
+        /// half-screen or too narrow for the longest line (the standings table at the end of a session
+        /// is much wider than the turn line), so the text mesh is measured instead.
+        /// </summary>
+        private void FitHudPlate(Camera camera)
+        {
+            var bounds = status!.GetComponent<MeshRenderer>().bounds;
+            if (bounds.size.sqrMagnitude <= 0f) return;
+
+            var min = camera.transform.InverseTransformPoint(bounds.min);
+            var max = camera.transform.InverseTransformPoint(bounds.max);
+            var width = max.x - min.x;
+            var height = max.y - min.y;
+            if (width <= 0f || height <= 0f) return;
+
+            hudPlate.localScale = new Vector3(width + HudPlateMargin * 2f, height + HudPlateMargin, 1f);
+            hudPlate.localPosition = new Vector3(
+                (min.x + max.x) * 0.5f,
+                (min.y + max.y) * 0.5f,
+                HudZ + 0.02f);
+        }
+
         /// <summary>Index of the fresh tile being placed in the current rebuild; reset by <see cref="Rebuild"/>.</summary>
         private int dealIndex;
+
+        /// <summary>Whether the scored tiles are on screen; free play hides them.</summary>
+        private bool tilesVisible = true;
+
+        /// <summary>The well in the middle of the table; free play covers it with its own grid.</summary>
+        private GameObject well = null!;
+
+        /// <summary>Dark plate under the HUD; resized with the frame.</summary>
+        private Transform hudPlate = null!;
 
         /// <summary>Meld signatures already shown, so a kong hops only once when it is declared.</summary>
         private readonly HashSet<string> announcedMelds = new();
@@ -90,8 +184,11 @@ namespace Mahjong.Unity
         private IMahjongBot[] bots = null!;
         private TextMesh status = null!;
         private ActionBar bar = null!;
+        private RulesPanel rules = null!;
+        private FreePlayTable free = null!;
         private Transform table = null!;
         private Transform board = null!;
+        private readonly TextMesh[] seatPlates = new TextMesh[4];
         private readonly PlayClock clock = new();
 
         private float nextBotAction;
@@ -118,6 +215,10 @@ namespace Mahjong.Unity
 
         private void Start()
         {
+            // The interface language comes from MAHJONG_LANG and defaults to Russian; everything below
+            // builds its captions from Loc, so it has to be set before the scene is generated.
+            Loc.Current = Loc.PreferredLanguage;
+
             var random = new System.Random(randomSeed);
             var level = BotDifficulty();
             bots = new IMahjongBot[]
@@ -173,8 +274,12 @@ namespace Mahjong.Unity
                 camera = new GameObject("Main Camera") { tag = "MainCamera" }.AddComponent<Camera>();
             }
 
-            camera.transform.position = new Vector3(0f, 1.15f, -1.45f);
-            camera.transform.rotation = Quaternion.Euler(40f, 0f, 0f);
+            // The eye sits far enough back that the whole table fits with a margin above it: the top
+            // of the screen belongs to the HUD, and the far hand must not disappear behind that text.
+            var eye = new Vector3(0f, 1.78f, -1.70f);
+            var lookAt = new Vector3(0f, 0f, 0.08f);
+            camera.transform.position = eye;
+            camera.transform.rotation = Quaternion.LookRotation(lookAt - eye, Vector3.up);
             camera.fieldOfView = 34f;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.08f, 0.09f, 0.11f);
@@ -185,12 +290,31 @@ namespace Mahjong.Unity
             sun.intensity = 1.1f;
             lightObject.transform.rotation = Quaternion.Euler(55f, -35f, 0f);
 
+            // The table is a dark wooden frame with a felt inset, so the playing surface reads as a
+            // table and not as a green slab: the frame is the first "Table" object, the felt sits on
+            // top of it and the tiles rest on the felt.
             var tableObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
             tableObject.name = "Table";
-            tableObject.transform.position = new Vector3(0f, -0.02f, 0.08f);
-            tableObject.transform.localScale = new Vector3(1.35f, 0.03f, 1.35f);
-            tableObject.GetComponent<Renderer>().material.color = new Color(0.09f, 0.32f, 0.20f);
+            tableObject.transform.position = new Vector3(0f, -0.045f, 0.08f);
+            tableObject.transform.localScale = new Vector3(1.47f, 0.05f, 1.47f);
+            tableObject.GetComponent<Renderer>().material.color = new Color(0.20f, 0.13f, 0.08f);
             table = tableObject.transform;
+
+            var feltObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            feltObject.name = "Felt";
+            feltObject.transform.SetParent(table, false);
+            feltObject.transform.localPosition = new Vector3(0f, 0.58f, 0f);
+            feltObject.transform.localScale = new Vector3(0.925f, 0.25f, 0.925f);
+            feltObject.GetComponent<Renderer>().material.color = new Color(0.09f, 0.32f, 0.20f);
+
+            // A slightly lighter square in the middle marks the well where the discards go.
+            var wellObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            wellObject.name = "Well";
+            wellObject.transform.SetParent(table, false);
+            wellObject.transform.localPosition = new Vector3(0f, 0.83f, 0f);
+            wellObject.transform.localScale = new Vector3(0.52f, 0.03f, 0.52f);
+            wellObject.GetComponent<Renderer>().material.color = new Color(0.07f, 0.26f, 0.16f);
+            well = wellObject;
 
             // The table cube is scaled non-uniformly; tiles live in an unscaled container so they
             // keep the size given by TileObject instead of inheriting the table's squash.
@@ -200,18 +324,98 @@ namespace Mahjong.Unity
 
             var statusObject = new GameObject("Status");
             // HUD text follows the camera: anchored to the table it leaves the frame as soon as the
-            // camera is pitched down onto the board.
+            // camera is pitched down onto the board. It sits in the top-left corner, on its own dark
+            // plate, so it never covers the far hand and stays readable over a light table.
             statusObject.transform.SetParent(camera.transform, false);
-            statusObject.transform.localPosition = new Vector3(0f, 0.13f, 0.5f);
+            statusObject.transform.localPosition = new Vector3(HudLeft, HudTop, HudZ);
             statusObject.transform.localRotation = Quaternion.identity;
             status = statusObject.AddComponent<TextMesh>();
-            status.anchor = TextAnchor.UpperCenter;
-            status.alignment = TextAlignment.Center;
+            status.anchor = TextAnchor.UpperLeft;
+            status.alignment = TextAlignment.Left;
             status.fontSize = 64;
-            status.characterSize = 0.0016f;
+            // Small enough that the whole block sits above the table in the top-left corner and
+            // large enough to read at 720p, where one line is about eleven pixels high.
+            status.characterSize = 0.00125f;
             status.color = Color.white;
+            UiFont.Assign(status);
+            BuildHudPlate(camera.transform);
 
             bar = ActionBar.Create(camera.transform);
+            rules = RulesPanel.Create(camera.transform);
+            free = FreePlayTable.Create(board, randomSeed);
+
+            BuildSeatPlates(camera.transform);
+        }
+
+        /// <summary>
+        /// Four small plates with the wind of each seat, one per side, just outside that side's row of
+        /// tiles. They are billboards turned towards the camera every frame: a plate lying flat on the
+        /// felt was three pixels tall and unreadable, and one turned to its own player reads upside
+        /// down from the only screen the game has.
+        /// </summary>
+        private void BuildSeatPlates(Transform cameraTransform)
+        {
+            var sides = new[]
+            {
+                new Vector3(0f, SeatPlateY, -0.63f),
+                new Vector3(0.665f, SeatPlateY, -0.42f),
+                new Vector3(0f, SeatPlateY, 0.72f),
+                new Vector3(-0.665f, SeatPlateY, -0.42f)
+            };
+
+            for (var seat = 0; seat < 4; seat++)
+            {
+                var host = new GameObject($"seat-{seat}");
+                host.transform.SetParent(board, false);
+                host.transform.localPosition = sides[seat];
+
+                var mesh = host.AddComponent<TextMesh>();
+                mesh.anchor = TextAnchor.MiddleCenter;
+                mesh.alignment = TextAlignment.Center;
+                mesh.fontSize = 64;
+                mesh.characterSize = 0.0075f;
+                mesh.color = new Color(0.86f, 0.88f, 0.82f);
+                UiFont.Assign(mesh);
+                seatPlates[seat] = mesh;
+            }
+
+            FaceSeatPlates(cameraTransform);
+        }
+
+        /// <summary>Points every seat plate at the camera; a TextMesh reads when its back faces us.</summary>
+        private void FaceSeatPlates(Transform cameraTransform)
+        {
+            var eye = cameraTransform.position;
+            foreach (var plate in seatPlates)
+            {
+                if (plate == null) continue;
+                var away = plate.transform.position - eye;
+                if (away.sqrMagnitude < 1e-6f) continue;
+                plate.transform.rotation = Quaternion.LookRotation(away, Vector3.up);
+            }
+        }
+
+        /// <summary>
+        /// Dark plate behind the HUD text. The interface font is a system font, so the text has no
+        /// outline of its own: over the light felt and the pale tile backs it needs a backdrop. The
+        /// plate is a quad turned to face the camera, the same trick the rulebook uses.
+        /// </summary>
+        private void BuildHudPlate(Transform cameraTransform)
+        {
+            var quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            quad.name = "StatusPlate";
+            quad.transform.SetParent(cameraTransform, false);
+            // The quad mesh faces -Z and the camera looks along +Z: identity is the readable side.
+            quad.transform.localRotation = Quaternion.identity;
+            quad.transform.localPosition = new Vector3(HudLeft + HudPlateWidth * 0.5f,
+                HudTop - HudPlateHeight * 0.5f, HudZ + 0.02f);
+            quad.transform.localScale = new Vector3(HudPlateWidth, HudPlateHeight, 1f);
+            Destroy(quad.GetComponent<Collider>());
+            var renderer = quad.GetComponent<Renderer>();
+            renderer.material = new Material(Shader.Find("Unlit/Color"));
+            renderer.material.color = HudPlateColour;
+            hudPlate = quad.transform;
+            LayoutHud(cameraTransform.GetComponent<Camera>());
         }
 
         private void StartHand(int seed)
@@ -235,6 +439,13 @@ namespace Mahjong.Unity
         {
             if (session.State == null) return;
 
+            FaceSeatPlates(Camera.main != null ? Camera.main.transform : transform);
+            SyncInterfaceVisibility();
+
+            // The rulebook and the free table own the screen: while either is open the hand is
+            // paused, so a player can read a rule or move tiles without losing his turn.
+            if (HandleInterfaceKeys()) return;
+
             // Rule 3.5.6: the session clock runs during play, not during the pause between hands.
             if (!session.IsFinished && session.State.Phase != GamePhase.HandFinished)
                 session.AdvanceClock(System.TimeSpan.FromSeconds(Time.deltaTime));
@@ -245,7 +456,7 @@ namespace Mahjong.Unity
                 StopClock();
                 session.AbandonRunningHand();
                 waitingForNextHand = false;
-                status.text = "Time is up: the hand in progress scores nothing\n" + session.Describe();
+                status.text = Loc.Get("session.timeUp") + "\n" + Text.Standings(session.Standings(), humanSeat);
                 return;
             }
 
@@ -265,7 +476,8 @@ namespace Mahjong.Unity
                 }
                 else if (Time.time >= nextHandAt)
                 {
-                    if (session.IsFinished) status.text = "Session complete\n" + session.Describe();
+                    if (session.IsFinished)
+                        status.text = Loc.Get("session.complete") + "\n" + Text.Standings(session.Standings(), humanSeat);
                     else StartHand(new System.Random().Next());
                 }
                 return;
@@ -291,6 +503,152 @@ namespace Mahjong.Unity
             }
         }
 
+        // ----------------------------------------------------------- interface
+
+        /// <summary>
+        /// Rules panel, free play and the language switch. Returns true when the interface consumed
+        /// this frame, which pauses the hand: reading a rule must not cost a player his turn.
+        /// </summary>
+        private bool HandleInterfaceKeys()
+        {
+            if (Input.GetKeyDown(KeyCode.L))
+            {
+                ToggleLanguage();
+                return false;
+            }
+
+            if (rules.IsOpen)
+            {
+                if (rules.HandleKeys()) rules.Close();
+                return true;
+            }
+
+            if (Input.GetKeyDown(KeyCode.R))
+            {
+                ClosePrompt();
+                StopClock();
+                rules.SetOpen(true);
+                return true;
+            }
+
+            if (free.IsOpen)
+            {
+                if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.F))
+                {
+                    CloseFreePlay();
+                    return true;
+                }
+
+                if (Input.GetKeyDown(KeyCode.Tab)) free.NextSeat();
+                if (Input.GetKeyDown(KeyCode.Backspace)) free.Reset();
+
+                if (Input.GetMouseButtonDown(0)) free.TryClick(MouseRay(), flip: false);
+                else if (Input.GetMouseButtonDown(1)) free.TryClick(MouseRay(), flip: true);
+
+                var freeText = free.StatusText();
+                if (status.text != freeText) status.text = freeText;
+                return true;
+            }
+
+            if (Input.GetKeyDown(KeyCode.F))
+            {
+                OpenFreePlay();
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>Switches the interface language; every caption is rebuilt from the catalogue.</summary>
+        public Language ToggleLanguage()
+        {
+            Loc.Toggle();
+            bar.Hide();
+            if (free.IsOpen) status.text = free.StatusText();
+            else RefreshStatus();
+            return Loc.Current;
+        }
+
+        /// <summary>Opens free play: the whole set on the table, movable by any seat.</summary>
+        public void OpenFreePlay()
+        {
+            ClosePrompt();
+            StopClock();
+            free.Open();
+            HighlightHand(false);
+            SyncInterfaceVisibility();
+            status.text = free.StatusText();
+        }
+
+        /// <summary>Leaves free play and returns to the scored table.</summary>
+        public void CloseFreePlay()
+        {
+            free.Close();
+            SyncInterfaceVisibility();
+            status.text = DescribeState();
+        }
+
+        /// <summary>
+        /// Keeps whatever the interface is showing consistent with what is on the screen, every frame.
+        /// It is done from the state of the two panels rather than from the key handler, so a panel
+        /// opened by a tool or a test behaves exactly like one opened by the player.
+        /// </summary>
+        private void SyncInterfaceVisibility()
+        {
+            var rulesOpen = rules.IsOpen;
+            var freeOpen = free.IsOpen;
+
+            // The page covers the middle of the screen; a HUD drawn over it reads as two texts in
+            // the same place.
+            var hudWanted = !rulesOpen;
+            if (status != null && status.gameObject.activeSelf != hudWanted)
+                status.gameObject.SetActive(hudWanted);
+
+            // Wind plates belong to the scored table.
+            var platesWanted = !rulesOpen && !freeOpen;
+            foreach (var plate in seatPlates)
+                if (plate != null && plate.gameObject.activeSelf != platesWanted)
+                    plate.gameObject.SetActive(platesWanted);
+
+            // The scored hand keeps lying on the table otherwise, and the free set looks like it was
+            // dealt into a live hand. The tiles are hidden, not destroyed: the hand comes back as it was.
+            var tilesWanted = !freeOpen;
+            if (tilesVisible != tilesWanted)
+            {
+                SetScoredTilesVisible(tilesWanted);
+                tilesVisible = tilesWanted;
+            }
+
+            if (well != null && well.activeSelf != tilesWanted) well.SetActive(tilesWanted);
+
+            var camera = Camera.main;
+            if (camera != null) LayoutHud(camera);
+        }
+
+        /// <summary>Shows or hides the scored tiles without forgetting their views.</summary>
+        private void SetScoredTilesVisible(bool visible)
+        {
+            foreach (var tile in tilesById.Values)
+                if (tile != null) tile.gameObject.SetActive(visible);
+        }
+
+        /// <summary>
+        /// The HUD and the four wind plates belong to the scored table: a page that covers the screen
+        /// would be drawn into by both, so the rulebook hides them.
+        /// </summary>
+        private void SetTableLabelsVisible(bool visible)
+        {
+            if (status != null) status.gameObject.SetActive(visible);
+            SetSeatPlatesVisible(visible);
+        }
+
+        /// <summary>Wind plates of the four seats; free play has its own seat line in the HUD.</summary>
+        private void SetSeatPlatesVisible(bool visible)
+        {
+            foreach (var plate in seatPlates)
+                if (plate != null) plate.gameObject.SetActive(visible);
+        }
+
         // --------------------------------------------------------------- turns
 
         private void HandleHumanTurn()
@@ -308,6 +666,7 @@ namespace Mahjong.Unity
             }
 
             HighlightHand(true);
+            UpdateHandHover();
             ShowPrompt(ActionPrompt.FromLegalActions(options));
 
             // H stays as a shortcut for the decision that a tile click cannot express
@@ -417,7 +776,7 @@ namespace Mahjong.Unity
         private static string DefaultHint(ActionPrompt prompt) =>
             prompt.Count == 1
                 ? prompt.Options[0].Hint
-                : $"Press 1-{prompt.Count} or click a button";
+                : Loc.Format("hint.bar", prompt.Count);
 
         private void Play(LegalAction action)
         {
@@ -652,13 +1011,56 @@ namespace Mahjong.Unity
             }
 
             HighlightHand(state.CurrentPlayer == humanSeat && state.Phase == GamePhase.AwaitingDiscard);
+            RefreshSeatPlates(state);
             status.text = DescribeState();
+
+            // autoSyncTransforms is off in this project: without a sync the colliders of the hand stay
+            // where the tiles were before this rebuild, and a click on a tile is resolved at its old
+            // place.
+            Physics.SyncTransforms();
+        }
+
+        /// <summary>Names the four seats by their wind; the dealer changes every hand.</summary>
+        private void RefreshSeatPlates(GameState state)
+        {
+            for (var seat = 0; seat < 4; seat++)
+            {
+                if (seatPlates[seat] == null) continue;
+                var wind = Text.SeatName(state.SeatWindOf(seat));
+                seatPlates[seat].text = seat == humanSeat ? wind + " ▲" : wind;
+                seatPlates[seat].color = seat == humanSeat
+                    ? new Color(0.98f, 0.94f, 0.72f)
+                    : new Color(0.80f, 0.83f, 0.78f);
+            }
+        }
+
+        /// <summary>
+        /// Raises the hand tile under the cursor. It is only a hint for the player: the click itself
+        /// is still resolved by the engine action list, never by the hover.
+        /// </summary>
+        private void UpdateHandHover()
+        {
+            if (handTiles.Count == 0) return;
+
+            var hovered = PickTileUnderMouse();
+            foreach (var entry in handTiles)
+                if (entry.Value != null) entry.Value.SetHovered(hovered.HasValue && entry.Key == hovered.Value);
         }
 
         /// <summary>
         /// Rebuilds the HUD only when its text changes: the countdown makes it change once a second,
         /// which is cheap, but rebuilding it every frame would allocate a string per frame for nothing.
         /// </summary>
+        /// <summary>
+        /// A TextMesh rebuilds its mesh when the text changes, and the renderer bounds only follow on
+        /// the next frame: measuring the plate here keeps it one frame behind the text instead of never.
+        /// </summary>
+        private void LateUpdate()
+        {
+            var camera = Camera.main;
+            if (camera != null && status != null && status.gameObject.activeSelf) FitHudPlate(camera);
+        }
+
         private void RefreshStatus()
         {
             var text = DescribeState();
@@ -743,7 +1145,7 @@ namespace Mahjong.Unity
             return player switch
             {
                 1 => (new Vector3(0.60f, TileY, -0.32f), new Vector3(0f, 0f, 0.062f)),
-                2 => (new Vector3(-0.40f, TileY, 0.70f), new Vector3(0.062f, 0f, 0f)),
+                2 => (new Vector3(-0.40f, TileY, 0.60f), new Vector3(0.062f, 0f, 0f)),
                 _ => (new Vector3(-0.60f, TileY, -0.32f), new Vector3(0f, 0f, 0.062f))
             };
         }
@@ -773,42 +1175,46 @@ namespace Mahjong.Unity
             var wind = state.SeatWindOf(humanSeat);
             var lines = new List<string>
             {
-                $"Hand {session.HandsPlayed + 1}/{GameSession.TotalHands}  Round {session.RoundWind}  Your seat {wind}",
-                state.Phase == GamePhase.AwaitingDiscard && state.CurrentPlayer == humanSeat
-                    ? "Your turn: click a tile to discard, 1-N for the action bar, H for Hu"
-                    : $"Waiting for player {state.CurrentPlayer}",
-                $"Wall: {state.Wall.Remaining}",
-                $"Points: {string.Join("  ", session.Scores.Select((score, player) => $"P{player}={score}"))}",
-                $"Clock: {Clock(session.Elapsed)} / {Clock(session.TimeLimit)}"
-                + (session.IsTimeUp ? "  time is up" : session.IsFinalQuarterHour ? "  last quarter of an hour" : string.Empty)
+                Loc.Format("hud.header", session.HandsPlayed + 1, GameSession.TotalHands,
+                    Text.SeatName(session.RoundWind), Text.SeatName(wind)),
+                IsYourTurn ? Loc.Get("hud.yourTurn") : Loc.Format("hud.waiting", state.CurrentPlayer + 1),
+                Loc.Format("hud.wall", state.Wall.Remaining),
+                Loc.Format("hud.points", string.Join("  ",
+                    session.Scores.Select((score, player) => $"P{player + 1}={score}"))),
+                Loc.Format("hud.clock", Clock(session.Elapsed), Clock(session.TimeLimit))
+                + (session.IsTimeUp ? "  " + Loc.Get("hud.timeUp")
+                    : session.IsFinalQuarterHour ? "  " + Loc.Get("hud.lastQuarter") : string.Empty)
             };
 
+            if (IsYourTurn) lines.Add(Loc.Get("hud.keys"));
+
             if (clock.IsRunning)
-                lines.Add($"{ClockLabel(clock.Window)}: {clock.SecondsLeft} s");
+                lines.Add(Loc.Format("hud.seconds", Text.ClockLabel(clock.Window), clock.SecondsLeft));
 
             if (state.IsWinForbidden(humanSeat))
-                lines.Add($"Hu is forbidden this hand: {state.WinForbiddenReason(humanSeat)}");
+                lines.Add(Loc.Format("hud.huForbidden", state.WinForbiddenReason(humanSeat)));
 
             return string.Join("\n", lines);
         }
 
         private static string Clock(System.TimeSpan span) => $"{(int)span.TotalMinutes}:{span.Seconds:00}";
 
-        private static string ClockLabel(ClockWindow window) => window switch
-        {
-            ClockWindow.Arrange => "Arrange your tiles",
-            ClockWindow.Discard => "Time to discard",
-            ClockWindow.Claim => "Time to claim",
-            _ => "Time"
-        };
-
         private string DescribeResult()
         {
-            if (session.LastSettlement == null) return "Hand finished";
+            if (session.LastSettlement == null) return Loc.Get("result.handFinished");
             var settlement = session.LastSettlement;
-            if (settlement.WinnerPlayer < 0) return "Draw: the wall is empty";
-            var winner = settlement.WinnerPlayer == humanSeat ? "You win" : $"Player {settlement.WinnerPlayer} wins";
-            return $"{winner}\n{settlement.Explanation}\nPaid: {settlement.TotalPaid}";
+            if (settlement.WinnerPlayer < 0) return Loc.Get("result.draw");
+
+            var winner = settlement.WinnerPlayer == humanSeat
+                ? Loc.Get("result.youWin")
+                : Loc.Format("result.playerWins", settlement.WinnerPlayer + 1);
+
+            var result = session.State!.Result;
+            var breakdown = result != null && result.Score.IsValidWin
+                ? Text.ScoreSummary(result)
+                : settlement.Explanation;
+
+            return $"{winner}\n{breakdown}\n{Loc.Format("result.paid", settlement.TotalPaid)}";
         }
     }
 }

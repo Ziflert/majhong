@@ -37,7 +37,7 @@ namespace Mahjong.Rules.Diagnostics
     /// Verification of the rules core that runs both inside Unity (NUnit wrapper)
     /// and headless (Tools/RulesCheck). No UnityEngine dependency.
     /// </summary>
-    public static class RulesSelfTest
+    public static partial class RulesSelfTest
     {
         public static SelfTestReport RunAll()
         {
@@ -86,6 +86,7 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "score: last tile fans need the real last tile", () => LastTileBoundaries(report));
             Run(report, "hand: waiting tiles cover the special patterns", () => SpecialPatternWaits(report));
             Run(report, "session: a forfeited player takes no table points", () => ForfeitedRanking(report));
+            NetAndUiGroups(report);
 
             return report;
         }

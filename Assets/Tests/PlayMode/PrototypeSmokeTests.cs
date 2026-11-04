@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Linq;
+using Mahjong.Localization;
 using Mahjong.Unity;
 using NUnit.Framework;
 using UnityEngine;
@@ -68,8 +69,14 @@ namespace Mahjong.PlayTests
             var status = game.Status;
             Assert.IsNotNull(status, "The status line was not created.");
             Assert.IsNotNull(status!.font, "The status TextMesh has no font.");
-            StringAssert.Contains("Wall:", status.text, "Status text does not describe the session.");
-            StringAssert.Contains("Points:", status.text, "Status text does not show points.");
+            // The interface is Russian by default, so the assertions ask the catalogue rather than
+            // hard-coding English words: the HUD must use the texts of the active language.
+            StringAssert.Contains(Loc.Format("hud.wall", game.WallRemaining), status.text,
+                "Status text does not describe the wall:\n" + status.text);
+            StringAssert.Contains(Loc.Get("hud.points").Split('{')[0].Trim(), status.text,
+                "Status text does not show points:\n" + status.text);
+            StringAssert.Contains(Loc.Get("hud.header").Split('{')[0].Trim(), status.text,
+                "Status text does not describe the session:\n" + status.text);
 
             Debug.Log("[smoke] status:\n" + status.text);
             Debug.Log($"[smoke] tiles: {tiles.Length} (face up {faceUp.Count}, face down {faceDown.Count})");
@@ -106,7 +113,7 @@ namespace Mahjong.PlayTests
             yield return null;
 
             var status = game.Status;
-            var wallAtStart = ParseWall(status.text);
+            var wallAtStart = game.WallRemaining;
             Assert.Greater(wallAtStart, 0, "The wall count was not parsed from the status line.");
 
             var reachedHuman = false;
@@ -114,8 +121,7 @@ namespace Mahjong.PlayTests
             while (frames++ < 240 && !reachedHuman)
             {
                 yield return null;
-                var text = status.text;
-                reachedHuman = text.Contains("Your turn") || text.Contains("Waiting for player");
+                reachedHuman = game.IsYourTurn || game.HandClock.IsRunning || game.DiscardTileCount > 0;
                 if (reachedHuman) break;
             }
 
@@ -123,7 +129,7 @@ namespace Mahjong.PlayTests
 
             Assert.IsTrue(reachedHuman,
                 "After two simulated seconds the table is still not in a turn: the game loop is stuck.");
-            Debug.Log($"[smoke] reached a turn, wall at start {wallAtStart}, wall now {ParseWall(status.text)}"
+            Debug.Log($"[smoke] reached a turn, wall at start {wallAtStart}, wall now {game.WallRemaining}"
                       + "\n" + status.text);
         }
 
@@ -136,11 +142,5 @@ namespace Mahjong.PlayTests
             return label == null ? string.Empty : label.text;
         }
 
-        private static int ParseWall(string statusText)
-        {
-            var line = statusText.Split('\n').FirstOrDefault(part => part.StartsWith("Wall:"));
-            if (line == null) return -1;
-            return int.TryParse(line.Substring("Wall:".Length).Trim(), out var remaining) ? remaining : -1;
-        }
     }
 }

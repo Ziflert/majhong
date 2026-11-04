@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Mahjong.Localization;
 using Mahjong.Rules;
 
 namespace Mahjong.Controls
@@ -8,8 +9,11 @@ namespace Mahjong.Controls
     /// <summary>One button of the action bar: a legal action with a short label and a hotkey number.</summary>
     public sealed record ActionOption(int Number, LegalAction Action, string Label)
     {
-        /// <summary>Full sentence for the hint line; comes straight from the engine.</summary>
-        public string Hint => Action.Description;
+        /// <summary>
+        /// Full sentence for the hint line. In English this is the engine's own wording; in another
+        /// language <see cref="Text.ActionHint"/> builds the sentence from the same structured action.
+        /// </summary>
+        public string Hint => Text.ActionHint(Action);
 
         public override string ToString() => $"{Number}. {Label}";
     }
@@ -86,18 +90,11 @@ namespace Mahjong.Controls
             _ => 5
         };
 
-        /// <summary>Short captions that fit on a button; the full sentence goes to the hint line.</summary>
-        public static string Label(LegalAction action) => action.Kind switch
-        {
-            ActionKind.Win => "Hu",
-            ActionKind.Pass => "Pass",
-            ActionKind.Chow => "Chow " + action.Tile?.Type,
-            ActionKind.Pung => "Pung " + action.Tile?.Type,
-            ActionKind.OpenKong or ActionKind.ClosedKong or ActionKind.AddedKong => "Kong " + action.Tile?.Type,
-            ActionKind.Discard => "Discard " + action.Tile?.Type,
-            ActionKind.Draw => "Draw",
-            _ => action.Kind.ToString()
-        };
+        /// <summary>
+        /// Short caption that fits on a button; the full sentence goes to the hint line. The caption
+        /// follows the interface language, so the bar reads Russian under a Russian HUD.
+        /// </summary>
+        public static string Label(LegalAction action) => Text.ActionLabel(action);
 
         /// <summary>Finds an option by its hotkey number.</summary>
         public ActionOption? Find(int number) => Options.FirstOrDefault(option => option.Number == number);

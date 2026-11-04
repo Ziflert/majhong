@@ -12,13 +12,17 @@
 | `Assets/Scripts/Mahjong/Rules/` | Ядро правил: кости, рука, стена, кубики, разбор руки, подсчёт, состояние руки |
 | `Assets/Scripts/Mahjong/Diagnostics/` | `RulesSelfTest` — проверки ядра, общие для Unity и headless |
 | `Assets/Scripts/Mahjong/Bots/` | `HeuristicBot` — бот уровней 1–3 (`BotLevel`), `DangerModel` — чтение стола, `WaitQuality` — оценка ожиданий через `Scoring`, `BotTable` — прогон сессии и передача отставания по очкам |
-| `Assets/Scripts/Mahjong/Controls/` | `ActionPrompt` — что человеку предлагают в панели действий и в каком порядке |
+| `Assets/Scripts/Mahjong/Controls/` | `ActionPrompt` — что человеку предлагают в панели действий и в каком порядке; `PlayClock` / `ClockExpiry` — окна 20/10/3 секунды |
+| `Assets/Scripts/Mahjong/Net/` | Сетевой договор без сети: `TileNotation` (нотация кости), `ActionCodec` (ход строкой), `SeatView` (проекция на место), `AuthoritativeTable` (единственный владелец `GameState` + лог ходов + `Replay`), `InProcessTable` (транспорт в процессе), `FreeTable` (общий стол «переставь кости») |
+| `Assets/Scripts/Mahjong/Localization/` | `Loc` — каталог строк RU/EN, `Text` — сборка фраз из структурных данных движка |
+| `Assets/Scripts/Mahjong/Knowledge/` | `RulesBook` — справочник правил внутри игры (страницы по `rule.pdf` + таблица фан из `Fans.All`) |
 | `Assets/Scripts/Mahjong/Compat/` | Полифилл `IsExternalInit` — без него `record`/`init` не собираются в Unity |
-| `Assets/Scripts/MahjongView/` | Unity-слой: 3D-тайлы, панель действий, сборка стола, ввод мышью |
+| `Assets/Scripts/MahjongView/` | Unity-слой: `TileObject` (3D-тайл), `ActionBar`/`ActionButton`, `RulesPanel` (справочник), `FreePlayTable` (свободный стол), `UiFont` (шрифт с кириллицей), `MahjongGame` (сборка стола, ввод, часы) |
 | `Assets/Tests/Editor/` | Обёртка над `RulesSelfTest`, `ActionPromptTests`, `FansTableTests` (таблица фан из `rule.pdf`) |
-| `Assets/Tests/PlayMode/` | PlayMode-проверки сцены: тайлы, шрифты, порядок руки, панель и попадание лучом |
+| `Assets/Tests/PlayMode/` | PlayMode-проверки сцены: тайлы, шрифты, порядок руки, панель и попадание лучом, часы руки, анимации, атлас лиц, справочник, свободный стол, язык |
 | `Assets/Editor/PrototypeCapture.cs` | Прогон прототипа из CLI: Play, скриншоты Game view, коды выхода |
 | `Assets/Editor/ActionBarPreview.cs` | Скриншот панели действий на заданном наборе кнопок |
+| `Assets/Editor/InterfaceCapture.cs` | Скриншоты стола целиком, справочника и свободного стола из CLI |
 | `Tools/RulesCheck/` | Консольный прогон проверок без Unity (`dotnet run`) |
 | `Tools/BotBench/` | Замер силы ботов: игровые очки, победы, сносы «в руку» по уровням (`dotnet run --project Tools/BotBench -- 60`) |
 | `Tools/HandScore/` | Подсчёт одной руки из текстовой нотации для сверки с внешним калькулятором |
@@ -44,6 +48,10 @@
 | `GameState.cs` | Машина состояния руки: раздача, добор, снос, заявки, конги, победа, ничья |
 | `ClaimPriority.cs` | Кто выигрывает окно заявок: Ху > конг > панг > чоу, равные — ближайшему по ходу |
 | `Controls/ActionPrompt.cs` | Панель действий: какие действия человека становятся кнопками, подписи, горячие клавиши |
+| `Net/AuthoritativeTable.cs` | Серверный стол: проверка хода по `GetLegalActions`, отказ без изменений, лог и `Replay(dealer, seed, log)` |
+| `Net/SeatView.cs` | Что видит одно место: свои закрытые кости, у остальных только число; `Describe()` — текстовая форма для логов |
+| `Localization/Loc.cs` | Строки интерфейса RU/EN; `Loc.Current`, `Loc.Toggle()`, переменная `MAHJONG_LANG` |
+| `Knowledge/RulesBook.cs` | Страницы справочника правил и таблица фан для экрана `R` |
 | `Settlement.cs` | Выплаты за руку: самобор и выигрыш со сноса (3.9.1.2–3.9.1.3) |
 | `Penalties.cs` | Нарушения 3.11: каталог, шкала «предупреждение → 5/10/20/40», счётчики по сессии и раунду, `PenaltyLedger` |
 | `GameSession.cs` | Сессия: 4 раунда × 4 руки, смена разыгрывающего, часы на 150 минут (3.5.6), штрафные очки, итоговая таблица `Standings()` (3.9.2, 3.10.1) |
@@ -64,6 +72,10 @@
 - `session.AdvanceClock(...)` / `AbandonRunningHand()` — часы сессии и остановка недоигранной руки.
 - `session.ReportViolation(player, kind)` — штраф, который вычитается после руки.
 - `session.Standings()` — финальная таблица: место, игровые и турнирные очки.
+- `new AuthoritativeTable(dealer, seed)` → `Accept(seat, "discard|17")` → `ViewFor(seat)` — ход через сетевой договор.
+- `AuthoritativeTable.Replay(dealer, seed, logLines)` — восстановить стол из лога ходов.
+- `RulesBook.Sections` / `RulesBook.FanTableText()` — страницы справочника и таблица фан.
+- `Loc.Toggle()` / `Text.ActionHint(action)` — язык интерфейса и подписи действий.
 
 ## Команды
 ```bash
@@ -99,8 +111,8 @@ $env:MAHJONG_SHOT_DIR="D:\Temprary\shots"
   -executeMethod Mahjong.EditorTools.ActionBarPreview.CaptureAndExit
 ```
 
-Проверено на 2026-11-03 (после аудита): `RulesCheck` — 43 группы, 102 267 проверок; EditMode 13/13;
-PlayMode 7/7 (последний прогон в редакторе — до аудита, перепроверить при следующем запуске Unity).
+Проверено на 2026-11-04: `RulesCheck` — 54 группы, 119 059 проверок; EditMode 13/13; PlayMode 18/18;
+скриншоты `PrototypeCapture` и `InterfaceCapture` снимаются.
 
 ## Архитектура
 ```text
@@ -108,6 +120,9 @@ Assets/Scripts/Mahjong/Rules         чистая логика, без UnityEngi
 Assets/Scripts/Mahjong/Controls      панель действий человека, тоже без UnityEngine
 Assets/Scripts/Mahjong/Bots          боты поверх LegalAction
 Assets/Scripts/Mahjong/Diagnostics   самопроверки, без UnityEngine
+Assets/Scripts/Mahjong/Net           сетевой договор и общий стол, без UnityEngine
+Assets/Scripts/Mahjong/Localization  строки интерфейса RU/EN, без UnityEngine
+Assets/Scripts/Mahjong/Knowledge     справочник правил и таблица фан, без UnityEngine
 Assets/Scripts/MahjongView           MonoBehaviour: TileObject, TileLabel, ActionBar, ActionButton, MahjongGame (asmdef `Mahjong.View`)
 Assets/Tests/Editor                  NUnit-обёртка над RulesSelfTest (asmdef `Mahjong.Tests`)
 Assets/Tests/PlayMode                PlayMode-проверки сцены (asmdef `Mahjong.PlayTests`)

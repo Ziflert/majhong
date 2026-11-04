@@ -17,12 +17,17 @@ namespace Mahjong.Rules
     public enum ActionKind { Draw, Discard, Chow, Pung, OpenKong, AddedKong, ClosedKong, Win, Pass }
 
     /// <summary>An action the engine currently allows, with everything the UI needs to describe it.</summary>
+    /// <param name="Points">
+    /// Value of a promised Hu: the interface shows it on the button, and it spares the view from
+    /// parsing the English sentence in <paramref name="Description"/> to find the number.
+    /// </param>
     public sealed record LegalAction(
         ActionKind Kind,
         int PlayerIndex,
         Tile? Tile,
         IReadOnlyList<Tile> RequiredTiles,
-        string Description)
+        string Description,
+        int Points = 0)
     {
         public override string ToString() => $"P{PlayerIndex} {Kind}: {Description}";
     }
@@ -205,7 +210,8 @@ namespace Mahjong.Rules
                     : EvaluateWin(player, hand, LastDraw?.Type, LastDrawSource.Value, LastDrawWasLastWallTile, false,
                         winningTileInHand: true);
                 if (win.IsValidWin)
-                    actions.Add(new LegalAction(ActionKind.Win, player, null, Array.Empty<Tile>(), $"Declare Hu for {win.TotalPoints} points"));
+                    actions.Add(new LegalAction(ActionKind.Win, player, null, Array.Empty<Tile>(),
+                        $"Declare Hu for {win.TotalPoints} points", win.TotalPoints));
             }
 
             if (!claimedThisTurn && !Wall.IsExhausted)
@@ -244,7 +250,8 @@ namespace Mahjong.Rules
                 ? ScoreResult.Forbidden(WinForbiddenReason(player) ?? "Hu is forbidden in this hand.")
                 : EvaluateWin(player, hand, tile.Type, ClaimSource.Discard, false, Wall.IsExhausted);
             if (win.IsValidWin)
-                actions.Add(new LegalAction(ActionKind.Win, player, tile, Array.Empty<Tile>(), $"Claim Hu on {tile.Type} for {win.TotalPoints} points"));
+                actions.Add(new LegalAction(ActionKind.Win, player, tile, Array.Empty<Tile>(),
+                    $"Claim Hu on {tile.Type} for {win.TotalPoints} points", win.TotalPoints));
 
             var copies = hand.Concealed.Where(t => t.Type == tile.Type).ToList();
             // Rule: once the last tile of the wall has been taken, only Hu may be declared.
@@ -275,7 +282,8 @@ namespace Mahjong.Rules
                 ? ScoreResult.Forbidden(WinForbiddenReason(player) ?? "Hu is forbidden in this hand.")
                 : EvaluateWin(player, Players[player], robbery.Value.Tile.Type, ClaimSource.Discard, false, false, robbedKong: true);
             if (win.IsValidWin)
-                actions.Add(new LegalAction(ActionKind.Win, player, robbery.Value.Tile, Array.Empty<Tile>(), $"Robbing the kong for {win.TotalPoints} points"));
+                actions.Add(new LegalAction(ActionKind.Win, player, robbery.Value.Tile, Array.Empty<Tile>(),
+                    $"Robbing the kong for {win.TotalPoints} points", win.TotalPoints));
             actions.Add(new LegalAction(ActionKind.Pass, player, null, Array.Empty<Tile>(), "Pass"));
             return actions;
         }

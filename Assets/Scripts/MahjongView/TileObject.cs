@@ -24,6 +24,12 @@ namespace Mahjong.Unity
         /// <summary>How fast a tile turns to its new orientation, in degrees per second.</summary>
         public const float TurnSpeed = 720f;
 
+        /// <summary>Colour of the back of a tile: the green lacquer of a real set.</summary>
+        public static readonly Color BackColour = new(0.25f, 0.45f, 0.3f);
+
+        /// <summary>How far a tile under the cursor rises; enough to read as "this one".</summary>
+        public const float HoverLift = 0.012f;
+
         private TextMesh label = null!;
         private Renderer body = null!;
         private Renderer atlasFace = null!;
@@ -51,6 +57,9 @@ namespace Mahjong.Unity
 
         /// <summary>Where the slide ends; the hop of <see cref="Pulse"/> is added on top of it.</summary>
         private Vector3 basePosition;
+
+        private bool hovered;
+        private float hoverOffset;
 
         private float pulseElapsed;
         private float pulseDelay;
@@ -155,7 +164,7 @@ namespace Mahjong.Unity
             IsFaceUp = false;
             faceSet = true;
             label.text = string.Empty;
-            body.material.color = new Color(0.25f, 0.45f, 0.3f);
+            body.material.color = BackColour;
             label.gameObject.SetActive(false);
             atlasFace.gameObject.SetActive(false);
         }
@@ -193,9 +202,23 @@ namespace Mahjong.Unity
 
         public void SetHighlight(bool highlighted)
         {
+            // A face-down tile must stay the colour of its back: tinting it with the face colour
+            // would show which tile is being highlighted even when the player cannot see the face.
+            if (!IsFaceUp)
+            {
+                body.material.color = highlighted ? Color.Lerp(BackColour, Color.yellow, 0.35f) : BackColour;
+                return;
+            }
+
             var colour = TileLabel.Face(Type);
             body.material.color = highlighted ? Color.Lerp(colour, Color.yellow, 0.45f) : colour;
         }
+
+        /// <summary>Raises the tile slightly while the cursor is over it.</summary>
+        public void SetHovered(bool on) => hovered = on;
+
+        /// <summary>Current lift of the hover, in table units; zero when the cursor is elsewhere.</summary>
+        public float HoverOffset => hoverOffset;
 
         /// <summary>Persistent victory colour used while the hand-result screen is shown.</summary>
         public void SetVictoryHighlight()
@@ -283,7 +306,15 @@ namespace Mahjong.Unity
         {
             UpdateSlide();
             UpdatePulse();
-            transform.position = basePosition + Vector3.up * pulseOffset;
+            UpdateHover();
+            transform.position = basePosition + Vector3.up * (pulseOffset + hoverOffset);
+        }
+
+        private void UpdateHover()
+        {
+            var target = hovered ? HoverLift : 0f;
+            if (Mathf.Approximately(hoverOffset, target)) return;
+            hoverOffset = Mathf.MoveTowards(hoverOffset, target, Time.deltaTime * 0.12f);
         }
 
         private void UpdateSlide()
