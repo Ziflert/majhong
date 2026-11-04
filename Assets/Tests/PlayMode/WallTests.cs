@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Linq;
+using Mahjong.Controls;
 using Mahjong.Rules;
 using Mahjong.Unity;
 using NUnit.Framework;
@@ -148,6 +149,34 @@ namespace Mahjong.PlayTests
                 "The wall does not show what the engine has left.");
             Assert.IsTrue(stillStanding.All(standing.Contains),
                 "A tile that was dealt is still drawn in the wall.");
+        }
+
+        [UnityTest]
+        public IEnumerator TheWallShowsNoFaceWhileTheDiceAreStillFlying()
+        {
+            yield return null;
+            yield return null;
+
+            // The engine deals at once, so a dealt tile is already in a hand while its view is still
+            // standing in the wall: the deal lets go of it only when its beat comes.
+            var previousScale = Time.timeScale;
+            Time.timeScale = 10f;
+            var frames = 0;
+            var looked = 0;
+            while (frames++ < 3000 && game.Opening.Step != OpeningStep.Deal)
+            {
+                var open = Tiles()
+                    .Where(tile => tile.IsFaceUp && OnTheWallSquare(tile.transform.position))
+                    .Select(tile => tile.gameObject.name)
+                    .ToList();
+                Assert.IsEmpty(open, "A tile standing in the wall shows its face before the deal has started.");
+                looked++;
+                yield return null;
+            }
+            Time.timeScale = previousScale;
+
+            Assert.Greater(looked, 0, "The opening was over before the wall could be looked at.");
+            Assert.AreEqual(OpeningStep.Deal, game.Opening.Step, "The opening never reached the deal.");
         }
 
         [UnityTest]

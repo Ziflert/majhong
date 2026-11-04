@@ -1540,14 +1540,15 @@ namespace Mahjong.Unity
         }
 
         /// <summary>
-        /// Highlights the hand when it is the human turn. Every face-up tile is reset first: a tile that
-        /// left the hand has to lose the highlight instead of carrying it into the discard pile.
+        /// Highlights the hand when it is the human turn. Every tile is reset first: a tile that left the
+        /// hand has to lose the highlight instead of carrying it into the discard pile. A tile that is
+        /// still waiting in the wall remembers the wish and picks it up when it shows its face.
         /// </summary>
         private void HighlightHand(bool on)
         {
             foreach (var tile in tilesById.Values)
             {
-                if (!tile.IsFaceUp) continue;
+                if (tile == null) continue;
                 tile.SetHighlight(on && handTiles.ContainsValue(tile));
             }
         }
@@ -1901,15 +1902,19 @@ namespace Mahjong.Unity
             }
 
             view.gameObject.name = name;
-            if (faceUp) view.SetFace(tile.Type);
-            else view.SetBack();
 
             // A tile that has just left the wall waits its turn in the deal; anything later moves at
             // once, which is what makes a drawn tile fly straight out of the wall into the hand.
             var delay = dealDelays.TryGetValue(tile.InstanceId, out var wait)
                 ? wait + (float)opening.TimeUntilDeal
                 : 0f;
+
+            // The place comes first: whether the tile may show its face right now depends on how long
+            // it still has to stand in the wall, and only the target knows that (see TileObject.SetFace).
             view.SetTarget(position, rotationY, delay);
+            if (faceUp) view.SetFace(tile.Type);
+            else view.SetBack();
+
             used.Add(tile.InstanceId);
             return view;
         }

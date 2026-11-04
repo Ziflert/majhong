@@ -38,6 +38,13 @@ namespace Mahjong.Unity
         /// <summary>A fresh tile shows neither face nor back until one of them is bound.</summary>
         private bool faceSet;
 
+        /// <summary>Face that waits for the tile to set off: a tile still standing in the wall shows its back.</summary>
+        private TileType pendingFace;
+        private bool hasPendingFace;
+
+        /// <summary>Whether the tile is asked to stand out; a tile with no face yet shows nothing of it.</summary>
+        private bool highlighted;
+
         public TileType Type { get; private set; }
         public bool IsFaceUp { get; private set; }
 
@@ -157,6 +164,8 @@ namespace Mahjong.Unity
                 atlasFace.material.mainTextureOffset = AtlasOffset(type);
                 atlasFace.gameObject.SetActive(true);
             }
+
+            ApplyHighlight();
         }
 
         public void BindBack()
@@ -167,11 +176,27 @@ namespace Mahjong.Unity
             body.material.color = BackColour;
             label.gameObject.SetActive(false);
             atlasFace.gameObject.SetActive(false);
+            ApplyHighlight();
         }
 
-        /// <summary>Shows a face, doing nothing when the tile already shows it.</summary>
+        /// <summary>
+        /// Shows a face, doing nothing when the tile already shows it.
+        ///
+        /// A tile that still has to wait its turn in the deal is standing in the wall, and the wall is
+        /// face down: the face waits for the tile to set off. Binding it at once is what used to make
+        /// the walls of two seats look as if they had open tiles while the dice were still being thrown.
+        /// </summary>
         public void SetFace(TileType type)
         {
+            if (animating && animationDelay > 0f)
+            {
+                pendingFace = type;
+                hasPendingFace = true;
+                SetBack();
+                return;
+            }
+
+            hasPendingFace = false;
             if (faceSet && IsFaceUp && Type == type) return;
             Bind(type);
         }
@@ -181,6 +206,14 @@ namespace Mahjong.Unity
         {
             if (faceSet && !IsFaceUp) return;
             BindBack();
+        }
+
+        /// <summary>Binds the face that was waiting for the tile to leave the wall, if there is one.</summary>
+        private void BindPendingFace()
+        {
+            if (!hasPendingFace) return;
+            hasPendingFace = false;
+            Bind(pendingFace);
         }
 
         private static Vector2 AtlasScale(TileType type) => new(1f / 9f, 1f / 5f);
@@ -200,8 +233,22 @@ namespace Mahjong.Unity
             return new Vector2(column / 9f, (4 - row) / 5f);
         }
 
-        public void SetHighlight(bool highlighted)
+        /// <summary>
+        /// Marks the tile as one the player may act on. The wish is remembered, not just painted: a tile
+        /// that is still in the wall has no face to tint yet, and it picks the highlight up when it gets one.
+        /// </summary>
+        public void SetHighlight(bool on)
         {
+            highlighted = on;
+            ApplyHighlight();
+        }
+
+        private void ApplyHighlight()
+        {
+            // A tile that is still waiting in the wall has to keep looking like a wall tile: the tint
+            // would give away which tiles are about to leave.
+            if (!faceSet || hasPendingFace) return;
+
             // A face-down tile must stay the colour of its back: tinting it with the face colour
             // would show which tile is being highlighted even when the player cannot see the face.
             if (!IsFaceUp)
@@ -259,6 +306,10 @@ namespace Mahjong.Unity
                 transform.rotation = destinationRotation;
             }
 
+            // A tile that no longer has to wait is not standing in the wall any more: nothing would
+            // ever release its face.
+            if (!animating) BindPendingFace();
+
             transform.position = basePosition + Vector3.up * pulseOffset;
         }
 
@@ -284,6 +335,7 @@ namespace Mahjong.Unity
             animating = false;
             pulsing = false;
             pulseOffset = 0f;
+            BindPendingFace();
             transform.position = basePosition;
         }
 
@@ -293,6 +345,7 @@ namespace Mahjong.Unity
             transform.position = position;
             hasTarget = false;
             animating = false;
+            hasPendingFace = false;
             pulsing = false;
             pulseOffset = 0f;
         }
@@ -322,6 +375,8 @@ namespace Mahjong.Unity
             if (!animating) return;
 
             animationElapsed += Time.deltaTime;
+            // The wait in the deal is over: the tile sets off and may show what it is.
+            if (hasPendingFace && animationElapsed >= animationDelay) BindPendingFace();
             var t = Mathf.Clamp01((animationElapsed - animationDelay) / animationDuration);
             // Smooth-step gives the move a deliberate ease-in/ease-out instead of robotic constant speed.
             var eased = t * t * (3f - 2f * t);
