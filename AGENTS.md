@@ -9,7 +9,9 @@
 - Тесты: Unity Test Framework — `Assets/Tests/Editor` (обёртка над `RulesSelfTest`) и `Assets/Tests/PlayMode` (сцена 3D-прототипа).
 - Прогон прототипа со скриншотами: `-executeMethod Mahjong.EditorTools.PrototypeCapture.CaptureAndExit` (см. `docs/unity-layer.md`).
 - Быстрая проверка ядра без Unity: `dotnet run --project Tools/RulesCheck`.
-- Локальный .NET SDK лежит вне репозитория: `D:/Temprary/dotnet-sdk/dotnet.exe`.
+- Локальный .NET SDK лежит в проекте, но вне git: `D:/Temprary/game/.local/dotnet-sdk/dotnet.exe`
+  (папка в `.gitignore`). Системный `dotnet` (10.x) тоже собирает `Tools/RulesCheck`, но локальный SDK 8
+  остаётся запасным: он не зависит от системных обновлений. Логи и XML прогонов — в `Logs/` (папка в `.gitignore`).
 - Профиль правил выбирается пресетом: `MAHJONG_VARIANT=classic144` (классика по `rule-2.pdf`),
   без переменной — спортивный по `rule.pdf`. Каталог переключателей и трактовок — `docs/rules-classic.md`.
 

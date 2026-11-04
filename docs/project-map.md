@@ -31,11 +31,13 @@
 | `Tools/BotBench/` | Замер силы ботов: игровые очки, победы, сносы «в руку» по уровням (`dotnet run --project Tools/BotBench -- 60`) |
 | `Tools/HandScore/` | Подсчёт одной руки из текстовой нотации для сверки с внешним калькулятором |
 | `Tools/GoldenCompare/` | Эталонные руки и сверка с независимым MCR-анализатором (`python Tools/GoldenCompare/compare.py`) |
-| `Tools/mcr-ref/` | Обёртка над `miaoda-game-mcr-mahjong-analysis-core` для эталонного прогона |
+| `Tools/mcr-ref/` | Обёртка над `miaoda-game-mcr-mahjong-analysis-core` для эталонного прогона; `Tools/mcr-ref/reference/` — вход и выход прогона на 50 руках (`hands-50.json`, `oracle-result-50.json`) |
 | `Tools/Tiles/build_atlas.py` | Сборка `tile-atlas.png` из SVG-исходников (Skia, `python Tools/Tiles/build_atlas.py`) |
 | `.github/workflows/rules.yml` | CI: `Tools/RulesCheck` на push и pull request |
 | `docs/unity-layer.md` | Как запустить 3D-прототип и что он умеет |
 | `Tiles/` + `Assets/Resources/Tiles/` | SVG-исходники лиц и собранный атлас `tile-atlas.png` |
+| `.local/dotnet-sdk/` | Локальный .NET SDK 8 для headless-прогонов; в git не входит |
+| `Logs/` | Логи Unity и XML тестовых прогонов (`Logs/editmode-results.xml`, `Logs/playmode-results.xml`); в git не входит |
 
 ## Ключевые файлы ядра
 | Файл | Назначение |
@@ -120,14 +122,14 @@ Hub 3.22.5 — в `D:\Software\Unity\Hub`. Версия проекта закр�
 
 # тесты в редакторе
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -batchmode -projectPath "D:\Temprary\game" \
-  -runTests -testPlatform EditMode -testResults D:\temp\editmode.xml -logFile -
+  -runTests -testPlatform EditMode -testResults D:\Temprary\game\Logs\editmode-results.xml -logFile -
 
 # PlayMode-проверки (сцена, панель действий, попадание лучом)
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -batchmode -projectPath "D:\Temprary\game" \
-  -runTests -testPlatform PlayMode -testResults D:\Temprary\temp\playmode.xml -logFile -
+  -runTests -testPlatform PlayMode -testResults D:\Temprary\game\Logs\playmode-results.xml -logFile -
 
 # прототип с GUI + скриншоты Game view (0 — успех, 2 — сцена не поднялась, 3 — пустой стол)
-$env:MAHJONG_SHOT_DIR="D:\Temprary\shots"
+$env:MAHJONG_SHOT_DIR="D:\Temprary\game\Screenshots"
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game" \
   -executeMethod Mahjong.EditorTools.PrototypeCapture.CaptureAndExit
 

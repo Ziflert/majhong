@@ -30,6 +30,9 @@ sysinfo.txt
 Screenshots/
 __pycache__/
 
+# Machine-local tooling and run artifacts (a private .NET SDK, test XML and logs)
+.local/
+
 # Reference-scoring workspaces
 node_modules/
 .tmpcmp/

@@ -84,14 +84,14 @@ Unity: слой представления подаёт ему `Time.deltaTime`,
 ```bash
 # EditMode-тесты (обёртка над RulesSelfTest) внутри редактора
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -batchmode -projectPath "D:\Temprary\game" \
-  -runTests -testPlatform EditMode -testResults D:\temp\editmode.xml -logFile -
+  -runTests -testPlatform EditMode -testResults D:\Temprary\game\Logs\editmode-results.xml -logFile -
 
 # PlayMode-проверки: сцена собирается, тайлы и шрифты на месте, рука выложена по порядку
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -batchmode -projectPath "D:\Temprary\game" \
-  -runTests -testPlatform PlayMode -testResults D:\temp\playmode.xml -logFile -
+  -runTests -testPlatform PlayMode -testResults D:\Temprary\game\Logs\playmode-results.xml -logFile -
 
 # Прогон с GUI и скриншотами Game view (нужен реальный рендер)
-$env:MAHJONG_SHOT_DIR="D:\Temprary\shots"
+$env:MAHJONG_SHOT_DIR="D:\Temprary\game\Screenshots"
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game" \
   -executeMethod Mahjong.EditorTools.PrototypeCapture.CaptureAndExit
 

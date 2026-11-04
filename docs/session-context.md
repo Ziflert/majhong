@@ -107,7 +107,7 @@
 ## Команды
 
 ```
-D:/Temprary/dotnet-sdk/dotnet.exe run --project Tools/RulesCheck
-D:/Temprary/dotnet-sdk/dotnet.exe run --project Tools/BotBench -- 60
+D:/Temprary/game/.local/dotnet-sdk/dotnet.exe run --project Tools/RulesCheck
+D:/Temprary/game/.local/dotnet-sdk/dotnet.exe run --project Tools/BotBench -- 60
 MAHJONG_VARIANT=classic144  # пресет правил для прогонов, кадров и тестов
 ```

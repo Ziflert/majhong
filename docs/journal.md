@@ -1,5 +1,37 @@
 # Журнал проекта
 
+## 2026-11-04 — порядок вокруг проекта: артефакты прогонов переехали внутрь `game`
+
+Корень `D:/Temprary` был свалкой: рядом с папками других проектов лежали скриншоты, логи тестов,
+одноразовые песочницы и 4 ГБ скачанного установщика Unity. Теперь всё, что относится к игре, живёт
+в `D:/Temprary/game`.
+
+**Удалено (только игровое и только восстановимое).** `unity-download/` — 4,0 ГБ инсталляторов,
+редактор давно стоит в `D:\Software\Unity`; `shots/`, `shots2/`, `shots3/`, `shots-anim/`,
+`shots-clock/`, `shots-kong/` — устаревшие кадры (актуальные снимаются в `game/Screenshots`);
+`temp/`, `editmode-*.log`, `playmode-*.log`, `eng-*.jsonl` — логи и XML прогонов; `audit/` и
+`unitycheck/` — песочницы (проверка «конг на последней кости» уже закреплена в `RulesSelfTest`,
+а заглушки Unity API отстали от кода и не собирались: 10 ошибок); `mcr-oracle/node_modules` и
+отладочные `.mjs` — то же, что уже есть в `Tools/mcr-ref`.
+
+**Перенесено в проект.** `dotnet-sdk/` (726 МБ, .NET SDK 8) → `game/.local/dotnet-sdk`,
+папка в `.gitignore`: headless-прогоны больше не зависят от того, что лежит рядом с репозиторием.
+Системный `dotnet` 10 тоже собирает `Tools/RulesCheck`, локальный SDK остаётся запасным.
+Вход и выход эталонного прогона на 50 руках (`hands.json`, `oracle-result.json`) → `Tools/mcr-ref/reference/`
+как `hands-50.json` и `oracle-result-50.json`: это происхождение чисел в `docs/scoring-golden.md`.
+
+**Пути в документации.** Команды прогонов больше не пишут в `D:\Temprary\shots` и `D:\temp`:
+кадры идут в `game/Screenshots`, результаты тестов — в `game/Logs/editmode-results.xml` и
+`Logs/playmode-results.xml` (обе папки в `.gitignore`). Обновлены `AGENTS.md`, `docs/project-map.md`,
+`docs/unity-layer.md`, `docs/session-context.md`, `docs/audit.md`, З-9 в `docs/plan.md`.
+`Unity -testResults` не принимает папку с точкой в имени, поэтому `.tmp/` не годится — используется
+штатная `Logs/`.
+
+**Проверено:** `RulesCheck` из нового места SDK — 75 групп, 122 305 проверок; EditMode 13/13.
+PlayMode на момент уборки: 30 из 31 зелёные — красный `TheResultScreenCountsDownAndDealsOnItsOwn`
+(«The countdown never ran out») относится к незакоммиченной работе по У-7 и ждёт отдельной правки:
+тест ждёт конца отсчёта по кадрам, а в batchmode кадры идут быстрее реального времени.
+
 ## 2026-11-05 — summary: настоящая стена из 18 стопок, кубики и разрыв (4.8, З-5)
 
 Закрыт пункт, который стоял в плане как упрощение: стол больше не рисует кости «где-то в середине».

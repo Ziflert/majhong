@@ -1,0 +1,559 @@
+{
+ "hands": [
+  {
+   "id": "big-four-winds",
+   "intent": "88: four wind pungs suppress little four winds, all pungs and wind pungs",
+   "concealed": "E E E S S S W W W N N N 1c 1c",
+   "winning": "1c",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "big-three-dragons",
+   "intent": "88: three dragon pungs suppress little three dragons and dragon pungs",
+   "concealed": "Rd Rd Rd Gd Gd Gd Wd Wd Wd 1c 2c 3c 5c 5c",
+   "winning": "1c",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "all-green",
+   "intent": "88: every tile green",
+   "concealed": "2b 3b 4b 2b 3b 4b 6b 6b 6b 8b 8b 8b Gd Gd",
+   "winning": "Gd",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "nine-gates",
+   "intent": "88: 1112345678999 plus 5, suppresses full flush and waits",
+   "concealed": "1c 1c 1c 2c 3c 4c 5c 5c 6c 7c 8c 9c 9c 9c",
+   "winning": "5c",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "four-kongs",
+   "intent": "88 four kongs on four closed kongs, kong replacement win",
+   "concealed": "2c 2c",
+   "melds": [
+    {
+     "kind": "ClosedKong",
+     "tiles": "1c 1c 1c 1c"
+    },
+    {
+     "kind": "ClosedKong",
+     "tiles": "4d 4d 4d 4d"
+    },
+    {
+     "kind": "ClosedKong",
+     "tiles": "6b 6b 6b 6b"
+    },
+    {
+     "kind": "ClosedKong",
+     "tiles": "8d 8d 8d 8d"
+    }
+   ],
+   "winning": "2c",
+   "source": "KongReplacement",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "seven-shifted-pairs",
+   "intent": "88: seven consecutive pairs",
+   "concealed": "1c 1c 2c 2c 3c 3c 4c 4c 5c 5c 6c 6c 7c 7c",
+   "winning": "7c",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "thirteen-orphans",
+   "intent": "88: thirteen orphans, suppresses all types and concealed hand",
+   "concealed": "1c 9c 1d 9d 1b 9b E S W N Rd Gd Wd 1c",
+   "winning": "1c",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "all-terminals",
+   "intent": "64: pungs of 1s and 9s",
+   "concealed": "1c 1c 1c 9c 9c 9c 1b 1b 1b 9b 9b 9b 9d 9d",
+   "winning": "9d",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "little-four-winds",
+   "intent": "64: three wind pungs plus the fourth wind as the pair",
+   "concealed": "E E E S S S W W W N N 1c 2c 3c",
+   "winning": "3c",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "little-three-dragons",
+   "intent": "64: two dragon pungs plus the third dragon as the pair",
+   "concealed": "Rd Rd Rd Gd Gd Gd Wd Wd 1c 2c 3c 4c 5c 6c",
+   "winning": "6c",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "all-honors",
+   "intent": "64: only honor tiles",
+   "concealed": "E E E S S S W W W Rd Rd Rd Wd Wd",
+   "winning": "Wd",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "four-concealed-pungs",
+   "intent": "64: four concealed pungs by self-draw",
+   "concealed": "1c 1c 1c 2c 2c 2c 3d 3d 3d 4b 4b 4b 9b 9b",
+   "winning": "9b",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "four-terminal-chows",
+   "intent": "64: 123 and 789 twice in one suit with a pair of 5s",
+   "concealed": "1c 2c 3c 1c 2c 3c 7c 8c 9c 7c 8c 9c 5c 5c",
+   "winning": "5c",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "quadruple-chow",
+   "intent": "48: four identical chows, won on a discard",
+   "concealed": "1c 2c 3c 1c 2c 3c 1c 2c 3c 1c 2c 3c 9c 9c",
+   "winning": "9c",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "four-pure-shifted-pungs",
+   "intent": "48: four consecutive pungs in one suit",
+   "concealed": "1c 1c 1c 2c 2c 2c 3c 3c 3c 4c 4c 4c 9c 9c",
+   "winning": "9c",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "four-pure-shifted-chows",
+   "intent": "32: four shifted chows in one suit",
+   "concealed": "1c 2c 3c 2c 3c 4c 3c 4c 5c 4c 5c 6c 9c 9c",
+   "winning": "9c",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "three-kongs",
+   "intent": "32: three kongs, two closed and one open",
+   "concealed": "5c 6c 7c 2b 2b",
+   "melds": [
+    {
+     "kind": "ClosedKong",
+     "tiles": "1c 1c 1c 1c"
+    },
+    {
+     "kind": "ClosedKong",
+     "tiles": "4d 4d 4d 4d"
+    },
+    {
+     "kind": "OpenKong",
+     "tiles": "7b 7b 7b 7b"
+    }
+   ],
+   "winning": "7c",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "all-terminals-and-honors",
+   "intent": "32: every set holds a terminal or an honor",
+   "concealed": "1c 1c 1c 9c 9c 9c 1b 1b 1b E E E N N",
+   "winning": "N",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "seven-pairs-full-flush",
+   "intent": "24 + 24: seven pairs in one suit, both count",
+   "concealed": "1c 1c 3c 3c 4c 4c 5c 5c 6c 6c 8c 8c 9c 9c",
+   "winning": "9c",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "all-even-pungs",
+   "intent": "24: pungs of 2, 4, 6, 8 plus an even pair",
+   "concealed": "2c 2c 2c 4c 4c 4c 6c 6c 6c 8c 8c 8c 2b 2b",
+   "winning": "2b",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "full-flush-pure-straight",
+   "intent": "24 + 16: full flush with a pure straight",
+   "concealed": "1c 2c 3c 4c 5c 6c 7c 8c 9c 2c 3c 4c 5c 5c",
+   "winning": "5c",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "upper-tiles",
+   "intent": "24: only 7, 8 and 9",
+   "concealed": "7c 8c 9c 7c 8c 9c 7b 8b 9b 7d 7d 7d 9d 9d",
+   "winning": "9d",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "three-suited-terminal-chows",
+   "intent": "16: 123 and 789 in two suits, pair of 5s in the third",
+   "concealed": "1c 2c 3c 7c 8c 9c 1d 2d 3d 7d 8d 9d 5b 5b",
+   "winning": "5b",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "all-fives",
+   "intent": "16: every set and the pair contain a 5",
+   "concealed": "3c 4c 5c 4c 5c 6c 4d 5d 6d 5b 5b 5b 5c 5c",
+   "winning": "5c",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "triple-pung",
+   "intent": "16: pungs of the same rank in three suits",
+   "concealed": "2c 2c 2c 2d 2d 2d 2b 2b 2b 4b 5b 6b E E",
+   "winning": "6b",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "three-concealed-pungs",
+   "intent": "16: three concealed pungs",
+   "concealed": "1c 1c 1c 3c 3c 3c 5d 5d 5d 2b 3b 4b 2b 2b",
+   "winning": "2b",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "chicken-hand",
+   "intent": "8: a complete hand with no other fan",
+   "concealed": "2c 3c 4c 3c 4c 5c 5d 6d 7d 6b 7b 8b E E",
+   "winning": "2c",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "below-minimum",
+   "intent": "a complete hand worth less than eight points cannot win",
+   "concealed": "4b 5b 6b 6b 7b 8b 9b 9b",
+   "melds": [
+    {
+     "kind": "Pung",
+     "tiles": "1c 1c 1c"
+    },
+    {
+     "kind": "Pung",
+     "tiles": "2d 2d 2d"
+    }
+   ],
+   "winning": "9b",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "melded-hand",
+   "intent": "6: four claimed sets and a single-tile wait",
+   "concealed": "9d 9d",
+   "melds": [
+    {
+     "kind": "Pung",
+     "tiles": "3c 3c 3c"
+    },
+    {
+     "kind": "Chow",
+     "tiles": "4d 5d 6d"
+    },
+    {
+     "kind": "Chow",
+     "tiles": "2b 3b 4b"
+    },
+    {
+     "kind": "Pung",
+     "tiles": "6b 6b 6b"
+    }
+   ],
+   "winning": "9d",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "two-dragon-pungs",
+   "intent": "6: two dragon pungs count once each",
+   "concealed": "Rd Rd Rd Gd Gd Gd 1c 2c 3c 4d 5d 6d E E",
+   "winning": "E",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "concealed-and-melded-kong",
+   "intent": "6: one closed and one claimed kong",
+   "concealed": "2c 2c 2c 3b 4b 5b 8b 8b",
+   "melds": [
+    {
+     "kind": "ClosedKong",
+     "tiles": "1c 1c 1c 1c"
+    },
+    {
+     "kind": "OpenKong",
+     "tiles": "5d 5d 5d 5d"
+    }
+   ],
+   "winning": "5b",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "two-concealed-kongs",
+   "intent": "8: two closed kongs",
+   "concealed": "2c 2c 2c 3b 4b 5b 8b 8b",
+   "melds": [
+    {
+     "kind": "ClosedKong",
+     "tiles": "1c 1c 1c 1c"
+    },
+    {
+     "kind": "ClosedKong",
+     "tiles": "5d 5d 5d 5d"
+    }
+   ],
+   "winning": "5b",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "two-melded-kongs",
+   "intent": "4: two claimed kongs",
+   "concealed": "1c 2c 3c 4b 5b 6b 8b 8b",
+   "melds": [
+    {
+     "kind": "OpenKong",
+     "tiles": "Rd Rd Rd Rd"
+    },
+    {
+     "kind": "OpenKong",
+     "tiles": "Gd Gd Gd Gd"
+    }
+   ],
+   "winning": "6b",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "robbing-kong",
+   "intent": "8: robbery of an added kong suppresses the last-tile fans",
+   "concealed": "2b 3b 4b 5c 6c 7c 8d 8d",
+   "melds": [
+    {
+     "kind": "OpenKong",
+     "tiles": "9c 9c 9c 9c"
+    },
+    {
+     "kind": "Pung",
+     "tiles": "3d 3d 3d"
+    }
+   ],
+   "winning": "8d",
+   "source": "Discard",
+   "robbedKong": true,
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "last-tile-draw",
+   "intent": "8: won on the last tile of the wall",
+   "concealed": "1c 2c 3c 4c 5c 6c 7d 8d 9d 2b 2b 2b E E",
+   "winning": "E",
+   "source": "SelfDraw",
+   "lastWall": true,
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "last-tile-claim",
+   "intent": "8: won on the last discard",
+   "concealed": "1c 2c 3c 4c 5c 6c 7d 8d 9d 2b 2b 2b E E",
+   "winning": "E",
+   "source": "Discard",
+   "lastWall": true,
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "out-with-replacement",
+   "intent": "8: won on a kong replacement tile",
+   "concealed": "1c 2c 3c 4c 5c 6c 7d 8d 9d 2b 2b 2b E E",
+   "winning": "E",
+   "source": "KongReplacement",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "last-copy",
+   "intent": "4: the winning tile is the fourth copy",
+   "concealed": "1c 2c 3c 4c 5c 6c 7d 8d 9d 2b 2b 2b E E",
+   "winning": "E",
+   "source": "Discard",
+   "lastCopy": true,
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "reversible-tiles",
+   "intent": "8: only tiles that read the same upside down",
+   "concealed": "1c 2c 3c 3c 4c 5c 4d 5d 6d 8d 8d 8d 5d 5d",
+   "winning": "5d",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "mixed-straight",
+   "intent": "8: 123, 456 and 789 in three suits",
+   "concealed": "1c 2c 3c 4d 5d 6d 7b 8b 9b 2d 2d 2d E E",
+   "winning": "E",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "mixed-triple-chow",
+   "intent": "8: the same chow in three suits",
+   "concealed": "1c 2c 3c 1d 2d 3d 1b 2b 3b 4c 5c 6c E E",
+   "winning": "E",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "mixed-shifted-pungs",
+   "intent": "8: consecutive pungs in three suits",
+   "concealed": "1c 1c 1c 2d 2d 2d 3b 3b 3b 5c 5c 5c E E",
+   "winning": "E",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "half-flush",
+   "intent": "6: one suit plus honors",
+   "concealed": "1c 2c 3c 4c 5c 6c 7c 7c 7c E E E 9c 9c",
+   "winning": "9c",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "all-types",
+   "intent": "6: all three suits plus a wind and a dragon",
+   "concealed": "1c 2c 3c 4d 5d 6d 7b 8b 9b E E E Rd Rd",
+   "winning": "Rd",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "mixed-shifted-chows",
+   "intent": "6: consecutive chows in three suits",
+   "concealed": "1c 2c 3c 2d 3d 4d 3b 4b 5b 7c 8c 9c E E",
+   "winning": "E",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "outside-hand",
+   "intent": "4: every set and the pair hold a terminal or an honor",
+   "concealed": "1c 2c 3c 7d 8d 9d 1b 1b 1b E E E N N",
+   "winning": "N",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E"
+  },
+  {
+   "id": "knitted-straight",
+   "intent": "12: 147, 258 and 369 in three suits plus a set and a pair",
+   "concealed": "1c 4c 7c 2d 5d 8d 3b 6b 9b 5b 5b 5b 9d 9d",
+   "winning": "9d",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "lesser-honors-knitted",
+   "intent": "12: knitted suit tiles plus five single honors",
+   "concealed": "1c 4c 7c 2d 5d 8d 3b 6b 9b E S W N Rd",
+   "winning": "Rd",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "greater-honors-knitted",
+   "intent": "24: all seven honors plus knitted suit tiles",
+   "concealed": "1c 4c 7c 2d 5d 3b 6b E S W N Rd Gd Wd",
+   "winning": "6b",
+   "source": "SelfDraw",
+   "seat": "E",
+   "round": "E"
+  },
+  {
+   "id": "flowers-add-points",
+   "intent": "flowers pay one point each and do not lift the eight-point gate",
+   "concealed": "1c 2c 3c 4c 5c 6c 7c 8c 9c 2c 3c 4c 5c 5c",
+   "winning": "5c",
+   "source": "Discard",
+   "seat": "S",
+   "round": "E",
+   "flowers": 2
+  }
+ ]
+}

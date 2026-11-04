@@ -14,7 +14,7 @@
 | ⬜ найдено, не исправлено | баг подтверждён, но требует решения (правило, объём, риск) |
 | ℹ️ известное упрощение | не баг, а зафиксированная трактовка (см. `rules-status.md`) |
 
-Прогон-эталон: `dotnet run --project Tools/RulesCheck` (Windows: `D:/Temprary/dotnet-sdk/dotnet.exe`).
+Прогон-эталон: `dotnet run --project Tools/RulesCheck` (Windows: `D:/Temprary/game/.local/dotnet-sdk/dotnet.exe`).
 
 ---
 
