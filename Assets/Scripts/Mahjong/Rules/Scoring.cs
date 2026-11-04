@@ -26,6 +26,12 @@ namespace Mahjong.Rules
         public bool RobbedKong { get; set; }
         public IReadOnlyCollection<TileType> DiscardPile { get; set; } = Array.Empty<TileType>();
 
+        /// <summary>
+        /// Points the hand needs before it may win, flowers excluded. Eight in the sporting rules
+        /// (3.4.22); the profile decides, so a table without a minimum can simply say so.
+        /// </summary>
+        public int MinimumPoints { get; set; } = Scoring.MinimumPoints;
+
         /// <summary>Melds of the opponents. Must not repeat the melds of <see cref="Hand"/>.</summary>
         public IReadOnlyCollection<Meld> OtherMelds { get; set; } = Array.Empty<Meld>();
     }
@@ -36,7 +42,8 @@ namespace Mahjong.Rules
         int HandPoints,
         IReadOnlyList<ScoredFan> Fans,
         HandAnalysis Analysis,
-        string? Error = null)
+        string? Error = null,
+        ClassicScore? Classic = null)
     {
         /// <summary>A hand that may not win at all, e.g. after a violation of rule 3.11.6.</summary>
         public static ScoreResult Forbidden(string reason) =>
@@ -81,10 +88,11 @@ namespace Mahjong.Rules
                 var fans = EvaluateShape(shape, context, analysis);
                 var handPoints = fans.Sum(f => f.Fan.Points);
                 var flowers = context.Hand.Flowers.Count * Fans.Flower.Points;
-                var error = handPoints >= MinimumPoints
+                var minimum = context.MinimumPoints;
+                var error = handPoints >= minimum
                     ? null
-                    : $"The hand scores {handPoints} points; a win needs {MinimumPoints} excluding flowers.";
-                var candidate = new ScoreResult(handPoints >= MinimumPoints, handPoints + flowers, handPoints, fans, analysis, error);
+                    : $"The hand scores {handPoints} points; a win needs {minimum} excluding flowers.";
+                var candidate = new ScoreResult(handPoints >= minimum, handPoints + flowers, handPoints, fans, analysis, error);
                 if (best == null || candidate.TotalPoints > best.TotalPoints) best = candidate;
             }
 

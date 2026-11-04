@@ -219,7 +219,8 @@ namespace Mahjong.Bots
                 if (Level == BotLevel.Strategic && shanten == 0)
                 {
                     var quality = WaitQuality.Of(rest, hand.Melds, state.SeatWindOf(player), state.RoundWind,
-                        danger == null ? null : (Func<TileType, int>)(face => danger.VisibleCopies(face)));
+                        danger == null ? null : (Func<TileType, int>)(face => danger.VisibleCopies(face)),
+                        state.Variant);
                     score += Math.Min(WaitWeight, quality.Value);
                 }
 
@@ -250,9 +251,16 @@ namespace Mahjong.Bots
     /// <summary>Plays a whole session between bots; used by tests and by offline balance checks.</summary>
     public static class BotTable
     {
-        public static GameSession PlaySession(int? seed = null, params IMahjongBot[] bots)
+        public static GameSession PlaySession(int? seed = null, params IMahjongBot[] bots) =>
+            PlaySession(seed, RuleVariant.Default, bots);
+
+        /// <summary>
+        /// Sixteen hands by the rules of one profile: the wall, the scorer and the settlement all come
+        /// from it, so a classic session is measured by the same bots that play the sporting one.
+        /// </summary>
+        public static GameSession PlaySession(int? seed, RuleVariant variant, params IMahjongBot[] bots)
         {
-            var session = new GameSession();
+            var session = new GameSession(null, variant);
             var random = new Random(seed ?? Environment.TickCount);
 
             for (var handIndex = 0; handIndex < GameSession.TotalHands; handIndex++)

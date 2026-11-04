@@ -80,6 +80,12 @@ namespace Mahjong.Localization
         public static string Tiles(IEnumerable<Tile> tiles) =>
             string.Join(", ", tiles.Select(tile => Tile(tile.Type)));
 
+        // ------------------------------------------------------------- variants
+
+        /// <summary>Name of the rules profile: "Спортивный (ВОМ)" or "Классика 144".</summary>
+        public static string VariantName(RuleVariant variant) =>
+            Loc.Current == Language.Ru ? variant.NameRu : variant.NameEn;
+
         // ------------------------------------------------------------- actions
 
         /// <summary>Short caption that fits on a button of the action bar.</summary>
@@ -179,6 +185,44 @@ namespace Mahjong.Localization
                 .ToList();
             var total = Loc.Format("result.total", result.Score.HandPoints);
             return parts.Count == 0 ? total : string.Join(" + ", parts) + " = " + total;
+        }
+
+        /// <summary>
+        /// The result screen of a classic hand: what the winner's combination is made of, the doublings
+        /// it earned, what every seat's combination was worth and who paid whom (rule-2.pdf, IV–V).
+        /// </summary>
+        public static string ClassicSettlementSummary(WinResult result, Settlement settlement)
+        {
+            var score = result.Score.Classic;
+            var lines = new List<string>();
+
+            if (score != null)
+            {
+                var parts = string.Join(" + ", score.Parts.Select(part =>
+                    $"{(Loc.Current == Language.Ru ? part.NameRu : part.NameEn)} {part.Points}"));
+                lines.Add(Loc.Format("classic.base", parts, score.BasePoints));
+
+                if (score.Doublings.Count > 0)
+                {
+                    var names = string.Join(", ", score.Doublings.Select(doubling =>
+                        Loc.Current == Language.Ru ? doubling.NameRu : doubling.NameEn));
+                    lines.Add(Loc.Format("classic.doublings", names, score.DoublingCount, score.Value)
+                              + (score.AtLimit ? "  " + Loc.Get("classic.limit") : string.Empty));
+                }
+            }
+
+            if (settlement.Classic != null)
+            {
+                var values = string.Join("  ", settlement.Classic.Values
+                    .Select((value, seat) => $"P{seat + 1}={value}"));
+                lines.Add(Loc.Format("classic.values", values));
+            }
+
+            if (settlement.Payments.Count > 0)
+                lines.Add(string.Join("  ", settlement.Payments
+                    .Select(payment => $"P{payment.FromPlayer + 1}→P{payment.ToPlayer + 1} {payment.Points}")));
+
+            return string.Join("\n", lines);
         }
 
         /// <summary>

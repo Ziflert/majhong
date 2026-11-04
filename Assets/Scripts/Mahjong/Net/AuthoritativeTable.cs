@@ -39,17 +39,21 @@ namespace Mahjong.Net
         private readonly List<TableEvent> events = new();
         private readonly List<(int Seat, string Wire)> log = new();
 
-        public AuthoritativeTable(int dealer = 0, int? seed = null, Wind roundWind = Wind.East)
+        public AuthoritativeTable(int dealer = 0, int? seed = null, Wind roundWind = Wind.East,
+            RuleVariant? variant = null)
         {
             Dealer = dealer;
             Seed = seed;
             RoundWind = roundWind;
-            State = new GameState();
+            State = new GameState(variant);
             State.StartHand(dealer, seed, roundWind);
             RecordHandStart();
         }
 
         public GameState State { get; private set; }
+
+        /// <summary>The rules profile of the table; a replay has to deal under the same one.</summary>
+        public RuleVariant Variant => State.Variant;
         public int Dealer { get; private set; }
         public int? Seed { get; private set; }
         public Wind RoundWind { get; private set; }
@@ -154,9 +158,10 @@ namespace Mahjong.Net
         /// Rebuilds a table by replaying a log onto a fresh deal. The deal is deterministic from the
         /// seed, so the replay needs the log and nothing else — no wall is ever sent over the wire.
         /// </summary>
-        public static AuthoritativeTable Replay(int dealer, int? seed, Wind roundWind, IEnumerable<string> logLines)
+        public static AuthoritativeTable Replay(int dealer, int? seed, Wind roundWind, IEnumerable<string> logLines,
+            RuleVariant? variant = null)
         {
-            var table = new AuthoritativeTable(dealer, seed, roundWind);
+            var table = new AuthoritativeTable(dealer, seed, roundWind, variant);
             foreach (var line in logLines)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;

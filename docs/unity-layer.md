@@ -95,6 +95,12 @@ $env:MAHJONG_SHOT_DIR="D:\Temprary\shots"
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game" \
   -executeMethod Mahjong.EditorTools.PrototypeCapture.CaptureAndExit
 
+# То же в классических правилах: в HUD строка «Правила: Классика 144», стена останавливается
+# на 14 костях + 2 Свободные, дилер остаётся при победе
+$env:MAHJONG_VARIANT="classic144"
+"D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game" \
+  -executeMethod Mahjong.EditorTools.PrototypeCapture.CaptureAndExit
+
 # Скриншот панели действий (та же папка, файл action-bar.png)
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game" \
   -executeMethod Mahjong.EditorTools.ActionBarPreview.CaptureAndExit

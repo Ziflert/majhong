@@ -12,8 +12,8 @@
 | `docs/audit.md` | Аудит кода: карта покрытия (что прочитано), исправленные баги A-n с воспроизведением, найденное-но-не-исправленное O-n |
 | `docs/rules-status.md` | Что реализовано, какие упрощения и что осталось по правилам |
 | `docs/scoring-golden.md` | Эталонные руки, принятые трактовки подсчёта и расхождения с независимым MCR-анализатором |
-| `Assets/Scripts/Mahjong/Rules/` | Ядро правил: кости, рука, стена, кубики, разбор руки, подсчёт, состояние руки |
-| `Assets/Scripts/Mahjong/Diagnostics/` | `RulesSelfTest` — проверки ядра, общие для Unity и headless |
+| `Assets/Scripts/Mahjong/Rules/` | Ядро правил: кости, рука, стена, кубики, разбор руки, подсчёт, состояние руки; профиль правил и классический подсчёт — отдельными файлами |
+| `Assets/Scripts/Mahjong/Diagnostics/` | `RulesSelfTest` — проверки ядра, общие для Unity и headless (`RunAll` + файлы-части по темам: `.Net`, `.Replay`, `.Menu`, `.Opening`, `.Variant`) |
 | `Assets/Scripts/Mahjong/Bots/` | `HeuristicBot` — бот уровней 1–3 (`BotLevel`), `DangerModel` — чтение стола, `WaitQuality` — оценка ожиданий через `Scoring`, `BotTable` — прогон сессии и передача отставания по очкам |
 | `Assets/Scripts/Mahjong/Controls/` | `ActionPrompt` — что человеку предлагают в панели действий и в каком порядке; `PlayClock` / `ClockExpiry` — окна 20/10/3 секунды; `HandOpening` — такты открытия руки: два броска, разрыв, раздача (0.9 / 0.9 / 0.6 / 1.1 с, `MAHJONG_OPENING_SPEED`); `GameSettings` — язык, сила и темп ботов (`MAHJONG_LANG`, `MAHJONG_BOT_LEVEL`, `MAHJONG_BOT_SPEED`), `GameMenu` — модель меню: строки, курсор, что значит шаг и выбор |
 | `Assets/Scripts/Mahjong/Net/` | Сетевой договор без сети: `TileNotation` (нотация кости), `ActionCodec` (ход строкой), `SeatView` (проекция на место), `AuthoritativeTable` (единственный владелец `GameState` + лог ходов + `Replay`), `InProcessTable` (транспорт в процессе), `FreeTable` (общий стол «переставь кости») |
@@ -47,7 +47,9 @@
 | `WallGeometry.cs` | Геометрия стены: 4 стороны × 18 стопок × 2 кости, кольцо на 144 позиции, `SlotAt` / `RingIndex`, место разрыва |
 | `Dice.cs` | Два броска, определение бросающего и места разрыва |
 | `HandSolver.cs` | Разбор на 4 комбинации + пара, Семь пар, Семь смещённых пар, Тринадцать сирот, ожидания |
-| `Scoring.cs` | `ScoringContext`, оценка фанов, матрица исключений, порог 8 очков |
+| `RuleVariant.cs` | Профиль правил: `Sports` (MCR по `rule.pdf`) и `Classic144` (классика по `rule-2.pdf`), `Id`/имена RU-EN, `ScoringMode`, порог, конец стены, свободные кости, предел, дилер; `TryParse`/`Parse` для `MAHJONG_VARIANT`; `Score` — единственное место, где выбирается подсчёт |
+| `ClassicScoring.cs` | Классический подсчёт (`rule-2.pdf`, разделы V и VIII): очки за комбинации и пары, Ма-Джонг 20, со стены 2, единственное ожидание 2, цветы 4, удвоения, предел «Дом полон», `ValueOf` — стоимость любого места для взаимозачёта |
+| `Scoring.cs` | `ScoringContext`, оценка фанов, матрица исключений, порог (берётся из профиля) |
 | `Fans.cs` | Каталог фанов и их стоимость |
 | `Knitted.cs` | Переплетённые руки: 147 / 258 / 369, lesser и greater honors knitted |
 | `GameState.cs` | Машина состояния руки: раздача, добор, снос, заявки, конги, победа, ничья |
@@ -61,10 +63,10 @@
 | `Replay/SessionRestore.cs` | Восстановление сессии из сохранения: разыгрывающий и раунд сверяются с сессией, счёт считается из переигранных рук, часы и лимит берутся из файла |
 | `Localization/Loc.cs` | Строки интерфейса RU/EN; `Loc.Current`, `Loc.Toggle()`, переменная `MAHJONG_LANG` |
 | `Knowledge/RulesBook.cs` | Страницы справочника правил и таблица фан для экрана `R` |
-| `Controls/GameSettings.cs` | Настройки стола: язык, сила ботов (`BotLevel`), темп (`Speeds` ×0.25…×4, `ScaledDelay`); разбор переменных окружения в инвариантной культуре |
+| `Controls/GameSettings.cs` | Настройки стола: профиль правил (`RuleVariant`, `MAHJONG_VARIANT`), язык, сила ботов (`BotLevel`), темп (`Speeds` ×0.25…×4, `ScaledDelay`); разбор переменных окружения в инвариантной культуре |
 | `Controls/GameMenu.cs` | Меню как модель: восемь строк, курсор с переносом, `Adjust` (шаг настройки) и `Activate` (команда строки), подписи из `Loc` |
 | `MahjongView/MenuPanel.cs` | Отрисовка меню: строки-плашки с подписями, подсветка курсора, `TryPick` лучом; размер считается от `fieldOfView` и `aspect` камеры |
-| `Settlement.cs` | Выплаты за руку: самобор и выигрыш со сноса (3.9.1.2–3.9.1.3) |
+| `Settlement.cs` | Выплаты за руку: самобор и выигрыш со сноса (3.9.1.2–3.9.1.3) и классический раздел IV (`ForClassic`, взаимозачёт проигравших, двойной Восток); диспетчер `ForState` выбирает арифметику по профилю |
 | `Penalties.cs` | Нарушения 3.11: каталог, шкала «предупреждение → 5/10/20/40», счётчики по сессии и раунду, `PenaltyLedger` |
 | `GameSession.cs` | Сессия: 4 раунда × 4 руки, смена разыгрывающего, часы на 150 минут (3.5.6), штрафные очки, итоговая таблица `Standings()` (3.9.2, 3.10.1) |
 
@@ -80,7 +82,10 @@
 - `ClaimPriority.Winner(claims, discarder)` — чья заявка выигрывает.
 - `state.Result` — результат победы с разбивкой по фанам.
 - `state.ForbidWin(player, reason)` / `state.IsWinForbidden(player)` — лишение права на Ху в текущей руке (3.11.6).
-- `Settlements.ForWin(result)` — кто кому сколько платит.
+- `Settlements.ForWin(result)` / `Settlements.ForState(state, variant)` — кто кому сколько платит.
+- `RuleVariant.Parse("classic144")` / `new GameSession(null, RuleVariant.Classic144)` — стол по классическим правилам.
+- `ClassicScoring.ValueOf(hand, seatWind, roundWind, limit)` — что стоит комбинация любого места.
+- `wall.FreeTilePair()` / `wall.CanReplace` — свободные кости и замена в конце классической стены.
 - `Penalties.Rule(kind)` / `Penalties.EscalatedPoints(n)` — каталог штрафов и шкала повторов.
 - `new PenaltyLedger().Register(player, kind, judgePoints, victim, tileSeen)` — размер одного нарушения.
 - `new GameSession()` → `StartNextHand()` → `CompleteHand()` — полная сессия из 16 рук.
@@ -131,7 +136,7 @@ $env:MAHJONG_SHOT_DIR="D:\Temprary\shots"
   -executeMethod Mahjong.EditorTools.ActionBarPreview.CaptureAndExit
 ```
 
-Проверено на 2026-11-05: `RulesCheck` — 68 групп, 121 840 проверок; EditMode 13/13; PlayMode 28/28;
+Проверено на 2026-11-05: `RulesCheck` — 74 группы, 122 198 проверок; EditMode 13/13; PlayMode 28/28;
 скриншоты `PrototypeCapture` и `InterfaceCapture` снимаются.
 
 ## Архитектура

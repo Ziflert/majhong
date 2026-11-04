@@ -33,11 +33,16 @@ namespace Mahjong.Rules
         private readonly List<PenaltyResult> penaltyHistory = new();
         private readonly List<AbandonedHand> abandonedHands = new();
         private readonly HashSet<int> forfeited = new();
+        private int dealer;
 
-        public GameSession(TimeSpan? timeLimit = null)
+        public GameSession(TimeSpan? timeLimit = null, RuleVariant? variant = null)
         {
             TimeLimit = timeLimit ?? DefaultTimeLimit;
+            Variant = variant ?? RuleVariant.Default;
         }
+
+        /// <summary>The rules every hand of this session is played and paid by.</summary>
+        public RuleVariant Variant { get; }
 
         public IReadOnlyList<int> Scores => scores;
         public IReadOnlyList<Settlement> History => history;
@@ -58,8 +63,11 @@ namespace Mahjong.Rules
         public int RoundIndex => Math.Min(HandsPlayed / HandsPerRound, RoundsPerGame - 1);
         public bool IsFinished => EndedByTimeLimit || HandsPlayed >= TotalHands;
 
-        /// <summary>Rule 3.4.8: the dealer passes the dice on after every hand, win or draw.</summary>
-        public int Dealer => HandsPlayed % 4;
+        /// <summary>
+        /// The seat that deals the next hand. MCR passes the dice on after every hand (3.4.8); the
+        /// classic rules let a dealer who wins his own hand keep the seat (rule-2.pdf, "Партия").
+        /// </summary>
+        public int Dealer => dealer;
         public Wind RoundWind => (Wind)Math.Min(HandsPlayed / HandsPerRound, RoundsPerGame - 1);
         public GameState? State { get; private set; }
         public Settlement? LastSettlement { get; private set; }
@@ -82,7 +90,7 @@ namespace Mahjong.Rules
                 ? "The session time is up."
                 : "All sixteen hands have been played.");
             Violations.StartRound(RoundIndex);
-            State = new GameState();
+            State = new GameState(Variant);
             State.StartHand(Dealer, seed, RoundWind);
             pendingPenalties.Clear();
         }
@@ -93,10 +101,12 @@ namespace Mahjong.Rules
             if (State == null) throw new InvalidOperationException("No hand is in progress.");
             if (State.Phase != GamePhase.HandFinished) throw new InvalidOperationException("The hand is still running.");
 
-            var settlement = State.Result != null ? Settlements.ForWin(State.Result) : Settlements.ForDraw();
+            var settlement = Settlements.ForState(State, Variant);
             Apply(settlement);
             ApplyPendingPenalties();
             HandsPlayed++;
+            if (!(Variant.DealerKeepsSeatOnWin && State.Result?.PlayerIndex == dealer))
+                dealer = (dealer + 1) % 4;
             AdvanceClock(handDuration ?? TimeSpan.Zero);
             return settlement;
         }

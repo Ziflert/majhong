@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using Mahjong.Bots;
 using Mahjong.Localization;
+using Mahjong.Rules;
 
 namespace Mahjong.Controls
 {
@@ -15,6 +16,12 @@ namespace Mahjong.Controls
     /// </summary>
     public sealed class GameSettings
     {
+        /// <summary>
+        /// The rules profile of the table. Chosen by <c>MAHJONG_VARIANT</c> until the table screen
+        /// offers the presets on screen (docs/rules-classic.md, "Настройки стола", этап 2).
+        /// </summary>
+        public RuleVariant Variant { get; set; } = RuleVariant.Default;
+
         /// <summary>Speeds the menu steps through; the delay between bot moves is divided by this.</summary>
         public static readonly double[] Speeds = { 0.25, 0.5, 1, 2, 4 };
 
@@ -63,7 +70,8 @@ namespace Mahjong.Controls
             var settings = new GameSettings
             {
                 Language = Loc.PreferredLanguage,
-                Level = FromLevelText(Environment.GetEnvironmentVariable("MAHJONG_BOT_LEVEL")) ?? fallbackLevel
+                Level = FromLevelText(Environment.GetEnvironmentVariable("MAHJONG_BOT_LEVEL")) ?? fallbackLevel,
+                Variant = RuleVariant.Parse(Environment.GetEnvironmentVariable("MAHJONG_VARIANT"))
             };
 
             var speedText = Environment.GetEnvironmentVariable("MAHJONG_BOT_SPEED");

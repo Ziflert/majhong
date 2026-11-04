@@ -39,7 +39,7 @@ namespace Mahjong.Replay
 
             var info = log.Info
                        ?? new SessionLog.SessionInfo(TimeSpan.Zero, fallbackTimeLimit ?? GameSession.DefaultTimeLimit);
-            var session = new GameSession(info.TimeLimit);
+            var session = new GameSession(info.TimeLimit, log.Variant);
             var moves = 0;
             var inProgress = false;
 

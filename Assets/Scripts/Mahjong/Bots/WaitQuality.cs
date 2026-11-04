@@ -42,7 +42,8 @@ namespace Mahjong.Bots
 
         /// <summary>Reads the waits of a hand that is one tile short of a win.</summary>
         public static WaitQuality Of(IReadOnlyList<TileType> concealed, IReadOnlyList<Meld> melds,
-            Wind seatWind = Wind.East, Wind roundWind = Wind.East, Func<TileType, int>? visibleCopies = null)
+            Wind seatWind = Wind.East, Wind roundWind = Wind.East, Func<TileType, int>? visibleCopies = null,
+            RuleVariant? variant = null)
         {
             var hand = Build(concealed, melds);
             var waits = HandSolver.WaitingTiles(hand);
@@ -51,11 +52,12 @@ namespace Mahjong.Bots
             var live = waits.Sum(wait => Math.Max(0, 4 - (visibleCopies?.Invoke(wait) ?? 0)));
 
             // Scoring takes the thirteen tiles and the winning face separately: it adds the face itself.
+            var rules = variant ?? RuleVariant.Default;
             var points = 0;
             var scored = 0;
             foreach (var wait in waits)
             {
-                var result = Scoring.Evaluate(new ScoringContext
+                var result = rules.Score(new ScoringContext
                 {
                     Hand = hand,
                     WinningTile = wait,

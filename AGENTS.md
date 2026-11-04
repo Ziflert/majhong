@@ -10,6 +10,8 @@
 - Прогон прототипа со скриншотами: `-executeMethod Mahjong.EditorTools.PrototypeCapture.CaptureAndExit` (см. `docs/unity-layer.md`).
 - Быстрая проверка ядра без Unity: `dotnet run --project Tools/RulesCheck`.
 - Локальный .NET SDK лежит вне репозитория: `D:/Temprary/dotnet-sdk/dotnet.exe`.
+- Профиль правил выбирается пресетом: `MAHJONG_VARIANT=classic144` (классика по `rule-2.pdf`),
+  без переменной — спортивный по `rule.pdf`. Каталог переключателей и трактовок — `docs/rules-classic.md`.
 
 ## Рабочие правила
 - Логика правил должна быть отделена от интерфейса, анимаций и ассетов.

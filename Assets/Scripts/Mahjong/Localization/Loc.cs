@@ -99,6 +99,7 @@ namespace Mahjong.Localization
                 "1-9 — an action, R — rules, F — free play, V — review, Esc — menu, F5 — save, F9 — resume");
             Add("hud.waiting", "Ход игрока {0}", "Waiting for player {0}");
             Add("hud.wall", "В стене: {0}", "Wall: {0}");
+            Add("hud.rules", "Правила: {0}", "Rules: {0}");
             Add("hud.dice", "Кубики {0}, бросал {1} · разрыв после {2}-й стопки",
                 "Dice {0}, thrown by {1} · break after stack {2}");
             Add("hud.points", "Очки: {0}", "Points: {0}");
@@ -122,6 +123,10 @@ namespace Mahjong.Localization
             Add("result.paid", "Выплачено: {0}", "Paid: {0}");
             Add("result.scoreLine", "{0} очков", "{0} points");
             Add("result.total", "{0} очков", "{0} points");
+            Add("classic.base", "Итого: {0} = {1}", "Total: {0} = {1}");
+            Add("classic.doublings", "Удвоения: {0} (×{1}) → {2}", "Doublings: {0} (×{1}) → {2}");
+            Add("classic.values", "Комбинации: {0}", "Combinations: {0}");
+            Add("classic.limit", "по пределу «Дом полон»", "capped by the house limit");
             Add("result.seatWins", "выиграло место {0}", "seat {0} wins");
             Add("standings.header", "Итоговая таблица", "Final standings");
             Add("standings.line", "{0}. {1} — {2} очков, {3} турнирных{4}",

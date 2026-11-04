@@ -2,102 +2,112 @@
 
 Живой файл: состояние рабочего дерева на момент передачи. Перезаписывать в начале новой сессии.
 Постоянные записи — `docs/journal.md` (вехи), `docs/plan.md` (что сделано), `docs/rules-status.md`,
-`docs/unity-layer.md`. Здесь — только «где мы стоим прямо сейчас», чтобы не собирать это заново.
+`docs/unity-layer.md`, трактовки классики — `docs/rules-classic.md`. Здесь — только «где мы стоим».
 
-**Обновлён:** 2026-11-05, после коммита вехи «стена, кубики, разрыв».
+**Обновлён:** 2026-11-05, сразу после вехи «профиль правил от и до». Дерево чистое, всё закоммичено
+(`rules become a variant profile: sports and classic 144 end to end`).
 
 ---
 
 ## Одной строкой
 
-Две вехи в одном коммите: меню на `Esc` (4.11, 4.11.1) и настоящая стена из 18 стопок с двумя
-бросками кубиков, разрывом и раздачей «из стены» (4.8.1, З-5). Обе описаны в журнале и плане.
-Дерево зелёное: `RulesCheck` 68 групп / 121 840 проверок, EditMode 13/13, PlayMode 28/28.
+Этап 1 из `docs/rules-classic.md` («Настройки стола») **закрыт**: правила стали профилем
+(`Rules/RuleVariant.cs`) — спортивный (MCR, `rule.pdf`) и «Классика 144» (`rule-2.pdf`) работают
+от и до: подсчёт, выплаты, конец стены, свободные кости, дилер, сейв, HUD и экран результата.
+Новые headless-группы `variant: …` (6 штук) держат числа из самого rulebook.
+`RulesCheck` — 74 группы, 122 198 проверок; Unity EditMode 13/13, PlayMode 28/28.
+
+Следующая работа — не этап 2, а четыре правки, которые болят в любом режиме (порядок от игрока):
+**У-7** (экран конца руки) → **У-1** (окна времени в настройках) → **У-6** (экранные кнопки) →
+**У-3** (комбинации по кадру). Потом экран создания стола (У-2, этап 2 профиля) и этап 3.
 
 ---
 
-## Что сделано в этой сессии
+## Что где лежит по профилю правил
 
-1. **Веха стены описана в документах** — это был единственный крупный долг прошлой сессии:
-   `docs/journal.md` (запись 2026-11-05), `docs/plan.md` (пункт 4.8.1, закрытый З-5, счётчики),
-   `docs/unity-layer.md` (раздел «Стена, кубики и открытие руки», `MAHJONG_OPENING_SPEED`,
-   переписанный раздел про темп раздачи, обновлённые ограничения), `docs/project-map.md`
-   (файлы, точки входа, счётчики).
-2. **Headless-проверка `HandOpening`** (долг №2 прошлой сессии): новый файл
-   `Diagnostics/RulesSelfTest.Opening.cs`, две группы — `opening: two throws, the break and the deal
-   keep their beats` (длины тактов, переходы, `TimeUntilDeal`, `Progress`, `Skip`, темп, скачок
-   времени, нулевая и отрицательная дельта) и `opening: the opening and the engine break the same wall`
-   (40 сидов: те же броски, тот же разрыв, 53 взятые кости, 91 оставшаяся, кольцо идёт от разрыва).
-3. **Три ошибки, найденные проверками** (все — в тестах и в трактовке, не в правилах):
-   - «разрыв всегда в стене бросавшего» неверно: сумма двух бросков 4–24 при 18 стопках в стене,
-     счёт уходит в соседнюю. Тот же ложный инвариант стоял в PlayMode `WallTests` — он падал бы
-     примерно в 16 % раздач. Теперь ожидаемая сторона считается.
-   - `MAHJONG_OPENING_SPEED` был вывернут: `Pace` — длина такта, поэтому `2` замедлял вдвое.
-     Появился `HandOpening.PaceFromSpeed` (0 — без открытия, 2 — вдвое быстрее) с headless-проверкой.
-   - `state: a kong on the last wall tile keeps the turn alive` держался за один сид (1308), после
-     кольцевой раздачи подходящая рука уехала на 1975. Окно сидов 1900–2150, выход на первой.
-4. **Гигиена репозитория:** `Temprarytemp*.log|xml` убраны из индекса и добавлены в `.gitignore`;
-   `ProjectSettings.asset` (пустые списки иконок, которые Unity переписывает при каждом запуске)
-   откачен, чтобы не мусорить в диффе.
-
----
-
-## Проверки, которые прошли
-
-| Прогон | Результат |
+| Файл | Что делает |
 |---|---|
-| `dotnet run --project Tools/RulesCheck` | `OK — 121 840 checks passed in 68 test groups` |
-| PlayMode (`-runTests -testPlatform PlayMode`) | 28/28 Passed |
-| EditMode (`-runTests -testPlatform EditMode`) | 13/13 Passed |
-| `PrototypeCapture` / `InterfaceCapture` | прошлый прогон: код 0, кадры на месте (после правок тестов не переснимались) |
+| `Rules/RuleVariant.cs` | Пресеты `Sports` / `Classic144`: `Id`, имена RU/EN, `Mode` (`Fans` / `ClassicPoints`), `MinimumPoints`, `DeadWallTiles`, `FreeTiles`, `HouseLimit`, `DealerKeepsSeatOnWin`; `Presets`, `TryParse`/`Parse` (алиасы `mcr`, `wmo`, `classic`, `home`), `Score(context)` — единственное место выбора подсчёта |
+| `Rules/ClassicScoring.cs` | Классический подсчёт: `ClassicPart`, `ClassicDoubling`, `ClassicScore`, `Evaluate(context, limit)`, `ValueOf(hand, seatWind, roundWind, limit)` — стоимость любого места (комбинации + заявленные + цветы), `SetPoints`, `PairPoints`, `OwnBonuses` |
+| `Rules/Settlement.cs` | `ClassicSettlement(Values, EastSeat, Limit)`, диспетчер `Settlements.ForState(state, variant)`, `ForClassic(state, variant)` и чистая арифметика `ForClassic(values, winner, eastSeat, limit, selfDrawn)` |
+| `Rules/Wall.cs` | `DeadWallTiles`, `FreeTiles`, `ReservedTiles`, `DrawableTiles`, `IsExhausted` (= `remaining <= ReservedTiles`), `CanReplace` (= `remaining > DeadWallTiles`), `FreeTilePair()` |
+| `Rules/GameState.cs` | `GameState(RuleVariant?)` + `Variant`; стена с резервом; замены идут через `CanReplace`; `EvaluateWin` → `Variant.Score` |
+| `Rules/GameSession.cs` | `GameSession(limit, RuleVariant?)`; `Dealer` — поле (в классике победа дилера оставляет место) |
+| `Diagnostics/RulesSelfTest.Variant.cs` | **новый**: группы `variant: …` — пресеты, порог, таблица очков, конец стены, выплаты, сессия |
+| `Controls/GameSettings.cs` | `Settings.Variant` + `MAHJONG_VARIANT` (мусор → спортивный) |
+| `Bots/HeuristicBot.cs` | `BotTable.PlaySession(seed, variant, bots)` — сессия по профилю |
+| `Replay/SessionLog.cs`, `SessionRestore.cs` | строка `rules=<id>` в сейве; старые файлы читаются спортивными |
+| `Localization/Text.cs`, `Loc.cs` | `Text.VariantName`, `Text.ClassicSettlementSummary(result, settlement)`, ключи `hud.rules`, `classic.base/doublings/values/limit` |
+| `MahjongView/MahjongGame.cs` | сессия с профилем из настроек, строка HUD «Правила: …», экран результата в классике |
 
-Новые headless-группы этой сессии: две `opening: …`. Новые PlayMode-тесты прошлой сессии:
-`WallTests` (3), `MenuTests` (4).
-
----
-
-## Открытые вопросы визуала (следующая работа)
-
-1. **Во время открытия кости руки стоят в стене лицом вверх.** `Place` вызывает `SetFace` сразу,
-   а уезжают кости к руке только после такта раздачи, поэтому в стене видны белые кости среди
-   рубашек. Похоже на дырки; лицо логично открывать, когда кость уже легла в руку.
-2. **Белая кость в линии дальней стены** на `table-overview.png` — вероятно тот же эффект или
-   цветок, выложенный не туда. Нужно поймать и посмотреть.
-3. **Таблички мест.** `Юг` на правой стороне читается боком, `Восток` у нижнего края частично уходит
-   за кадр. Билборды поворачиваются к камере, но не отодвинуты от руки.
-4. **Дальняя рука соперника и дальняя стена сливаются** на наклонной камере: две линии костей
-   наверху, какая из них рука — по кадру не разобрать.
-
-Скриншоты (в `MAHJONG_SHOT_DIR`, у меня `D:\Temprary\shots`): `opening-dice.png`,
-`table-overview.png`, `play-3s.png`, `play-12s.png`, `table-midgame.png`, `menu-panel.png`,
-`rules-panel.png`, `free-play.png`, `replay-review.png`.
+Где смотреть числа: примеры 2 (22/24), 3 (26 → 104) и 4 (26 → 208) `rule-2.pdf` закреплены
+в `variant: classic scoring counts sets, doublings and the limit`; предел 100 режет 208 → 100.
 
 ---
 
-## Следующие шаги по порядку
+## Принятые трактовки спорных мест `rule-2.pdf`
 
-1. **Визуальные правки 1–4** из списка выше — после них переснять кадры (`InterfaceCapture`,
-   `PrototypeCapture`) и сверить с этим же списком.
-2. **Звук (4.10)** — последний пустой пункт базовой игры: снос, Чи/Панг/Конг, Ху, конец руки.
-3. **Эталонные руки подсчёта (З-2, З-3)** — 21/24 совпадений, осталось закрепить спорные пары
-   исключений тестами.
+Полностью — `docs/rules-classic.md`, раздел «Принятые трактовки». Коротко:
+
+1. Удвоения **перемножаются**; «удвоение трижды» = ×8 (пример 4: 26 → 208).
+2. Предел «Дом полон» = **2000**, ограничивает **стоимость комбинации**, не выплату.
+3. Пара двойного ветра = **4** (свой 2 + раунд 2).
+4. Закрытая рука остаётся закрытой и при выигрыше со сноса; открыты только объявленные комбинации.
+5. Конец стены: 14 мёртвых + 2 Свободные = 16 стоящих; живой добор стоит на 16, замена — на 14.
+6. В классике выигрывает только 4 группы + пара (семь пар, сироты, переплетённые — нет).
+7. Дилер, выигравший руку, остаётся дилером; Восток в расчёте — дилер (двойные выплаты).
+8. Заявленные комбинации проигравшего **считаются** в его стоимость (раньше терялись — починено).
 
 ---
 
-## Как повторить прогоны
+## Что осталось (по порядку)
 
-```bash
-# ядро без Unity
-"D:/Temprary/dotnet-sdk/dotnet.exe" run --project Tools/RulesCheck
+1. **У-7. Экран конца руки.** Сейчас три секунды текста в HUD и сразу следующая рука с открытием
+   (`nextHandAt = Time.time + 3f`). Нужен экран результата: разбор руки (в классике — сумма,
+   удвоения, четыре комбинации и выплаты; текст уже готов — `Text.ClassicSettlementSummary`),
+   таблица выплат, кнопка «Дальше» (`Enter`/пробел), настраиваемый авто-переход (3 / 5 / 10 с /
+   только по кнопке), между раундами — итоговая таблица. Проверки: headless-модель экрана
+   (как `GameMenu`) + PlayMode.
+2. **У-1. Окна времени в настройках.** `Controls/PlayClock.cs` держит 20 / 10 / 3 в `static readonly`;
+   вывести в `GameSettings` (пресеты «по правилам / спокойно 30/20/10 / без ограничения», пометка
+   «не по правилам» в HUD), протащить в `PlayClock` и в `ClockExpiry`.
+3. **У-6. Экранные кнопки вместо горячих клавиш.** Панель-трей у края кадра: справочник, меню,
+   просмотр партии, сохранить, язык, режим. Механизм тот же, что у `ActionBar` (плитка, `TextMesh`,
+   коллайдер, `Physics.RaycastAll`), клавиши остаются.
+4. **У-3. Комбинации по кадру.** Кости внутри комбинации стоят почти вплотную (`TilePitch` 0.062,
+   повёрнутая кость 0.072 наезжает), своя комбинация за своим кольцом стены. Нужен скриншот живого
+   стола с 2–3 комбинациями и правка `TableLayout.MeldPosition` / `RebuildFrom`.
+5. **У-2. Экран создания стола (этап 2 профиля).** Пресет, окна времени, длина партии, сид, сила
+   и темп ботов; переключатели появляются только с работающим кодом и тестом.
+6. **У-5. Справочник:** `↑`/`↓`, кнопки-стрелки с номером страницы, оглавление, возврат в меню.
+7. **Звук (4.10)** — последний пустой пункт базовой игры.
+8. **Этап 3 профиля:** Просящая рука, пенальти «заплатил за всех», 14 лимитированных рук, фуритен,
+   набор 136 костей (`WallGeometry.StacksPerSide` параметром вместо константы).
+9. **З-2/З-3:** эталонные руки для подсчёта MCR (21/24 сейчас).
+10. **У-8/У-10:** переосмыслить свободный стол; уточнить формулировку про эталонные руки.
 
-# PlayMode и EditMode в batchmode
-"D:/Software/Unity/6000.0.85f1/Editor/Unity.exe" -batchmode -projectPath "D:\Temprary\game" \
-  -runTests -testPlatform PlayMode -testResults "D:/Temprary/temp/playmode.xml" -logFile Logs/wall-playmode.log
+---
 
-# скриншоты (нужен реальный рендер, не batchmode)
-MAHJONG_SHOT_DIR=D:/Temprary/shots "D:/Software/Unity/6000.0.85f1/Editor/Unity.exe" \
-  -projectPath "D:\Temprary\game" -executeMethod Mahjong.EditorTools.InterfaceCapture.CaptureAndExit
+## Ловушки
+
+- `Wall.IsExhausted` **включает резерв** (16 в классике). Для добора замен нужен `Wall.CanReplace`,
+  иначе цветок или конг в конце стены закончит руку на две кости раньше.
+- `GameSession.Dealer` больше не `HandsPlayed % 4`; `SessionRestore` сверяет дилера каждой руки —
+  сохранение классики под спортивным профилем не сойдётся, и это правильно.
+- Сейв без строки `rules=` — спортивный. Не ломать старые файлы.
+- `ScoreResult.Fans` в классике пустой, разбивка лежит в `ScoreResult.Classic`; экран результата
+  выбирает ветку по `Settlement.Classic != null`.
+- `Tools/RulesCheck` собирает только `Assets/Scripts/Mahjong/**`: правка `MahjongView` headless
+  не проверяется — из-за этого в прошлой итерации Unity падал на несовпадении сигнатуры
+  `Text.ClassicSettlementSummary`, хотя проверки были зелёными. После правок слоя Unity — прогонять
+  EditMode.
+- Тест `text: both languages are complete` падает, если RU и EN строки совпали буквально.
+- Новая `.cs` в `Assets` требует `.meta` (Unity создаёт при импорте — прогон EditMode её и создаёт).
+
+## Команды
+
 ```
-
-Путь к `-testResults` на bash надо брать в кавычках: без них обратные слэши съедаются и файл
-появляется как `Temprarytempplaymode.xml` в корне проекта (теперь такие файлы в `.gitignore`).
+D:/Temprary/dotnet-sdk/dotnet.exe run --project Tools/RulesCheck
+D:/Temprary/dotnet-sdk/dotnet.exe run --project Tools/BotBench -- 60
+MAHJONG_VARIANT=classic144  # пресет правил для прогонов, кадров и тестов
+```

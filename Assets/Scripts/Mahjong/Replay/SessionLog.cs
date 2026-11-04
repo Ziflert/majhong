@@ -58,6 +58,14 @@ namespace Mahjong.Replay
         /// <summary>Session-wide facts; null for a file written before they were stored.</summary>
         public SessionInfo? Info { get; set; }
 
+        /// <summary>
+        /// The rules the hands were played by. A save is only its moves, and the moves are only legal
+        /// under the profile that dealt them: a classic save resumed under the sporting rules would
+        /// stop at a wall that never ends and pay hands nobody paid. Old saves carry no line and are
+        /// sporting, which is what they were.
+        /// </summary>
+        public RuleVariant Variant { get; set; } = RuleVariant.Default;
+
         public IReadOnlyList<HandRecord> Hands => hands;
 
         /// <summary>Comment lines that sit before the first hand; kept on a round trip.</summary>
@@ -91,7 +99,7 @@ namespace Mahjong.Replay
         {
             var lines = new List<string> { Header };
             if (Info != null)
-                lines.Add($"session|elapsed={Seconds(Info.Elapsed)}|limit={Seconds(Info.TimeLimit)}");
+                lines.Add($"session|elapsed={Seconds(Info.Elapsed)}|limit={Seconds(Info.TimeLimit)}|rules={Variant.Id}");
             lines.AddRange(notes.Select(note => "# " + note));
             foreach (var hand in hands)
             {
@@ -143,7 +151,7 @@ namespace Mahjong.Replay
 
                 if (line.StartsWith("session|"))
                 {
-                    log.Info = ParseSession(line, number);
+                    log.ParseSessionLine(line, number);
                     continue;
                 }
 
@@ -196,7 +204,7 @@ namespace Mahjong.Replay
             var hand = hands[index];
             try
             {
-                return AuthoritativeTable.Replay(hand.Dealer, hand.Seed, hand.RoundWind, hand.LogLines());
+                return AuthoritativeTable.Replay(hand.Dealer, hand.Seed, hand.RoundWind, hand.LogLines(), Variant);
             }
             catch (Exception failure) when (failure is FormatException or InvalidOperationException)
             {
@@ -208,10 +216,10 @@ namespace Mahjong.Replay
             span.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture);
 
         /// <summary>
-        /// Reads the session line: <c>session|elapsed=seconds|limit=seconds</c>. Keys that this version
-        /// does not know are skipped, so an older build can still read a newer save.
+        /// Reads the session line: <c>session|elapsed=seconds|limit=seconds|rules=id</c>. Keys that this
+        /// version does not know are skipped, so an older build can still read a newer save.
         /// </summary>
-        private static SessionInfo ParseSession(string line, int number)
+        private void ParseSessionLine(string line, int number)
         {
             var elapsed = GameSession.DefaultTimeLimit;
             var limit = GameSession.DefaultTimeLimit;
@@ -221,11 +229,21 @@ namespace Mahjong.Replay
             {
                 var parts = field.Split('=', 2);
                 if (parts.Length != 2) continue;
-                if (!double.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture,
-                        out var seconds) || seconds < 0)
-                    throw new FormatException($"line {number}: '{parts[1]}' is not a number of seconds");
 
-                switch (parts[0].Trim())
+                var key = parts[0].Trim();
+                var text = parts[1].Trim();
+
+                if (key == "rules")
+                {
+                    if (!string.IsNullOrWhiteSpace(text)) Variant = RuleVariant.Parse(text);
+                    continue;
+                }
+
+                if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture,
+                        out var seconds) || seconds < 0)
+                    throw new FormatException($"line {number}: '{text}' is not a number of seconds");
+
+                switch (key)
                 {
                     case "elapsed":
                         elapsed = TimeSpan.FromSeconds(seconds);
@@ -239,7 +257,7 @@ namespace Mahjong.Replay
 
             if (!sawElapsed)
                 throw new FormatException($"line {number}: the session line has no elapsed time");
-            return new SessionInfo(elapsed, limit);
+            Info = new SessionInfo(elapsed, limit);
         }
 
         private static HandRecord ParseHand(string line, int number)

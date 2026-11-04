@@ -298,7 +298,7 @@ namespace Mahjong.Unity
             bots = CreateBots(settings.Level);
 
             BuildScene();
-            session = new GameSession(SessionTimeLimit());
+            session = new GameSession(SessionTimeLimit(), settings.Variant);
             if (!ResumeFromEnvironment()) StartHand(new System.Random(randomSeed).Next());
         }
 
@@ -1107,6 +1107,7 @@ namespace Mahjong.Unity
             if (moveLog.IsEmpty) return string.Empty;
             // The clock is stamped at the save, so a resumed game lands on the same minute of the session.
             moveLog.Info = new SessionLog.SessionInfo(session.Elapsed, session.TimeLimit);
+            moveLog.Variant = session.Variant;
             try
             {
                 // The path is worked out on every save: MAHJONG_SAVE may be set after the game started,
@@ -1948,7 +1949,8 @@ namespace Mahjong.Unity
                     session.Scores.Select((score, player) => $"P{player + 1}={score}"))),
                 Loc.Format("hud.clock", Clock(session.Elapsed), Clock(session.TimeLimit))
                 + (session.IsTimeUp ? "  " + Loc.Get("hud.timeUp")
-                    : session.IsFinalQuarterHour ? "  " + Loc.Get("hud.lastQuarter") : string.Empty)
+                    : session.IsFinalQuarterHour ? "  " + Loc.Get("hud.lastQuarter") : string.Empty),
+                Loc.Format("hud.rules", Text.VariantName(session.Variant))
             };
 
             // The key list lives in the menu hint and in the rulebook: on the HUD it was the widest
@@ -1981,6 +1983,11 @@ namespace Mahjong.Unity
             var breakdown = result != null && result.Score.IsValidWin
                 ? Text.ScoreSummary(result)
                 : settlement.Explanation;
+
+            // The classic table is paid by four combinations and a mutual settlement, so the result
+            // screen shows those numbers instead of a fan list: the same line cannot serve both.
+            if (settlement.Classic != null && result != null)
+                breakdown = Text.ClassicSettlementSummary(result, settlement);
 
             return $"{winner}\n{breakdown}\n{Loc.Format("result.paid", settlement.TotalPaid)}";
         }

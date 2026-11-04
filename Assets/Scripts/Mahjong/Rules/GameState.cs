@@ -44,6 +44,15 @@ namespace Mahjong.Rules
         private readonly Dictionary<int, LegalAction> claimResponses = new();
         private readonly Dictionary<int, string> winForbidden = new();
 
+        /// <summary>
+        /// The rules this hand is played by. The state machine itself is the same for every profile;
+        /// the profile only decides where the wall ends, which scorer prices the hand and whether a
+        /// win needs a minimum of points.
+        /// </summary>
+        public GameState(RuleVariant? variant = null) => Variant = variant ?? RuleVariant.Default;
+
+        public RuleVariant Variant { get; }
+
         private (int Player, Tile Tile)? pendingDiscard;
         private (int Player, Tile Tile)? robbery;
         private bool claimedThisTurn;
@@ -106,7 +115,7 @@ namespace Mahjong.Rules
             CurrentPlayer = dealer;
             RoundWind = roundWind;
             var random = seed.HasValue ? new Random(seed.Value) : new Random();
-            Wall = Wall.CreateShuffled(random);
+            Wall = Wall.CreateShuffled(random, Variant.DeadWallTiles, Variant.FreeTiles);
 
             DealerRoll = Dice.Roll(random);
             DiceThrower = (dealer + Dice.ThrowerOffset(DealerRoll.Sum)) % 4;
@@ -157,7 +166,7 @@ namespace Mahjong.Rules
                 foreach (var flower in hand.TakeConcealedFlowers())
                 {
                     hand.AddFlower(flower);
-                    if (Wall.IsExhausted) return;
+                    if (!Wall.CanReplace) return;
                     hand.AddConcealed(ResolveFlowerChain(Wall.DrawReplacement()));
                 }
             }
@@ -169,7 +178,7 @@ namespace Mahjong.Rules
             while (tile.IsFlower)
             {
                 hand.AddFlower(tile);
-                if (Wall.IsExhausted) throw new InvalidOperationException("The wall ran out while replacing flowers.");
+                if (!Wall.CanReplace) throw new InvalidOperationException("The wall ran out while replacing flowers.");
                 tile = Wall.DrawReplacement();
             }
             return tile;
@@ -217,7 +226,7 @@ namespace Mahjong.Rules
                         $"Declare Hu for {win.TotalPoints} points", win.TotalPoints));
             }
 
-            if (!claimedThisTurn && !Wall.IsExhausted)
+            if (!claimedThisTurn && Wall.CanReplace)
             {
                 foreach (var group in hand.Concealed.GroupBy(t => t.Type).Where(g => g.Count() == 4))
                 {
@@ -375,7 +384,7 @@ namespace Mahjong.Rules
             {
                 hand.AddFlower(tile);
                 source = ClaimSource.FlowerReplacement;
-                if (Wall.IsExhausted) { FinishDraw(); return; }
+                if (!Wall.CanReplace) { FinishDraw(); return; }
                 tile = Wall.DrawReplacement();
             }
 
@@ -590,14 +599,14 @@ namespace Mahjong.Rules
 
         private void DrawReplacementForCurrentPlayer()
         {
-            if (Wall.IsExhausted) { FinishDraw(); return; }
+            if (!Wall.CanReplace) { FinishDraw(); return; }
 
             var hand = Players[CurrentPlayer];
             var tile = Wall.DrawReplacement();
             while (tile.IsFlower)
             {
                 hand.AddFlower(tile);
-                if (Wall.IsExhausted) { FinishDraw(); return; }
+                if (!Wall.CanReplace) { FinishDraw(); return; }
                 tile = Wall.DrawReplacement();
             }
 
@@ -624,7 +633,7 @@ namespace Mahjong.Rules
         public ScoreResult EvaluateWin(int player, PlayerHand hand, TileType? winningTile, ClaimSource source,
             bool lastTileOfWall, bool lastDiscard, bool robbedKong = false, bool winningTileInHand = false)
         {
-            return Scoring.Evaluate(new ScoringContext
+            return Variant.Score(new ScoringContext
             {
                 Hand = hand,
                 WinningTile = winningTile,
