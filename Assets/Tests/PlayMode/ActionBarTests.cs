@@ -134,6 +134,8 @@ namespace Mahjong.PlayTests
         {
             var game = Object.FindAnyObjectByType<MahjongGame>();
             if (game == null) game = new GameObject("MahjongTestHost").AddComponent<MahjongGame>();
+            // The welcome screen holds the table at launch; a test of the table starts its own game.
+            game.SkipWelcome();
 
             var previousScale = Time.timeScale;
             Time.timeScale = 6f;

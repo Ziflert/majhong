@@ -45,8 +45,40 @@ namespace Mahjong.Unity
         /// <summary>Distance between two neighbouring tiles of a hand or a discard row.</summary>
         public const float TilePitch = 0.062f;
 
-        /// <summary>Where the melds of a seat stand: inside the wall, in front of the player.</summary>
-        public const float MeldDistance = WallCenter - 0.21f;
+        /// <summary>
+        /// Pitch inside one exposed meld. Wider than a hand: a claimed tile is turned sideways and lies
+        /// along the row, so it is 0.072 long instead of 0.052 and used to run into its neighbours (У-3).
+        /// </summary>
+        public const float MeldPitch = 0.070f;
+
+        /// <summary>Gap between two melds of the same seat, so a player can see where one ends.</summary>
+        public const float MeldGap = 0.032f;
+
+        /// <summary>How far one meld reaches along its row: four tiles at the meld pitch and the gap after them.</summary>
+        public const float MeldSpan = 3f * MeldPitch + TileObject.Length + MeldGap;
+
+        /// <summary>
+        /// Where the melds of a seat stand: inside the wall, between the discards and the wall, where a
+        /// player puts his own open combos and sees everybody else's.
+        /// </summary>
+        public const float MeldDistance = 0.55f;
+
+        /// <summary>Where the flowers of a seat lie: outside the melds, inside the wall.</summary>
+        public const float FlowerDistance = MeldDistance + 0.080f;
+
+        /// <summary>Discards stand in blocks of six, as on a real table.</summary>
+        public const int DiscardsPerRow = 6;
+
+        /// <summary>
+        /// Distance from the middle of the table to the first row of a seat's discards. It clears a
+        /// block of six (0.181 wide half-way out) plus the length of a tile: at 0.18 the two corner
+        /// tiles of neighbouring seats were lying on top of each other.
+        /// </summary>
+        public const float DiscardNear = TileObject.Length * 0.5f + (DiscardsPerRow - 1) * 0.5f * TilePitch
+                                         + TileObject.Width * 0.5f + 0.008f;
+
+        /// <summary>Distance between two rows of the same discard block: a tile long and a little air.</summary>
+        public const float DiscardRowPitch = TileObject.Length + 0.008f;
 
         /// <summary>Where the seat plates stand: outside the felt, so they never cover a tile.</summary>
         public const float PlateDistance = FeltHalf + 0.02f;
@@ -84,9 +116,10 @@ namespace Mahjong.Unity
         /// <summary>Centre of one tile of a seat's meld row, which stands inside the wall.</summary>
         public static Vector3 MeldPosition(int seat, int index, int tileIndex)
         {
-            // Melds line up side by side along the seat's own row, one tile apart from each other.
-            var spread = index * (TilePitch * 4.6f - TilePitch) + tileIndex * TilePitch;
-            return RowPosition(seat, 0, MeldDistance) + RowDirection(seat) * spread;
+            // Melds line up side by side along the seat's own row, each one a span apart from the next,
+            // and the tiles inside one meld keep a pitch wide enough for the sideways claimed tile.
+            var along = index * MeldSpan + tileIndex * MeldPitch;
+            return RowStart(seat, MeldDistance) + RowUnit(seat) * along;
         }
 
         /// <summary>
@@ -95,24 +128,27 @@ namespace Mahjong.Unity
         /// </summary>
         public static Vector3 FlowerPosition(int seat, int index)
         {
-            var start = RowPosition(seat, 0, WallCenter - 0.105f);
-            return start + RowDirection(seat) * (WallGeometry.StacksPerSide - 1 - index);
+            var along = (WallGeometry.StacksPerSide - 1 - index) * TilePitch;
+            return RowStart(seat, FlowerDistance) + RowUnit(seat) * along;
         }
 
         /// <summary>Centre of one tile of a seat's discard block: rows of six, as on a real table.</summary>
         public static Vector3 DiscardPosition(int seat, int index)
         {
-            const int perRow = 6;
-            var column = index % perRow;
-            var row = index / perRow;
-            var inward = 0.10f + row * TilePitch * 1.25f;
-            var spread = (column - (perRow - 1) * 0.5f) * TilePitch;
+            var column = index % DiscardsPerRow;
+            var row = index / DiscardsPerRow;
+
+            // The first row stands clear of the middle and of its two neighbours: a block is six tiles
+            // wide, and the corners used to meet, so the last tile of one seat lay on top of the first
+            // of the next (У-3).
+            var distance = DiscardNear + row * DiscardRowPitch;
+            var spread = (column - (DiscardsPerRow - 1) * 0.5f) * TilePitch;
             return seat switch
             {
-                0 => new Vector3(spread, TileY, -inward - 0.08f),
-                2 => new Vector3(-spread, TileY, inward + 0.08f),
-                3 => new Vector3(-inward - 0.08f, TileY, -spread),
-                _ => new Vector3(inward + 0.08f, TileY, spread)
+                0 => new Vector3(spread, TileY, -distance),
+                2 => new Vector3(-spread, TileY, distance),
+                3 => new Vector3(-distance, TileY, -spread),
+                _ => new Vector3(distance, TileY, spread)
             };
         }
 
@@ -137,17 +173,20 @@ namespace Mahjong.Unity
             _ => new Vector3(0f, 0f, TilePitch)
         };
 
-        /// <summary>Centre of the tile at <paramref name="index"/> in a row that lies <paramref name="distance"/> from the middle.</summary>
-        private static Vector3 RowPosition(int seat, int index, float distance)
+        /// <summary>The same direction, in metres: what a distance along the row is multiplied by.</summary>
+        private static Vector3 RowUnit(int seat) => RowDirection(seat) / TilePitch;
+
+        /// <summary>First tile of a row that lies <paramref name="distance"/> from the middle of the table.</summary>
+        private static Vector3 RowStart(int seat, float distance) => seat switch
         {
-            var start = seat switch
-            {
-                0 => new Vector3(HandRowStart, TileY, -distance),
-                2 => new Vector3(-HandRowStart, TileY, distance),
-                3 => new Vector3(-distance, TileY, -HandRowStart),
-                _ => new Vector3(distance, TileY, HandRowStart)
-            };
-            return start + RowDirection(seat) * index;
-        }
+            0 => new Vector3(HandRowStart, TileY, -distance),
+            2 => new Vector3(-HandRowStart, TileY, distance),
+            3 => new Vector3(-distance, TileY, -HandRowStart),
+            _ => new Vector3(distance, TileY, HandRowStart)
+        };
+
+        /// <summary>Centre of the tile at <paramref name="index"/> in a row that lies <paramref name="distance"/> from the middle.</summary>
+        private static Vector3 RowPosition(int seat, int index, float distance) =>
+            RowStart(seat, distance) + RowDirection(seat) * index;
     }
 }

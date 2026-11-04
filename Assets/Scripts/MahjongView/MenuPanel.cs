@@ -23,9 +23,9 @@ namespace Mahjong.Unity
         private const float FrameShare = 0.92f;
 
         private const float RowWidth = 0.44f;
-        private const float RowHeight = 0.020f;
-        private const float RowStep = 0.0235f;
-        private const float FirstRowY = 0.068f;
+        private const float RowHeight = 0.019f;
+        private const float RowStep = 0.0205f;
+        private const float FirstRowY = 0.082f;
 
         private static readonly Color PanelColour = new(0.06f, 0.08f, 0.10f, 0.96f);
         private static readonly Color RowColour = new(0.13f, 0.16f, 0.19f);

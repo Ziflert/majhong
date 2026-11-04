@@ -20,6 +20,8 @@ namespace Mahjong.PlayTests
         {
             var game = Object.FindAnyObjectByType<MahjongGame>();
             if (game == null) game = new GameObject("MahjongInterfaceTestHost").AddComponent<MahjongGame>();
+            // The welcome screen holds the table at launch; a test of the table starts its own game.
+            game.SkipWelcome();
             return game;
         }
 

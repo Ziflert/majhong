@@ -17,7 +17,10 @@ namespace Mahjong.PlayTests
         private static MahjongGame Game()
         {
             var game = Object.FindAnyObjectByType<MahjongGame>();
-            return game != null ? game : new GameObject("MahjongMotionHost").AddComponent<MahjongGame>();
+            if (game == null) game = new GameObject("MahjongMotionHost").AddComponent<MahjongGame>();
+            // The welcome screen holds the table at launch; a test of tile motion starts its own game.
+            game.SkipWelcome();
+            return game;
         }
 
         private static TileObject[] Tiles() => Object.FindObjectsByType<TileObject>(FindObjectsSortMode.None);

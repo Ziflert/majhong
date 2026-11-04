@@ -21,7 +21,10 @@ namespace Mahjong.PlayTests
         private static MahjongGame Game()
         {
             var game = UnityEngine.Object.FindAnyObjectByType<MahjongGame>();
-            return game != null ? game : new GameObject("MahjongReplayTestHost").AddComponent<MahjongGame>();
+            if (game == null) game = new GameObject("MahjongReplayTestHost").AddComponent<MahjongGame>();
+            // The welcome screen holds the table at launch; a test of the replay starts its own game.
+            game.SkipWelcome();
+            return game;
         }
 
         /// <summary>

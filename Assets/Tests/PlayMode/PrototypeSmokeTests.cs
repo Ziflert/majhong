@@ -20,6 +20,8 @@ namespace Mahjong.PlayTests
         {
             var game = Object.FindAnyObjectByType<MahjongGame>();
             if (game == null) game = new GameObject("MahjongTestHost").AddComponent<MahjongGame>();
+            // The welcome screen holds the table at launch; a test of the table starts its own game.
+            game.SkipWelcome();
 
             // one frame for Start(), one more for the first Update()
             yield return null;
@@ -114,6 +116,8 @@ namespace Mahjong.PlayTests
             var previousScale = Time.timeScale;
             var game = Object.FindAnyObjectByType<MahjongGame>();
             if (game == null) game = new GameObject("MahjongTestHost").AddComponent<MahjongGame>();
+            // The welcome screen holds the table at launch; a test of the table starts its own game.
+            game.SkipWelcome();
 
             // botDelay is 0.45 s per action; speed time up so several turns happen quickly
             Time.timeScale = 6f;

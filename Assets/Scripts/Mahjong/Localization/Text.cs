@@ -226,6 +226,71 @@ namespace Mahjong.Localization
         }
 
         /// <summary>
+        /// Who pays whom in one line: "Payments: player 3 → player 2: 32  player 4 → player 2: 32".
+        /// The classic table prints its own transfer list, so this is the sports wording.
+        /// </summary>
+        public static string PaymentSummary(Settlement settlement)
+        {
+            var transfers = string.Join("  ", settlement.Payments.Select(payment =>
+                Loc.Format("result.payment", payment.FromPlayer + 1, payment.ToPlayer + 1, payment.Points)));
+            return Loc.Format("result.payments", transfers);
+        }
+
+        /// <summary>
+        /// The end-of-hand screen: who won, what the hand was worth and how it was paid, the points
+        /// after the hand and — after the fourth hand of a round or the sixteenth of the session —
+        /// where the players stand. Assembled here so the panel only draws what it is given.
+        /// </summary>
+        public static HandResultContent HandResult(GameSession session, int humanSeat)
+        {
+            var settlement = session.LastSettlement ?? Settlements.ForDraw();
+            var result = session.State?.Result;
+            var lines = new List<string>();
+
+            var title = settlement.WinnerPlayer < 0
+                ? Loc.Get("result.draw")
+                : settlement.WinnerPlayer == humanSeat
+                    ? Loc.Get("result.youWin")
+                    : Loc.Format("result.playerWins", settlement.WinnerPlayer + 1);
+
+            if (settlement.Classic != null && result != null)
+                lines.Add(ClassicSettlementSummary(result, settlement));
+            else if (result != null && result.Score.IsValidWin)
+                lines.Add(ScoreSummary(result));
+            else
+                lines.Add(settlement.Explanation);
+
+            // The classic summary carries the transfers of section IV itself; the sports table has to
+            // list them here, because its own result line only says what the hand was worth.
+            if (settlement.Payments.Count > 0 && settlement.Classic == null)
+                lines.Add(PaymentSummary(settlement));
+
+            if (settlement.Payments.Count > 0)
+                lines.Add(Loc.Format("result.paid", settlement.TotalPaid));
+
+            lines.Add(Loc.Format("result.scores", string.Join("  ",
+                session.Scores.Select((score, player) => $"P{player + 1}={score}"))));
+
+            var standings = new List<string>();
+            if (session.IsFinished)
+            {
+                standings.AddRange(Lines(Standings(session.Standings(), humanSeat)));
+            }
+            else if (session.HandsPlayed > 0 && session.HandsPlayed % GameSession.HandsPerRound == 0)
+            {
+                var roundWind = (Wind)((session.HandsPlayed - 1) / GameSession.HandsPerRound);
+                standings.Add(Loc.Format("result.roundEnd", WindName(roundWind)));
+                // The header of the final table would read as the end of the session; the round line
+                // above says which round it is instead.
+                standings.AddRange(Lines(Standings(session.Standings(), humanSeat)).Skip(1));
+            }
+
+            return new HandResultContent(title, lines, standings, !session.IsFinished);
+        }
+
+        private static IEnumerable<string> Lines(string text) => text.Split('\n');
+
+        /// <summary>
         /// The final table of a session: place, seat, game points and table points, with a mark for a
         /// shared place and for a player who did not turn up. English keeps the engine wording.
         /// </summary>

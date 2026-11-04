@@ -6,6 +6,14 @@ using UnityEngine;
 
 namespace Mahjong.Unity
 {
+    /// <summary>What a key did to the rulebook: nothing, one page turned, or the book should close.</summary>
+    public enum RulesKey
+    {
+        None = 0,
+        Turned = 1,
+        Close = 2
+    }
+
     /// <summary>
     /// The rulebook inside the game: a flat panel hanging in front of the camera with one page of
     /// <see cref="RulesBook"/> at a time. The pages are the Russian text from the rules translation,
@@ -222,26 +230,33 @@ namespace Mahjong.Unity
             if (rest.Length > 0) yield return rest;
         }
 
-        /// <summary>Reads the panel keys; true when the key was used, so the caller stops handling it.</summary>
-        public bool HandleKeys()
+        /// <summary>
+        /// Reads the panel keys. "Used" and "close" are different answers: an arrow turns a page, and
+        /// the panel must stay open afterwards — the old single boolean read every key as "close",
+        /// so a page turned with an arrow also shut the book and the next R opened a later page (У-5).
+        /// </summary>
+        public RulesKey HandleKeys()
         {
-            if (!IsOpen) return false;
+            if (!IsOpen) return RulesKey.None;
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.PageUp)
-                || Input.GetKeyDown(KeyCode.A))
+            // Both pairs of arrows turn pages: a player who reads a book reaches for either one.
+            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.UpArrow)
+                || Input.GetKeyDown(KeyCode.PageUp) || Input.GetKeyDown(KeyCode.A))
             {
                 Turn(-1);
-                return true;
+                return RulesKey.Turned;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.PageDown)
-                || Input.GetKeyDown(KeyCode.D))
+            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.DownArrow)
+                || Input.GetKeyDown(KeyCode.PageDown) || Input.GetKeyDown(KeyCode.D))
             {
                 Turn(1);
-                return true;
+                return RulesKey.Turned;
             }
 
-            return Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.R);
+            return Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.R)
+                ? RulesKey.Close
+                : RulesKey.None;
         }
 
         /// <summary>Titles of the pages, for tests and for a table of contents later.</summary>

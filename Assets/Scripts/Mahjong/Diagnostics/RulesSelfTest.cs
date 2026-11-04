@@ -92,6 +92,7 @@ namespace Mahjong.Rules.Diagnostics
             MenuGroups(report);
             OpeningGroups(report);
             VariantGroups(report);
+            TitleGroups(report);
 
             return report;
         }

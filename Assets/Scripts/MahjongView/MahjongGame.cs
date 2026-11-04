@@ -26,6 +26,13 @@ namespace Mahjong.Unity
         [SerializeField] [Range(1, 3)] private int botLevel = 3;
 
         /// <summary>
+        /// Whether the welcome screen takes the frame at launch (У-2). A capture run turns it off with
+        /// MAHJONG_TITLE=0, and a play-mode test that needs a live table calls <see cref="SkipWelcome"/>
+        /// before the first frame, because the table is built in Start.
+        /// </summary>
+        [SerializeField] private bool welcomeScreen = true;
+
+        /// <summary>
         /// The HUD line. Exposed so tests and tools can read the state of the table without a screen;
         /// the mesh itself is parented to the camera and is not part of the game object hierarchy.
         /// </summary>
@@ -46,6 +53,18 @@ namespace Mahjong.Unity
         /// <summary>The menu model: rows, cursor, what a step and a pick mean. Exposed for tests.</summary>
         public GameMenu Menu => gameMenu;
 
+        /// <summary>The end-of-hand screen (У-7). Exposed for tests and tools.</summary>
+        public ResultPanel ResultPanel => resultPanel;
+
+        /// <summary>The result screen model: what it says, how long it waits, when it is over.</summary>
+        public ResultScreen Result => resultScreen;
+
+        /// <summary>True while a finished hand is still on the screen and the next one has not been dealt.</summary>
+        public bool IsResultOpen => resultScreen.IsOpen;
+
+        /// <summary>Seat of the human; the result screen names the winner in this seat's words.</summary>
+        public int HumanSeat => humanSeat;
+
         /// <summary>True while the menu holds the table and the hand is paused.</summary>
         public bool IsMenuOpen => menu != null && menu.IsOpen;
 
@@ -63,6 +82,18 @@ namespace Mahjong.Unity
 
         /// <summary>File the session was last written to; empty until the first save.</summary>
         public string LastSavePath => sessionSavePath ?? string.Empty;
+
+        /// <summary>True while the welcome screen holds the table: no hand has been dealt yet (У-2).</summary>
+        public bool IsTitleOpen => titleOpen;
+
+        /// <summary>The welcome screen model: its rows, its two pages and what a pick means.</summary>
+        public TitleScreen Title => titleScreen;
+
+        /// <summary>The welcome screen as it stands on the screen. Exposed for tests and tools.</summary>
+        public TitlePanel TitlePanel => titlePanel;
+
+        /// <summary>The session of the table: points, penalties, the deals and the hand being played.</summary>
+        public GameSession Session => session;
 
         /// <summary>Game points of the four seats, as the score sheet has them. Exposed for tests.</summary>
         public IReadOnlyList<int> Scores => session?.Scores ?? new int[4];
@@ -101,6 +132,12 @@ namespace Mahjong.Unity
 
         /// <summary>How many tiles lie in the discard piles; a timed-out turn adds one.</summary>
         public int DiscardTileCount => session?.State?.Discards.Count ?? 0;
+
+        /// <summary>How many melds are open on the table, all four seats together (У-3).</summary>
+        public int OpenMeldCount => session?.State?.Players.Sum(player => player.Melds.Count) ?? 0;
+
+        /// <summary>How many melds the human has declared; the table shows them in its own row.</summary>
+        public int HumanMeldCount => session?.State?.Players[humanSeat].Melds.Count ?? 0;
 
         /// <summary>Tile objects on the scored table: the human hand, the melds, the piles and the backs.</summary>
         public int TableTileCount => tilesById.Count;
@@ -243,6 +280,8 @@ namespace Mahjong.Unity
         private ActionBar bar = null!;
         private RulesPanel rules = null!;
         private MenuPanel menu = null!;
+        private ResultPanel resultPanel = null!;
+        private readonly ResultScreen resultScreen = new();
         private FreePlayTable free = null!;
         private Transform table = null!;
         private Transform board = null!;
@@ -256,6 +295,12 @@ namespace Mahjong.Unity
         private bool replayOpen;
         private GameSettings settings = null!;
         private GameMenu gameMenu = null!;
+
+        /// <summary>The welcome screen: the way into a game, a save and the settings (У-2).</summary>
+        private TitleScreen titleScreen = null!;
+        private TitlePanel titlePanel = null!;
+        private bool titleOpen;
+
         private BotLevel botsLevel;
         private string sessionSavePath;
 
@@ -264,10 +309,9 @@ namespace Mahjong.Unity
         private float statusNoteUntil;
 
         /// <summary>Names the save file of this session; fixed at the start so every save overwrites it.</summary>
-        private readonly string sessionStamp = System.DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        private string sessionStamp = System.DateTime.Now.ToString("yyyyMMdd-HHmmss");
 
         private float nextBotAction;
-        private float nextHandAt;
         private bool waitingForNextHand;
 
         /// <summary>Bumped on every engine action; a new value means a new decision and a new clock window.</summary>
@@ -299,6 +343,15 @@ namespace Mahjong.Unity
 
             BuildScene();
             session = new GameSession(SessionTimeLimit(), settings.Variant);
+
+            // The game opens on the welcome screen (У-2). MAHJONG_TITLE=0 deals the first hand straight
+            // away, which is what a capture run and a scripted check want.
+            if (welcomeScreen && TitleFromEnvironment())
+            {
+                OpenTitle();
+                return;
+            }
+
             if (!ResumeFromEnvironment()) StartHand(new System.Random(randomSeed).Next());
         }
 
@@ -423,6 +476,8 @@ namespace Mahjong.Unity
             bar = ActionBar.Create(camera.transform);
             rules = RulesPanel.Create(camera.transform);
             menu = MenuPanel.Create(camera.transform);
+            titlePanel = TitlePanel.Create(camera.transform);
+            resultPanel = Mahjong.Unity.ResultPanel.Create(camera.transform);
             free = FreePlayTable.Create(board, randomSeed);
             dice = DiceTray.Create(board);
             breakMarker = BuildBreakMarker();
@@ -520,6 +575,7 @@ namespace Mahjong.Unity
             waitingForNextHand = false;
             humanDiscardedThisHand = false;
             resultPresented = false;
+            CloseResultScreen();
             stateVersion++;
             claimCheckVersion = -1;
             clock.Stop();
@@ -532,7 +588,15 @@ namespace Mahjong.Unity
 
         private void Update()
         {
-            if (session.State == null) return;
+            // The welcome screen owns the table until the player starts or loads a game.
+            if (titleOpen)
+            {
+                HandleTitleInput();
+                SyncInterfaceVisibility();
+                return;
+            }
+
+            if (session?.State == null) return;
 
             FaceSeatPlates(Camera.main != null ? Camera.main.transform : transform);
             SyncInterfaceVisibility();
@@ -573,19 +637,17 @@ namespace Mahjong.Unity
                 if (!waitingForNextHand)
                 {
                     waitingForNextHand = true;
-                    nextHandAt = Time.time + 3f;
                     ClosePrompt();
                     StopClock();
                     session.CompleteHand();
                     PresentResult();
                     SaveReplay();
+                    return;
                 }
-                else if (Time.time >= nextHandAt)
-                {
-                    if (session.IsFinished)
-                        status.text = Loc.Get("session.complete") + "\n" + Text.Standings(session.Standings(), humanSeat);
-                    else StartHand(new System.Random().Next());
-                }
+
+                // The result screen holds the table (У-7). The wait is ticked here and nowhere else, so
+                // the menu, the rulebook, the review and the free table pause it together with the hand.
+                if (resultScreen.Tick(Time.deltaTime)) NextHand();
                 return;
             }
 
@@ -624,6 +686,24 @@ namespace Mahjong.Unity
                 return true;
             }
 
+            // The next hand is a decision of its own: Enter, space or the button under the numbers.
+            // The keys below still work, so a player can read a rule or open the menu first.
+            if (resultScreen.IsOpen && resultScreen.CanContinue)
+            {
+                if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)
+                    || Input.GetKeyDown(KeyCode.Space))
+                {
+                    NextHand();
+                    return true;
+                }
+
+                if (Input.GetMouseButtonDown(0) && resultPanel.TryPick(MouseRay()))
+                {
+                    NextHand();
+                    return true;
+                }
+            }
+
             if (Input.GetKeyDown(KeyCode.L))
             {
                 ToggleLanguage();
@@ -632,7 +712,8 @@ namespace Mahjong.Unity
 
             if (rules.IsOpen)
             {
-                if (rules.HandleKeys()) rules.Close();
+                // A turned page is not a closed book: the arrows only page through (У-5).
+                if (rules.HandleKeys() == RulesKey.Close) rules.Close();
                 return true;
             }
 
@@ -725,6 +806,7 @@ namespace Mahjong.Unity
             if (replayOpen) status.text = DescribeReplay();
             else if (free.IsOpen) status.text = free.StatusText();
             else RefreshStatus();
+            RefreshResultTexts();
             return Loc.Current;
         }
 
@@ -747,6 +829,157 @@ namespace Mahjong.Unity
             status.text = DescribeState();
         }
 
+        // ---------------------------------------------------------------- title
+
+        /// <summary>
+        /// The welcome screen is the way the game starts. MAHJONG_TITLE=0 turns it off so a capture run
+        /// or a scripted check deals the first hand straight away, the way every earlier build did.
+        /// </summary>
+        private static bool TitleFromEnvironment()
+        {
+            var raw = System.Environment.GetEnvironmentVariable("MAHJONG_TITLE");
+            if (string.IsNullOrWhiteSpace(raw)) return true;
+            return raw.Trim().ToLowerInvariant() is not ("0" or "false" or "no" or "off");
+        }
+
+        /// <summary>
+        /// Opens the game without the welcome screen: a capture run, a tool or a play-mode test that
+        /// needs a live table calls this, and it does exactly what picking "new game" does. Called
+        /// before the first frame it only sets the flag, because the table is built in Start.
+        /// </summary>
+        public void SkipWelcome()
+        {
+            welcomeScreen = false;
+            if (titleOpen) StartNewGame(new System.Random(randomSeed).Next());
+        }
+
+        /// <summary>Opens the welcome screen with the saved games of the player's folder (У-2).</summary>
+        public void OpenTitle()
+        {
+            titleOpen = true;
+            titleScreen = new TitleScreen(settings, SaveSlots.Scan(SaveDirectory()));
+            titlePanel.SetOpen(true);
+            titlePanel.Refresh(titleScreen);
+            ClosePrompt();
+            StopClock();
+            bar.Hide();
+            SyncInterfaceVisibility();
+        }
+
+        /// <summary>Puts the welcome screen away so the table takes the frame.</summary>
+        public void CloseTitle()
+        {
+            titleOpen = false;
+            if (titlePanel != null) titlePanel.SetOpen(false);
+        }
+
+        /// <summary>Moves the cursor through the rows of the welcome screen; the selection wraps.</summary>
+        public void TitleMove(int rows)
+        {
+            if (!titleOpen) return;
+            titleScreen.Move(rows);
+            titlePanel.Refresh(titleScreen);
+        }
+
+        /// <summary>Steps the setting under the cursor and puts it into effect at once.</summary>
+        public bool TitleAdjust(int delta)
+        {
+            if (!titleOpen) return false;
+            var changed = titleScreen.Adjust(delta);
+            if (changed)
+            {
+                ApplySettings();
+                titlePanel.Refresh(titleScreen);
+            }
+            return changed;
+        }
+
+        /// <summary>Picks the row under the cursor: a setting steps, a command opens its screen.</summary>
+        public void TitleActivate()
+        {
+            if (!titleOpen) return;
+            var command = titleScreen.Activate();
+            ApplySettings();
+            titlePanel.Refresh(titleScreen);
+
+            switch (command)
+            {
+                case TitleCommand.NewGame:
+                    StartNewGame(new System.Random(randomSeed).Next());
+                    break;
+                case TitleCommand.Continue:
+                case TitleCommand.LoadSave:
+                    if (!ResumeSavedSession(titleScreen.PendingSave))
+                    {
+                        // The save would not load: the screen stays, with the reason under the rows.
+                        titleScreen.SetStatus(Loc.Get("title.save.broken"));
+                        titlePanel.Refresh(titleScreen);
+                    }
+                    break;
+                case TitleCommand.Rules:
+                    rules.SetOpen(true);
+                    break;
+                case TitleCommand.Quit:
+                    QuitGame();
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Deals the first hand of a fresh session with the settings chosen on the welcome screen.
+        /// Points, penalties, the move log and the name of the save file all start over.
+        /// </summary>
+        public void StartNewGame(int seed)
+        {
+            CloseTitle();
+            session = new GameSession(SessionTimeLimit(), settings.Variant);
+            moveLog = new SessionLog();
+            sessionSavePath = null;
+            sessionStamp = System.DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            StartHand(seed);
+            SyncInterfaceVisibility();
+        }
+
+        /// <summary>Leaves the game; the session is written out first, as it is on any other exit.</summary>
+        public void QuitGame()
+        {
+            SaveReplay();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+        }
+
+        /// <summary>Keys and clicks of the welcome screen; the row actions are public, so a test drives them.</summary>
+        private void HandleTitleInput()
+        {
+            // The rulebook opened from the welcome screen closes back to it, not to a hand nobody dealt.
+            if (rules.IsOpen)
+            {
+                if (rules.HandleKeys() == RulesKey.Close) rules.Close();
+                return;
+            }
+
+            if (Input.GetKeyDown(KeyCode.UpArrow)) TitleMove(-1);
+            else if (Input.GetKeyDown(KeyCode.DownArrow)) TitleMove(1);
+            else if (Input.GetKeyDown(KeyCode.LeftArrow)) TitleAdjust(-1);
+            else if (Input.GetKeyDown(KeyCode.RightArrow)) TitleAdjust(1);
+            else if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+                TitleActivate();
+            else if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                // Back from the list of saves, and out of the game from the main page.
+                if (!titleScreen.Back()) QuitGame();
+                else titlePanel.Refresh(titleScreen);
+            }
+            else if (Input.GetMouseButtonDown(0) && titlePanel.TryPick(MouseRay(), out var row))
+            {
+                TitleMove(row - titleScreen.Index);
+                TitleActivate();
+            }
+        }
+
         /// <summary>
         /// Keeps whatever the interface is showing consistent with what is on the screen, every frame.
         /// It is done from the state of the two panels rather than from the key handler, so a panel
@@ -757,15 +990,33 @@ namespace Mahjong.Unity
             var rulesOpen = rules.IsOpen;
             var freeOpen = free.IsOpen;
             var menuOpen = menu != null && menu.IsOpen;
+            var welcomeOpen = titleOpen;
+
+            // The rulebook can be read before a game is started: it is drawn over the welcome screen and
+            // the rows step aside, the same way they do for the menu.
+            if (titlePanel != null && titlePanel.IsOpen != (welcomeOpen && !rulesOpen))
+                titlePanel.SetOpen(welcomeOpen && !rulesOpen);
+
+            // A finished hand stays on the result screen until the next deal, but the pages that pause
+            // the table are drawn over it: two dark panels on the same plane read as one broken panel.
+            var resultOpen = resultScreen.IsOpen && !rulesOpen && !menuOpen && !freeOpen && !replayOpen;
+            if (resultPanel != null && resultPanel.IsOpen != resultOpen) resultPanel.SetOpen(resultOpen);
 
             // The page covers the middle of the screen; a HUD drawn over it reads as two texts in
-            // the same place.
-            var hudWanted = !rulesOpen && !menuOpen;
+            // the same place. The result screen fills that middle as well and carries the numbers a
+            // player would look for in the HUD.
+            // The HUD is a text mesh on a dark plate of its own: hiding the text alone leaves the plate
+            // in the corner of the frame, over whatever page the player is reading.
+            var hudWanted = !rulesOpen && !menuOpen && !resultOpen && !welcomeOpen;
             if (status != null && status.gameObject.activeSelf != hudWanted)
                 status.gameObject.SetActive(hudWanted);
+            if (hudPlate != null && hudPlate.gameObject.activeSelf != hudWanted)
+                hudPlate.gameObject.SetActive(hudWanted);
 
-            // Wind plates belong to the scored table.
-            var platesWanted = !rulesOpen && !freeOpen && !menuOpen;
+            // Wind plates belong to the scored table. The result screen is a page over the table as
+            // well, and a plate is a billboard of text drawn without a depth test: left standing, it
+            // prints straight through the panel.
+            var platesWanted = !rulesOpen && !freeOpen && !menuOpen && !resultOpen && !welcomeOpen;
             foreach (var plate in seatPlates)
                 if (plate != null && plate.gameObject.activeSelf != platesWanted)
                     plate.gameObject.SetActive(platesWanted);
@@ -781,8 +1032,11 @@ namespace Mahjong.Unity
 
             if (well != null && well.activeSelf != tilesWanted) well.SetActive(tilesWanted);
             // Free play covers the middle of the table with its own grid, so the dice step aside
-            // with the rest of the scored layout instead of poking through it.
-            if (dice != null) dice.SetShown(tilesWanted && diceVisible);
+            // with the rest of the scored layout instead of poking through it. The same goes for the
+            // rulebook, the menu and the result screen: the numbers on the dice are text without a
+            // depth test, so a page over the table would show them floating in the middle of it.
+            var pageOpen = rulesOpen || menuOpen || resultOpen || welcomeOpen;
+            if (dice != null) dice.SetShown(tilesWanted && diceVisible && !pageOpen);
 
             var camera = Camera.main;
             if (camera != null) LayoutHud(camera);
@@ -1080,7 +1334,11 @@ namespace Mahjong.Unity
             Rebuild();
         }
 
-        /// <summary>Shows the settled winning hand and gives its tiles a clear result-state highlight.</summary>
+        /// <summary>
+        /// Shows the settled winning hand, gives its tiles a clear result-state highlight and opens the
+        /// result screen. The screen is what replaced the three seconds of HUD text (У-7): the hand no
+        /// longer disappears before a player has read what it was worth.
+        /// </summary>
         private void PresentResult()
         {
             if (resultPresented) return;
@@ -1093,7 +1351,39 @@ namespace Mahjong.Unity
                     if (result.Score.IsValidWin && result.PlayerIndex == humanSeat && tile.IsFaceUp)
                         tile.SetVictoryHighlight();
             }
-            status.text = DescribeResult();
+
+            resultScreen.Show(Text.HandResult(session, humanSeat), settings.Result);
+            resultPanel.Refresh(resultScreen);
+            SyncInterfaceVisibility();
+        }
+
+        /// <summary>
+        /// Deals the next hand from the result screen, or leaves the last table standing when the
+        /// session is over. Public so a button, a key and a test all go through the same door.
+        /// </summary>
+        public void NextHand()
+        {
+            if (session?.State == null) return;
+            if (!resultScreen.IsOpen || !resultScreen.CanContinue) return;
+            if (session.State.Phase != GamePhase.HandFinished) return;
+
+            CloseResultScreen();
+            if (session.IsFinished)
+            {
+                status.text = Loc.Get(session.EndedByTimeLimit ? "session.timeUp" : "session.complete")
+                              + "\n" + Text.Standings(session.Standings(), humanSeat);
+                SyncInterfaceVisibility();
+                return;
+            }
+
+            StartHand(new System.Random().Next());
+        }
+
+        /// <summary>Puts the result screen away; the hand it describes is already in the score sheet.</summary>
+        private void CloseResultScreen()
+        {
+            resultScreen.Hide();
+            if (resultPanel != null) resultPanel.SetOpen(false);
         }
 
         // ------------------------------------------------------- save and review
@@ -1142,22 +1432,7 @@ namespace Mahjong.Unity
         }
 
         /// <summary>The most recently written save, or an empty path when there is none.</summary>
-        private static string NewestSave()
-        {
-            try
-            {
-                var directory = SaveDirectory();
-                if (!Directory.Exists(directory)) return string.Empty;
-                return Directory.GetFiles(directory, "*.mahjong")
-                           .OrderByDescending(File.GetLastWriteTimeUtc)
-                           .FirstOrDefault() ?? string.Empty;
-            }
-            catch (System.Exception failure)
-                when (failure is IOException or System.UnauthorizedAccessException)
-            {
-                return string.Empty;
-            }
-        }
+        private static string NewestSave() => SaveSlots.Newest(SaveDirectory());
 
         /// <summary>
         /// Opens the review: the file named by MAHJONG_REPLAY, otherwise the newest save, and when
@@ -1183,10 +1458,16 @@ namespace Mahjong.Unity
         /// Continues the saved session: the same hands, the points those hands pay, the same session
         /// clock, and the hand that was in progress left where it stopped.
         /// </summary>
-        public bool ResumeSavedSession()
+        public bool ResumeSavedSession() => ResumeSavedSession(ReplaySourcePath());
+
+        /// <summary>
+        /// Continues the save at <paramref name="path"/>; an empty path means the newest one. The
+        /// welcome screen picks the file, so one method serves "continue", the list of saves and F9.
+        /// </summary>
+        public bool ResumeSavedSession(string path)
         {
             // Only a file can be resumed: the game in progress has no session clock to come back to.
-            var path = ReplaySourcePath();
+            if (string.IsNullOrWhiteSpace(path)) path = ReplaySourcePath();
             if (path.Length == 0)
             {
                 status.text = Loc.Get("replay.nothing");
@@ -1226,6 +1507,8 @@ namespace Mahjong.Unity
             }
 
             session = resumed;
+            // A game is under way now: the welcome screen has done its job.
+            CloseTitle();
             // The loaded log becomes the session's log, so the next save holds the whole game.
             moveLog = log;
             BotTable.UpdateMatchContext(session, bots);
@@ -1358,6 +1641,18 @@ namespace Mahjong.Unity
                 if (session != null) BotTable.UpdateMatchContext(session, bots);
             }
             if (status != null && !menu.IsOpen && !rules.IsOpen) RefreshStatus();
+            RefreshResultTexts();
+        }
+
+        /// <summary>
+        /// Rewrites an open result screen in the language that is now in effect. Its countdown keeps
+        /// running from where it was: switching the language must not give a player a fresh wait.
+        /// </summary>
+        private void RefreshResultTexts()
+        {
+            if (session?.State == null || resultPanel == null || !resultScreen.IsOpen) return;
+            resultScreen.Relocalize(Text.HandResult(session, humanSeat));
+            resultPanel.Refresh(resultScreen);
         }
 
         /// <summary>Keys of the menu; the row actions are public, so a test drives them without a keyboard.</summary>
@@ -1973,28 +2268,5 @@ namespace Mahjong.Unity
         }
 
         private static string Clock(System.TimeSpan span) => $"{(int)span.TotalMinutes}:{span.Seconds:00}";
-
-        private string DescribeResult()
-        {
-            if (session.LastSettlement == null) return Loc.Get("result.handFinished");
-            var settlement = session.LastSettlement;
-            if (settlement.WinnerPlayer < 0) return Loc.Get("result.draw");
-
-            var winner = settlement.WinnerPlayer == humanSeat
-                ? Loc.Get("result.youWin")
-                : Loc.Format("result.playerWins", settlement.WinnerPlayer + 1);
-
-            var result = session.State!.Result;
-            var breakdown = result != null && result.Score.IsValidWin
-                ? Text.ScoreSummary(result)
-                : settlement.Explanation;
-
-            // The classic table is paid by four combinations and a mutual settlement, so the result
-            // screen shows those numbers instead of a fan list: the same line cannot serve both.
-            if (settlement.Classic != null && result != null)
-                breakdown = Text.ClassicSettlementSummary(result, settlement);
-
-            return $"{winner}\n{breakdown}\n{Loc.Format("result.paid", settlement.TotalPaid)}";
-        }
     }
 }

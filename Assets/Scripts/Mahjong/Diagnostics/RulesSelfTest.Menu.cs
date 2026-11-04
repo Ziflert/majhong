@@ -1,7 +1,9 @@
 using System;
+using System.Linq;
 using Mahjong.Bots;
 using Mahjong.Controls;
 using Mahjong.Localization;
+using Mahjong.Rules;
 
 namespace Mahjong.Rules.Diagnostics
 {
@@ -19,6 +21,7 @@ namespace Mahjong.Rules.Diagnostics
         {
             Run(report, "menu: the settings parse, step and scale the bot delay", () => SettingsParse(report));
             Run(report, "menu: the rows step the settings and report their commands", () => MenuRows(report));
+            Run(report, "result: the end-of-hand screen waits, holds and closes", () => ResultScreenRules(report));
         }
 
         private static void SettingsParse(SelfTestReport report)
@@ -123,17 +126,110 @@ namespace Mahjong.Rules.Diagnostics
             report.Equal(BotLevel.Strategic, settings.Level, "the level reaches the strongest bots");
             report.Check(!menu.Adjust(1), "there is no fourth level to step into");
 
+            // Result screen (У-7): the ladder of waiting times, and picking the row steps it too.
+            menu.Move(1);
+            report.Equal(MenuItem.Result, menu.Selected, "the fourth row is the end-of-hand screen");
+            report.Equal(ResultAdvanceSettings.Text(ResultAdvance.Five), menu.RowAt(3).Value,
+                "the result row shows the waiting time");
+            report.Check(menu.Adjust(1), "the result row can be stepped");
+            report.Equal(ResultAdvance.Ten, settings.Result, "stepping the result row waits longer");
+            while (menu.Adjust(1)) { }
+            report.Equal(ResultAdvance.Manual, settings.Result, "the ladder ends at the button-only setting");
+            report.Check(!menu.Adjust(1), "there is nothing past the button-only setting");
+            while (menu.Adjust(-1)) { }
+            report.Equal(ResultAdvance.Three, settings.Result, "the ladder starts at three seconds");
+            settings.Result = ResultAdvanceSettings.Default;
+
             // Commands: the rows that open something say what they open.
             menu.Move(1);
-            report.Equal(MenuCommand.Save, menu.Activate(), "the fourth row saves");
-            report.Equal(MenuCommand.Resume, menu.RowAt(4).Command, "the fifth row resumes");
-            report.Equal(MenuCommand.Review, menu.RowAt(5).Command, "the sixth row opens the review");
-            report.Equal(MenuCommand.Rules, menu.RowAt(6).Command, "the seventh row opens the rules");
+            report.Equal(MenuCommand.Save, menu.Activate(), "the fifth row saves");
+            report.Equal(MenuCommand.Resume, menu.RowAt(5).Command, "the sixth row resumes");
+            report.Equal(MenuCommand.Review, menu.RowAt(6).Command, "the seventh row opens the review");
+            report.Equal(MenuCommand.Rules, menu.RowAt(7).Command, "the eighth row opens the rules");
             menu.Move(4);
             report.Equal(MenuItem.Close, menu.Selected, "the last row closes the menu");
             report.Equal(MenuCommand.Close, menu.Activate(), "the last row asks to close");
 
             report.Equal(GameMenu.TotalRows, menu.AllRows().Count, "every row can be listed for the panel");
+        }
+
+        /// <summary>
+        /// У-7: the hand no longer ends with three seconds of HUD text. The screen that replaced it is a
+        /// model of its own — what it says, how long it waits and when the wait is over — so its
+        /// behaviour is checked here, with only the drawing left to the play-mode tests.
+        /// </summary>
+        private static void ResultScreenRules(SelfTestReport report)
+        {
+            // The default and the ladder: three, five, ten seconds and then only the button.
+            report.Equal(ResultAdvance.Five, new GameSettings().Result,
+                "the table waits five seconds before it deals again");
+            report.Equal(5f, ResultAdvanceSettings.Seconds(ResultAdvance.Five), "five seconds is five seconds");
+            report.Equal(0f, ResultAdvanceSettings.Seconds(ResultAdvance.Manual),
+                "the button-only setting does not wait at all");
+            report.Equal(ResultAdvance.Ten, ResultAdvanceSettings.Step(ResultAdvance.Five, 1),
+                "a step up waits longer");
+            report.Equal(ResultAdvance.Three, ResultAdvanceSettings.Step(ResultAdvance.Five, -1),
+                "a step down waits less");
+            report.Equal(ResultAdvance.Three, ResultAdvanceSettings.Step(ResultAdvance.Three, -1),
+                "the ladder stops at three seconds");
+            report.Equal(ResultAdvance.Manual, ResultAdvanceSettings.Step(ResultAdvance.Ten, 1),
+                "the last rung of the ladder is the button");
+            report.Equal(ResultAdvance.Manual, ResultAdvanceSettings.Step(ResultAdvance.Manual, 5),
+                "the ladder does not wrap round to three seconds");
+            report.Equal(ResultAdvance.Five, ResultAdvanceSettings.Step(ResultAdvance.Five, 0),
+                "a step of zero changes nothing");
+
+            // MAHJONG_RESULT_DELAY goes through one parse, like every other setting.
+            report.Equal<ResultAdvance?>(ResultAdvance.Manual, ResultAdvanceSettings.TryParse("0"),
+                "\"0\" holds the screen until the button");
+            report.Equal<ResultAdvance?>(ResultAdvance.Manual, ResultAdvanceSettings.TryParse("manual"),
+                "the setting can be named");
+            report.Equal<ResultAdvance?>(ResultAdvance.Ten, ResultAdvanceSettings.TryParse("10"),
+                "\"10\" is ten seconds");
+            report.Equal<ResultAdvance?>(ResultAdvance.Three, ResultAdvanceSettings.TryParse("3s"),
+                "\"3s\" is three seconds as well");
+            report.Equal<ResultAdvance?>(null, ResultAdvanceSettings.TryParse("7"),
+                "seven seconds is not on the ladder, so the default stays");
+            report.Equal<ResultAdvance?>(null, ResultAdvanceSettings.TryParse("быстро"),
+                "a broken value keeps the default instead of stopping the table");
+
+            // The screen itself: it holds the hand it was given and runs its own countdown.
+            var screen = new ResultScreen();
+            report.Check(!screen.IsOpen, "the screen starts closed");
+            var content = new HandResultContent("Выиграл игрок 2",
+                new[] { "32 очка", "Выплачено: 96" }, new[] { "Итоговая таблица", "1. Игрок 1 — 44" }, true);
+            screen.Show(content, ResultAdvance.Three);
+            report.Check(screen.IsOpen, "showing the content opens the screen");
+            report.Equal("Выиграл игрок 2", screen.Title, "the title is the one the hand produced");
+            report.Equal(4, screen.AllLines().Count, "the hand and the table of points are drawn together");
+            report.Equal(3f, screen.SecondsLeft, "the wait starts at the setting it was opened with");
+            report.Check(!screen.Tick(1.5f), "half the wait is not the end of it");
+            report.Equal(1.5f, screen.SecondsLeft, "the countdown follows the table, not the wall clock");
+            report.Check(screen.Tick(2f), "the wait is over when it has run out");
+            report.Check(screen.Expired, "an expired screen asks for the next hand");
+            report.Equal(0f, screen.SecondsLeft, "the countdown never goes below zero");
+            screen.Hide();
+            report.Check(!screen.IsOpen && !screen.Expired, "a closed screen asks for nothing");
+
+            // The button-only setting never runs out, and the last hand of a session offers no next one.
+            var manual = new ResultScreen();
+            manual.Show(content with { CanContinue = false }, ResultAdvance.Manual);
+            report.Check(!manual.CountsDown, "the button-only setting does not count down");
+            report.Check(!manual.Tick(3600f), "an hour changes nothing when the table waits for the button");
+            report.Check(!manual.CanContinue, "the last hand of the session has no next hand to deal");
+            report.Check(manual.Hint != screen.Hint, "a screen with nothing to deal says so");
+
+            // The content of a real hand: winner, what it was worth, the transfers and the points after.
+            var game = new GameSession();
+            game.StartNextHand(seed: 4242);
+            PlayHandToEnd(game.State!, new Random(9));
+            game.CompleteHand();
+            var hand = Text.HandResult(game, humanSeat: 0);
+            report.Check(hand.Title.Length > 0, "a settled hand names its winner");
+            report.Check(hand.Lines.Count >= 2, "the result lists the hand and the points after it");
+            report.Check(hand.Lines.Any(line => line.Contains("P1=")), "the points after the hand are shown");
+            report.Check(hand.CanContinue, "the first hand of a session is not the last one");
+            report.Check(hand.Standings.Count == 0, "a table of points belongs to the end of a round, not to every hand");
         }
     }
 }

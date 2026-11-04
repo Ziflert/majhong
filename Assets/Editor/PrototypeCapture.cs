@@ -39,6 +39,10 @@ namespace Mahjong.EditorTools
             if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MAHJONG_OPENING_SPEED")))
                 Environment.SetEnvironmentVariable("MAHJONG_OPENING_SPEED", "0");
 
+            // This run photographs a live hand: the welcome screen (У-2) is skipped, the way a player
+            // skips it by picking "new game".
+            Environment.SetEnvironmentVariable("MAHJONG_TITLE", "0");
+
             SessionState.SetString(DirectoryKey, directory);
             SessionState.SetFloat(StartKey, (float)EditorApplication.timeSinceStartup);
             SessionState.SetInt(ShotKey, 0);

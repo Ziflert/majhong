@@ -38,6 +38,8 @@ namespace Mahjong.PlayTests
                 Object.DestroyImmediate(leftover);
 
             game = new GameObject("MahjongWallTestHost").AddComponent<MahjongGame>();
+            // The welcome screen holds the table at launch; a test of the wall starts its own game.
+            game.SkipWelcome();
         }
 
         [TearDown]

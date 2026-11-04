@@ -15,15 +15,15 @@
 | `Assets/Scripts/Mahjong/Rules/` | Ядро правил: кости, рука, стена, кубики, разбор руки, подсчёт, состояние руки; профиль правил и классический подсчёт — отдельными файлами |
 | `Assets/Scripts/Mahjong/Diagnostics/` | `RulesSelfTest` — проверки ядра, общие для Unity и headless (`RunAll` + файлы-части по темам: `.Net`, `.Replay`, `.Menu`, `.Opening`, `.Variant`) |
 | `Assets/Scripts/Mahjong/Bots/` | `HeuristicBot` — бот уровней 1–3 (`BotLevel`), `DangerModel` — чтение стола, `WaitQuality` — оценка ожиданий через `Scoring`, `BotTable` — прогон сессии и передача отставания по очкам |
-| `Assets/Scripts/Mahjong/Controls/` | `ActionPrompt` — что человеку предлагают в панели действий и в каком порядке; `PlayClock` / `ClockExpiry` — окна 20/10/3 секунды; `HandOpening` — такты открытия руки: два броска, разрыв, раздача (0.9 / 0.9 / 0.6 / 1.1 с, `MAHJONG_OPENING_SPEED`); `GameSettings` — язык, сила и темп ботов (`MAHJONG_LANG`, `MAHJONG_BOT_LEVEL`, `MAHJONG_BOT_SPEED`), `GameMenu` — модель меню: строки, курсор, что значит шаг и выбор |
+| `Assets/Scripts/Mahjong/Controls/` | `TitleScreen` — приветственный экран: строки (новая игра, продолжить, загрузить, локальная игра, мультиплеер, настройки стола, справочник, выход), курсор, две страницы, что значит шаг и выбор; `ActionPrompt` — что человеку предлагают в панели действий и в каком порядке; `PlayClock` / `ClockExpiry` — окна 20/10/3 секунды; `HandOpening` — такты открытия руки: два броска, разрыв, раздача (0.9 / 0.9 / 0.6 / 1.1 с, `MAHJONG_OPENING_SPEED`); `GameSettings` — язык, сила и темп ботов (`MAHJONG_LANG`, `MAHJONG_BOT_LEVEL`, `MAHJONG_BOT_SPEED`), `GameMenu` — модель меню: строки, курсор, что значит шаг и выбор |
 | `Assets/Scripts/Mahjong/Net/` | Сетевой договор без сети: `TileNotation` (нотация кости), `ActionCodec` (ход строкой), `SeatView` (проекция на место), `AuthoritativeTable` (единственный владелец `GameState` + лог ходов + `Replay`), `InProcessTable` (транспорт в процессе), `FreeTable` (общий стол «переставь кости») |
-| `Assets/Scripts/Mahjong/Replay/` | Сохранение, просмотр и продолжение партии: `SessionLog` (формат файла `majhong-save v1`, запись/чтение, переигрывание рук), `ReplayCursor` (позиция внутри партии: ход вперёд/назад, соседняя рука, описание хода структурой `SavedMove`), `SessionRestore` (собрать `GameSession` из файла: счёт из переигранных рук, часы сессии, недоигранная рука) |
+| `Assets/Scripts/Mahjong/Replay/` | Сохранение, просмотр и продолжение партии: `SaveSlots` (каталог папки сохранений для экрана: имя, число рук, профиль, свежие сверху, битый файл с причиной), `SessionLog` (формат файла `majhong-save v1`, запись/чтение, переигрывание рук), `ReplayCursor` (позиция внутри партии: ход вперёд/назад, соседняя рука, описание хода структурой `SavedMove`), `SessionRestore` (собрать `GameSession` из файла: счёт из переигранных рук, часы сессии, недоигранная рука) |
 | `Assets/Scripts/Mahjong/Localization/` | `Loc` — каталог строк RU/EN, `Text` — сборка фраз из структурных данных движка |
 | `Assets/Scripts/Mahjong/Knowledge/` | `RulesBook` — справочник правил внутри игры (страницы по `rule.pdf` + таблица фан из `Fans.All`) |
 | `Assets/Scripts/Mahjong/Compat/` | Полифилл `IsExternalInit` — без него `record`/`init` не собираются в Unity |
-| `Assets/Scripts/MahjongView/` | Unity-слой: `TileObject` (3D-тайл), `ActionBar`/`ActionButton`, `RulesPanel` (справочник), `FreePlayTable` (свободный стол), `MenuPanel` (меню на `Esc`), `DiceTray` (две кости в середине), `TableLayout` (где что стоит на столе), `UiFont` (шрифт с кириллицей), `MahjongGame` (сборка стола, ввод, часы, открытие руки) |
+| `Assets/Scripts/MahjongView/` | Unity-слой: `TileObject` (3D-тайл), `ActionBar`/`ActionButton`, `RulesPanel` (справочник), `FreePlayTable` (свободный стол), `MenuPanel` (меню на `Esc`), `TitlePanel` (приветственный экран: кадр, строки, попадание лучом), `DiceTray` (две кости в середине), `TableLayout` (где что стоит на столе), `UiFont` (шрифт с кириллицей), `MahjongGame` (сборка стола, ввод, часы, открытие руки) |
 | `Assets/Tests/Editor/` | Обёртка над `RulesSelfTest`, `ActionPromptTests`, `FansTableTests` (таблица фан из `rule.pdf`) |
-| `Assets/Tests/PlayMode/` | PlayMode-проверки сцены: тайлы, шрифты, порядок руки, панель и попадание лучом, часы руки, анимации, атлас лиц, справочник, свободный стол, язык, сохранение в файл, просмотр и продолжение партии, меню (строки, пауза, настройки, пути из меню), стена и кубики (`WallTests`) |
+| `Assets/Tests/PlayMode/` | PlayMode-проверки сцены: тайлы, шрифты, порядок руки, панель и попадание лучом, часы руки, анимации, атлас лиц, справочник, свободный стол, язык, сохранение в файл, просмотр и продолжение партии, меню (строки, пауза, настройки, пути из меню), стена и кубики (`WallTests`), приветственный экран (`TitleTests`: экран на запуске, кадр, настройки доходят до стола, новая игра, справочник, «ещё в работе», продолжение из файла) |
 | `Assets/Editor/PrototypeCapture.cs` | Прогон прототипа из CLI: Play, скриншоты Game view, коды выхода |
 | `Assets/Editor/ActionBarPreview.cs` | Скриншот панели действий на заданном наборе кнопок |
 | `Assets/Editor/InterfaceCapture.cs` | Скриншоты стола целиком, середины руки, меню, справочника, свободного стола и просмотра партии из CLI |
@@ -67,6 +67,8 @@
 | `Knowledge/RulesBook.cs` | Страницы справочника правил и таблица фан для экрана `R` |
 | `Controls/GameSettings.cs` | Настройки стола: профиль правил (`RuleVariant`, `MAHJONG_VARIANT`), язык, сила ботов (`BotLevel`), темп (`Speeds` ×0.25…×4, `ScaledDelay`); разбор переменных окружения в инвариантной культуре |
 | `Controls/GameMenu.cs` | Меню как модель: восемь строк, курсор с переносом, `Adjust` (шаг настройки) и `Activate` (команда строки), подписи из `Loc` |
+| `Controls/TitleScreen.cs` | Приветственный экран как модель: 12 строк на главной странице и страница сохранений, `TitleRowState.Unavailable` для непостроенных режимов, `StepVariant` по пресетам правил, `TitleCommand` для игры (`MahjongGame.TitleActivate`) |
+| `Replay/SaveSlots.cs` | `SaveSlot` (путь, дата, руки, ходы, профиль, причина отказа, `Summary()`, `HandsText` с русским счётом) и `SaveSlots.Scan/Read/Newest` — единственное место, где экран и «продолжить» узнают, что лежит в папке сохранений |
 | `MahjongView/MenuPanel.cs` | Отрисовка меню: строки-плашки с подписями, подсветка курсора, `TryPick` лучом; размер считается от `fieldOfView` и `aspect` камеры |
 | `Settlement.cs` | Выплаты за руку: самобор и выигрыш со сноса (3.9.1.2–3.9.1.3) и классический раздел IV (`ForClassic`, взаимозачёт проигравших, двойной Восток); диспетчер `ForState` выбирает арифметику по профилю |
 | `Penalties.cs` | Нарушения 3.11: каталог, шкала «предупреждение → 5/10/20/40», счётчики по сессии и раунду, `PenaltyLedger` |
@@ -101,6 +103,9 @@
 - `SessionLog.Save(path)` / `SessionLog.Load(path)` — запись и чтение сохранённой партии.
 - `new ReplayCursor(log)` → `Next()` / `Back()` / `ToEnd()` → `cursor.State` — просмотр партии по ходам.
 - `SessionRestore.Restore(log, out outcome)` — продолжить сохранённую партию (счёт, часы, рука в процессе).
+- `new TitleScreen(settings, SaveSlots.Scan(dir))` → `Move` / `Adjust` / `Activate` — приветственный экран до раздачи.
+- `SaveSlots.Scan(dir)` / `SaveSlots.Newest(dir)` — что лежит в папке сохранений и что открывает «продолжить».
+- `MahjongGame.StartNewGame(seed)` / `ResumeSavedSession(path)` / `SkipWelcome()` / `MAHJONG_TITLE=0` — начать партию с экрана, продолжить файл, пропустить экран для прогона.
 - `GameSettings.FromEnvironment()` / `ScaledDelay(0.45)` — настройки стола из переменных окружения и темп ботов.
 - `new GameMenu(settings)` → `Move(1)` → `Adjust(1)` / `Activate()` → `MenuCommand` — меню как модель: шаг настройки и команда строки.
 
@@ -129,6 +134,7 @@ Hub 3.22.5 — в `D:\Software\Unity\Hub`. Версия проекта закр�
   -runTests -testPlatform PlayMode -testResults D:\Temprary\game\Logs\playmode-results.xml -logFile -
 
 # прототип с GUI + скриншоты Game view (0 — успех, 2 — сцена не поднялась, 3 — пустой стол)
+# сами инструменты выставляют MAHJONG_TITLE=0: приветственный экран снимает InterfaceCapture
 $env:MAHJONG_SHOT_DIR="D:\Temprary\game\Screenshots"
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game" \
   -executeMethod Mahjong.EditorTools.PrototypeCapture.CaptureAndExit
@@ -138,7 +144,7 @@ $env:MAHJONG_SHOT_DIR="D:\Temprary\game\Screenshots"
   -executeMethod Mahjong.EditorTools.ActionBarPreview.CaptureAndExit
 ```
 
-Проверено на 2026-11-05: `RulesCheck` — 74 группы, 122 198 проверок; EditMode 13/13; PlayMode 28/28;
+Проверено на 2026-11-05: `RulesCheck` — 78 групп, 122 531 проверка; EditMode 13/13; PlayMode 44/44;
 скриншоты `PrototypeCapture` и `InterfaceCapture` снимаются.
 
 ## Архитектура

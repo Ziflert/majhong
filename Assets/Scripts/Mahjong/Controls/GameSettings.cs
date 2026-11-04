@@ -35,6 +35,13 @@ namespace Mahjong.Controls
         /// <summary>Index into <see cref="Speeds"/>; 1× by default.</summary>
         public int SpeedIndex { get; private set; } = NormalSpeed;
 
+        /// <summary>
+        /// How long the result screen waits before the next hand: 3 / 5 / 10 seconds or only by the
+        /// button (У-7). The table used to deal again three seconds after the hand ended, which was
+        /// too fast to read a classic settlement.
+        /// </summary>
+        public ResultAdvance Result { get; set; } = ResultAdvanceSettings.Default;
+
         /// <summary>How much faster than normal the bots play; never zero, so a delay cannot vanish.</summary>
         public double Speed => Speeds[SpeedIndex];
 
@@ -79,6 +86,11 @@ namespace Mahjong.Controls
             // comma is the decimal separator and TryParse would otherwise refuse the string.
             if (double.TryParse(speedText, NumberStyles.Float, CultureInfo.InvariantCulture, out var speed))
                 settings.SetSpeedIndex(NearestSpeed(speed));
+
+            // MAHJONG_RESULT_DELAY=0 holds the result screen until the button is pressed, which is
+            // what a capture run needs; nonsense keeps the five-second default.
+            var resultText = Environment.GetEnvironmentVariable("MAHJONG_RESULT_DELAY");
+            if (ResultAdvanceSettings.TryParse(resultText) is { } advance) settings.Result = advance;
 
             return settings;
         }

@@ -28,11 +28,12 @@ namespace Mahjong.Controls
         Language = 0,
         Speed = 1,
         Level = 2,
-        Save = 3,
-        Resume = 4,
-        Review = 5,
-        Rules = 6,
-        Close = 7
+        Result = 3,
+        Save = 4,
+        Resume = 5,
+        Review = 6,
+        Rules = 7,
+        Close = 8
     }
 
     /// <summary>
@@ -53,7 +54,7 @@ namespace Mahjong.Controls
 
         private static readonly MenuItem[] Rows =
         {
-            MenuItem.Language, MenuItem.Speed, MenuItem.Level,
+            MenuItem.Language, MenuItem.Speed, MenuItem.Level, MenuItem.Result,
             MenuItem.Save, MenuItem.Resume, MenuItem.Review, MenuItem.Rules, MenuItem.Close
         };
 
@@ -89,6 +90,12 @@ namespace Mahjong.Controls
                     if (next == settings.Level) return false;
                     settings.Level = next;
                     return true;
+                case MenuItem.Result:
+                    if (delta == 0) return false;
+                    var advance = ResultAdvanceSettings.Step(settings.Result, delta);
+                    if (advance == settings.Result) return false;
+                    settings.Result = advance;
+                    return true;
                 default:
                     return false;
             }
@@ -114,6 +121,8 @@ namespace Mahjong.Controls
                     MenuCommand.None, true),
                 MenuItem.Level => new MenuRow(item, Loc.Get("menu.level"), LevelText(settings.Level),
                     MenuCommand.None, true),
+                MenuItem.Result => new MenuRow(item, Loc.Get("menu.result"),
+                    ResultAdvanceSettings.Text(settings.Result), MenuCommand.None, true),
                 MenuItem.Save => new MenuRow(item, Loc.Get("menu.save"), string.Empty, MenuCommand.Save, false),
                 MenuItem.Resume => new MenuRow(item, Loc.Get("menu.resume"), string.Empty, MenuCommand.Resume, false),
                 MenuItem.Review => new MenuRow(item, Loc.Get("menu.review"), string.Empty, MenuCommand.Review, false),
@@ -142,7 +151,7 @@ namespace Mahjong.Controls
         });
 
         private static bool ActivateSteps(MenuItem item) =>
-            item is MenuItem.Language or MenuItem.Speed or MenuItem.Level;
+            item is MenuItem.Language or MenuItem.Speed or MenuItem.Level or MenuItem.Result;
 
         /// <summary>Next of the three levels, clamped: the menu has no fourth setting to step into.</summary>
         private static int NextLevel(BotLevel level, int delta)

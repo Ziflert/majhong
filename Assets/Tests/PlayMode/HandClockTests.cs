@@ -22,7 +22,10 @@ namespace Mahjong.PlayTests
         private static MahjongGame Game()
         {
             var game = Object.FindAnyObjectByType<MahjongGame>();
-            return game != null ? game : new GameObject("MahjongClockHost").AddComponent<MahjongGame>();
+            if (game == null) game = new GameObject("MahjongClockHost").AddComponent<MahjongGame>();
+            // The welcome screen holds the table at launch; a test of the clock starts its own game.
+            game.SkipWelcome();
+            return game;
         }
 
         [UnityTest]

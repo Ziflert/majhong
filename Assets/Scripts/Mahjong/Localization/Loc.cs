@@ -121,6 +121,20 @@ namespace Mahjong.Localization
             Add("result.youWin", "Вы выиграли", "You win");
             Add("result.playerWins", "Выиграл игрок {0}", "Player {0} wins");
             Add("result.paid", "Выплачено: {0}", "Paid: {0}");
+            Add("result.payments", "Выплаты: {0}", "Payments: {0}");
+            Add("result.payment", "игрок {0} → игроку {1}: {2}", "player {0} → player {1}: {2}");
+            Add("result.scores", "Очки после руки: {0}", "Points after the hand: {0}");
+            Add("result.roundEnd", "Конец раунда «{0}» — положение игроков:",
+                "End of round “{0}” — where the players stand:");
+            Add("result.next", "Дальше", "Next hand");
+            Add("result.countdown", "Следующая рука через {0} с", "Next hand in {0} s");
+            Add("result.manual", "Следующая рука — по кнопке", "Next hand when you are ready");
+            Add("result.hint", "Enter или пробел — следующая рука, Esc — меню",
+                "Enter or space deals the next hand, Esc opens the menu");
+            Add("result.hintManual", "Enter, пробел или кнопка — следующая рука, Esc — меню",
+                "Enter, space or the button deals the next hand, Esc opens the menu");
+            Add("result.hintLast", "Партия окончена: V — просмотр, Esc — меню",
+                "The session is over: V reviews it, Esc opens the menu");
             Add("result.scoreLine", "{0} очков", "{0} points");
             Add("result.total", "{0} очков", "{0} points");
             Add("classic.base", "Итого: {0} = {1}", "Total: {0} = {1}");
@@ -210,6 +224,7 @@ namespace Mahjong.Localization
             Add("menu.language", "Язык", "Language");
             Add("menu.speed", "Темп ботов", "Bot speed");
             Add("menu.level", "Сила ботов", "Bot strength");
+            Add("menu.result", "Экран результата", "Result screen");
             Add("menu.save", "Сохранить партию", "Save the game");
             Add("menu.resume", "Продолжить сохранённую", "Resume the saved game");
             Add("menu.review", "Просмотр партии", "Review a saved game");
@@ -220,6 +235,42 @@ namespace Mahjong.Localization
             Add("menu.value.fast", "Быстрый", "Fast");
             Add("menu.value.cautious", "Осторожный", "Cautious");
             Add("menu.value.strategic", "Стратег", "Strategic");
+            Add("menu.value.manual", "по кнопке", "on the button");
+            Add("menu.value.seconds", "{0} с", "{0} s");
+
+            // ---------------------------------------------------------------- title
+            Add("title.title", "МАДЖОНГ", "MAHJONG");
+            Add("title.subtitle", "{0} · 144 кости", "{0} · 144 tiles");
+            Add("title.new", "Новая игра с ботами", "New game with bots");
+            Add("title.continue", "Продолжить игру", "Continue the game");
+            Add("title.load", "Загрузить игру", "Load a game");
+            Add("title.local", "Локальная игра", "Local game");
+            Add("title.multiplayer", "Мультиплеер", "Multiplayer");
+            Add("title.variant", "Правила", "Rules profile");
+            Add("title.language", "Язык", "Language");
+            Add("title.level", "Сила ботов", "Bot strength");
+            Add("title.speed", "Темп ботов", "Bot speed");
+            Add("title.result", "Экран результата", "Result screen");
+            Add("title.rules", "Справочник правил", "Rulebook");
+            Add("title.quit", "Выход", "Quit");
+            Add("title.back", "Назад", "Back");
+            Add("title.loadTitle", "Загрузить игру · сохранения", "Load a game · saved games");
+            Add("title.hint",
+                "↑ ↓ — строка, ← → — значение, Enter — выбрать, Esc — выход",
+                "Up/down a row, left/right a value, Enter picks, Esc quits");
+            Add("title.loadHint",
+                "↑ ↓ — сохранение, Enter — загрузить, Esc — назад",
+                "Up/down a save, Enter loads it, Esc goes back");
+            Add("title.planned", "«{0}» ещё в работе", "“{0}” is not built yet");
+            Add("title.noSave", "Сохранённых партий нет", "No game has been saved yet");
+            Add("title.value.planned", "в работе", "planned");
+            Add("title.value.none", "нет", "none");
+            Add("title.value.count", "{0} сохранений", "{0} saved");
+            Add("title.save.hand", "{0} рука", "{0} hand");
+            Add("title.save.hands234", "{0} руки", "{0} hands");
+            Add("title.save.hands", "{0} рук", "{0} hands");
+            Add("title.save.broken", "Файл не читается", "The file does not read");
+            Add("title.newGame", "Новая партия", "A new game");
 
             return table;
         }

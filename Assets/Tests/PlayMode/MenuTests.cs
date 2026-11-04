@@ -19,7 +19,10 @@ namespace Mahjong.PlayTests
         private static MahjongGame Game()
         {
             var game = UnityEngine.Object.FindAnyObjectByType<MahjongGame>();
-            return game != null ? game : new GameObject("MahjongMenuTestHost").AddComponent<MahjongGame>();
+            if (game == null) game = new GameObject("MahjongMenuTestHost").AddComponent<MahjongGame>();
+            // The welcome screen holds the table at launch; a test of the menu starts its own game.
+            game.SkipWelcome();
+            return game;
         }
 
         [UnityTest]
@@ -183,7 +186,7 @@ namespace Mahjong.PlayTests
             // The rules row opens the rulebook and leaves the menu closed.
             game.OpenMenu();
             game.MenuMove(-game.Menu.Index);      // the language row
-            game.MenuMove(6);                     // the rules row
+            game.MenuMove(7);                     // the rules row
             Assert.AreEqual(MenuItem.Rules, game.Menu.Selected, "The cursor is not on the rules row.");
             game.MenuActivate();
             yield return null;
@@ -195,7 +198,7 @@ namespace Mahjong.PlayTests
             // The review row opens the review of the game in progress.
             game.OpenMenu();
             game.MenuMove(-game.Menu.Index);
-            game.MenuMove(5);
+            game.MenuMove(6);
             Assert.AreEqual(MenuItem.Review, game.Menu.Selected, "The cursor is not on the review row.");
             game.MenuActivate();
             yield return null;
