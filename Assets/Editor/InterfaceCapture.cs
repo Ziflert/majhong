@@ -32,7 +32,11 @@ namespace Mahjong.EditorTools
         {
             ("table-overview", "none", new Vector3(0f, 2.15f, -1.85f), new Vector3(0f, 0f, 0.08f)),
             ("rules-panel", "rules", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f)),
-            ("free-play", "free", new Vector3(0f, 2.15f, -1.85f), new Vector3(0f, 0f, 0.08f))
+            ("free-play", "free", new Vector3(0f, 2.15f, -1.85f), new Vector3(0f, 0f, 0.08f)),
+            // No player sits at a capture run, so this step runs the human windows out and the shot
+            // shows the table mid-hand; the review after it then has real moves to step through.
+            ("table-midgame", "burn", new Vector3(0f, 2.15f, -1.85f), new Vector3(0f, 0f, 0.08f)),
+            ("replay-review", "replay", new Vector3(0f, 2.15f, -1.85f), new Vector3(0f, 0f, 0.08f))
         };
 
         /// <summary>Seconds a step is given before its shot: the deal and the panels need a frame or two.</summary>
@@ -94,7 +98,13 @@ namespace Mahjong.EditorTools
             var waited = now - startedAt;
             if (phase == 0)
             {
-                if (waited < SettleSeconds) return;
+                if (waited < SettleSeconds)
+                {
+                    // A capture run has no player: on the preparation step the human windows are run
+                    // out, which is exactly what the hand clock does when a turn times out.
+                    if (Steps[step].Open == "burn" && game.HandClock.IsRunning) game.AdvanceClock(60);
+                    return;
+                }
                 Capture(game, step);
                 SessionState.SetInt(PhaseKey, 1);
                 SessionState.SetFloat(StepStartKey, now);
@@ -123,6 +133,13 @@ namespace Mahjong.EditorTools
                 case "free":
                     game.OpenFreePlay();
                     break;
+                case "replay":
+                    // The review opens the newest save, or the game in progress when nothing is saved.
+                    game.OpenReplay();
+                    game.ReplayToEnd();
+                    break;
+                case "burn":
+                    break;
             }
         }
 
@@ -136,6 +153,8 @@ namespace Mahjong.EditorTools
             {
                 "rules" => $"rulebook page {game.Rules.Page + 1}/{game.Rules.PageCount}: {game.Rules.CurrentTitle}",
                 "free" => $"free play {game.FreePlay.TileViewCount} tiles, seat {game.FreePlay.ActiveSeat}",
+                "replay" => $"review {game.Replay.PositionText}, last {game.Replay.LastMoveText}",
+                "burn" => $"{game.MoveLog.MoveCount} moves played, phase {game.Phase}",
                 _ => $"hand tiles {game.TableTileCount}"
             };
             Debug.Log($"[interface capture] {name}: {path} | {detail}");
@@ -150,6 +169,9 @@ namespace Mahjong.EditorTools
                     break;
                 case "free":
                     game.CloseFreePlay();
+                    break;
+                case "replay":
+                    game.CloseReplay();
                     break;
             }
         }

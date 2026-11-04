@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Mahjong.Bots;
 using Mahjong.Controls;
 using Mahjong.Localization;
+using Mahjong.Replay;
 using Mahjong.Rules;
 using UnityEngine;
 
@@ -37,6 +39,18 @@ namespace Mahjong.Unity
 
         /// <summary>The free-play table that opens with F. Exposed for tests and tools.</summary>
         public FreePlayTable FreePlay => free;
+
+        /// <summary>The review of a saved game, while V has it open. Exposed for tests and tools.</summary>
+        public ReplayCursor Replay => replay;
+
+        /// <summary>True while the review of a saved game holds the table.</summary>
+        public bool IsReplayOpen => replayOpen;
+
+        /// <summary>The move log of this session: this is what a save file is made of.</summary>
+        public SessionLog MoveLog => moveLog;
+
+        /// <summary>File the session was last written to; empty until the first save.</summary>
+        public string LastSavePath => sessionSavePath ?? string.Empty;
 
         /// <summary>True while the human is to choose a discard: the game is waiting for him.</summary>
         public bool IsYourTurn =>
@@ -190,6 +204,13 @@ namespace Mahjong.Unity
         private Transform board = null!;
         private readonly TextMesh[] seatPlates = new TextMesh[4];
         private readonly PlayClock clock = new();
+
+        /// <summary>Every accepted move of the session, in order; a save file is this log as text.</summary>
+        private readonly SessionLog moveLog = new();
+
+        private ReplayCursor replay = null!;
+        private bool replayOpen;
+        private string sessionSavePath;
 
         private float nextBotAction;
         private float nextHandAt;
@@ -429,6 +450,9 @@ namespace Mahjong.Unity
             clockKey = string.Empty;
             ClosePrompt();
             session.StartNextHand(seed);
+            // The hand is logged from the deal that produced it, so a save replays from seeds alone.
+            var dealt = session.State!;
+            moveLog.BeginHand(dealt.Dealer, seed, dealt.RoundWind);
             BotTable.UpdateMatchContext(session, bots);
             announcedMelds.Clear();
             ClearViews();
@@ -457,6 +481,7 @@ namespace Mahjong.Unity
                 session.AbandonRunningHand();
                 waitingForNextHand = false;
                 status.text = Loc.Get("session.timeUp") + "\n" + Text.Standings(session.Standings(), humanSeat);
+                SaveReplay();
                 return;
             }
 
@@ -473,6 +498,7 @@ namespace Mahjong.Unity
                     StopClock();
                     session.CompleteHand();
                     PresentResult();
+                    SaveReplay();
                 }
                 else if (Time.time >= nextHandAt)
                 {
@@ -523,6 +549,13 @@ namespace Mahjong.Unity
                 return true;
             }
 
+            // The review of a saved game pauses the hand the same way the rulebook does.
+            if (replayOpen)
+            {
+                HandleReplayKeys();
+                return true;
+            }
+
             if (Input.GetKeyDown(KeyCode.R))
             {
                 ClosePrompt();
@@ -550,6 +583,18 @@ namespace Mahjong.Unity
                 return true;
             }
 
+            if (Input.GetKeyDown(KeyCode.F5))
+            {
+                SaveReplay();
+                return true;
+            }
+
+            if (Input.GetKeyDown(KeyCode.V))
+            {
+                OpenReplay();
+                return true;
+            }
+
             if (Input.GetKeyDown(KeyCode.F))
             {
                 OpenFreePlay();
@@ -564,7 +609,8 @@ namespace Mahjong.Unity
         {
             Loc.Toggle();
             bar.Hide();
-            if (free.IsOpen) status.text = free.StatusText();
+            if (replayOpen) status.text = DescribeReplay();
+            else if (free.IsOpen) status.text = free.StatusText();
             else RefreshStatus();
             return Loc.Current;
         }
@@ -660,7 +706,7 @@ namespace Mahjong.Unity
             if (draw != null)
             {
                 ClosePrompt();
-                state.Apply(draw);
+                ApplyMove(humanSeat, draw);
                 AfterAction();
                 return;
             }
@@ -704,7 +750,7 @@ namespace Mahjong.Unity
             var options = state.GetLegalActions(player);
             if (options.Count == 0) return;
 
-            state.Apply(bots[player].Choose(state, player, options));
+            ApplyMove(player, bots[player].Choose(state, player, options));
             AfterAction();
         }
 
@@ -750,7 +796,7 @@ namespace Mahjong.Unity
                 if (phase == GamePhase.AwaitingKongRobbery && options.All(o => o.Kind != ActionKind.Win))
                     continue;
 
-                state.Apply(bots[player].Choose(state, player, options));
+                ApplyMove(player, bots[player].Choose(state, player, options));
                 if (state.Phase != phase) break;
             }
         }
@@ -781,9 +827,19 @@ namespace Mahjong.Unity
         private void Play(LegalAction action)
         {
             ClosePrompt();
-            session.State!.Apply(action);
+            ApplyMove(humanSeat, action);
             if (action.Kind == ActionKind.Discard) humanDiscardedThisHand = true;
             AfterAction();
+        }
+
+        /// <summary>
+        /// The only place an engine action is applied: the state changes and the move enters the log,
+        /// so a session cannot quietly play a move the save file does not know about.
+        /// </summary>
+        private void ApplyMove(int seat, LegalAction action)
+        {
+            session.State!.Apply(action);
+            moveLog.Record(seat, action);
         }
 
         // ----------------------------------------------------------------- clock
@@ -923,6 +979,227 @@ namespace Mahjong.Unity
             status.text = DescribeResult();
         }
 
+        // ------------------------------------------------------- save and review
+
+        /// <summary>
+        /// Writes the move log of the session to a file and returns its path. Called after every
+        /// finished hand, on F5 and on quit, so an interrupted session is still reviewable.
+        /// </summary>
+        public string SaveReplay()
+        {
+            if (moveLog.IsEmpty) return string.Empty;
+            try
+            {
+                sessionSavePath ??= ReplaySavePath();
+                moveLog.Save(sessionSavePath);
+                return sessionSavePath;
+            }
+            catch (System.Exception failure)
+                when (failure is IOException or System.UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[replay] the session could not be saved: {failure.Message}");
+                return string.Empty;
+            }
+        }
+
+        /// <summary>Where a save goes: MAHJONG_SAVE, else a timestamped file in the save directory.</summary>
+        private static string ReplaySavePath()
+        {
+            var forced = System.Environment.GetEnvironmentVariable("MAHJONG_SAVE");
+            if (!string.IsNullOrWhiteSpace(forced)) return forced;
+            var name = $"replay-{System.DateTime.Now:yyyyMMdd-HHmmss}.mahjong";
+            return Path.Combine(SaveDirectory(), name);
+        }
+
+        /// <summary>Saves live next to the player data; MAHJONG_REPLAY_DIR moves them for a capture run.</summary>
+        private static string SaveDirectory()
+        {
+            var directory = System.Environment.GetEnvironmentVariable("MAHJONG_REPLAY_DIR");
+            return string.IsNullOrWhiteSpace(directory)
+                ? Path.Combine(Application.persistentDataPath, "saves")
+                : directory;
+        }
+
+        /// <summary>The most recently written save, or an empty path when there is none.</summary>
+        private static string NewestSave()
+        {
+            try
+            {
+                var directory = SaveDirectory();
+                if (!Directory.Exists(directory)) return string.Empty;
+                return Directory.GetFiles(directory, "*.mahjong")
+                           .OrderByDescending(File.GetLastWriteTimeUtc)
+                           .FirstOrDefault() ?? string.Empty;
+            }
+            catch (System.Exception failure)
+                when (failure is IOException or System.UnauthorizedAccessException)
+            {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Opens the review: the file named by MAHJONG_REPLAY, otherwise the newest save, and when
+        /// nothing has been saved yet — the game that is running right now.
+        /// </summary>
+        public bool OpenReplay()
+        {
+            if (!TryReplaySource(out var log, out var problem) || log.IsEmpty)
+            {
+                status.text = problem.Length > 0 ? problem : Loc.Get("replay.nothing");
+                return false;
+            }
+
+            ClosePrompt();
+            StopClock();
+            replay = new ReplayCursor(log);
+            replayOpen = true;
+            RenderReplay();
+            return true;
+        }
+
+        /// <summary>Returns to the live table exactly where the hand was paused.</summary>
+        public void CloseReplay()
+        {
+            if (!replayOpen) return;
+            replayOpen = false;
+            Rebuild();
+        }
+
+        /// <summary>Steps the review by whole moves: +1 forward, -1 back; false when it did not move.</summary>
+        public bool ReplayStep(int moves)
+        {
+            if (!replayOpen) return false;
+            var moved = false;
+            for (var i = 0; i < System.Math.Abs(moves); i++)
+            {
+                if (!(moves > 0 ? replay.Next() : replay.Back())) break;
+                moved = true;
+            }
+
+            if (moved) RenderReplay();
+            return moved;
+        }
+
+        /// <summary>Steps the review by hands: +1 to the next deal, -1 to the previous one.</summary>
+        public bool ReplayHand(int hands)
+        {
+            if (!replayOpen) return false;
+            var moved = false;
+            for (var i = 0; i < System.Math.Abs(hands); i++)
+            {
+                if (!(hands > 0 ? replay.NextHand() : replay.PreviousHand())) break;
+                moved = true;
+            }
+
+            if (moved) RenderReplay();
+            return moved;
+        }
+
+        public bool ReplayToStart()
+        {
+            if (!replayOpen) return false;
+            replay.ToStart();
+            RenderReplay();
+            return true;
+        }
+
+        public bool ReplayToEnd()
+        {
+            if (!replayOpen) return false;
+            replay.ToEnd();
+            RenderReplay();
+            return true;
+        }
+
+        /// <summary>Keys of the review; the step methods above are what a test drives instead.</summary>
+        private void HandleReplayKeys()
+        {
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.V))
+            {
+                CloseReplay();
+                return;
+            }
+
+            if (Input.GetKeyDown(KeyCode.RightArrow)) ReplayStep(1);
+            else if (Input.GetKeyDown(KeyCode.LeftArrow)) ReplayStep(-1);
+            else if (Input.GetKeyDown(KeyCode.DownArrow)) ReplayHand(1);
+            else if (Input.GetKeyDown(KeyCode.UpArrow)) ReplayHand(-1);
+            else if (Input.GetKeyDown(KeyCode.End)) ReplayToEnd();
+            else if (Input.GetKeyDown(KeyCode.Home)) ReplayToStart();
+        }
+
+        private void RenderReplay()
+        {
+            RebuildFrom(replay.State);
+            status.text = DescribeReplay();
+        }
+
+        /// <summary>The HUD of the review: where the cursor stands and which move it just passed.</summary>
+        private string DescribeReplay()
+        {
+            var state = replay.State;
+            var last = replay.LastStep;
+            return string.Join("\n",
+                Loc.Format("replay.title", replay.PositionText),
+                last == null
+                    ? Loc.Get("replay.deal")
+                    : Loc.Format("replay.move", DescribeSavedMove(last)),
+                Loc.Format("hud.wall", state.Wall.Remaining),
+                Loc.Get("replay.keys"));
+        }
+
+        /// <summary>A saved move in the words of the interface language.</summary>
+        private static string DescribeSavedMove(ReplayCursor.SavedMove move)
+        {
+            var tiles = string.Join(" ", move.Tiles);
+            var what = move.Kind switch
+            {
+                ActionKind.Draw => Loc.Get("action.draw"),
+                ActionKind.Discard => Loc.Format("action.discard", tiles),
+                ActionKind.Chow => Loc.Format("action.chow", tiles),
+                ActionKind.Pung => Loc.Format("action.pung", tiles),
+                ActionKind.OpenKong or ActionKind.AddedKong or ActionKind.ClosedKong =>
+                    Loc.Format("action.kong", tiles),
+                ActionKind.Win => Loc.Get("action.win"),
+                ActionKind.Pass => Loc.Get("action.pass"),
+                _ => move.Kind.ToString()
+            };
+
+            return $"P{move.Seat + 1} {what}".TrimEnd();
+        }
+
+        /// <summary>The log to review and, if it could not be read, why.</summary>
+        private bool TryReplaySource(out SessionLog log, out string problem)
+        {
+            log = null!;
+            problem = string.Empty;
+
+            var forced = System.Environment.GetEnvironmentVariable("MAHJONG_REPLAY");
+            var path = string.IsNullOrWhiteSpace(forced) ? NewestSave() : forced;
+            if (path.Length == 0)
+            {
+                // Nothing saved yet: the game in progress is the game to review.
+                log = moveLog;
+                return true;
+            }
+
+            try
+            {
+                log = SessionLog.Load(path);
+                return true;
+            }
+            catch (System.Exception failure) when (failure is IOException or System.FormatException
+                                                   or System.UnauthorizedAccessException)
+            {
+                problem = Loc.Format("replay.unreadable", failure.Message);
+                return false;
+            }
+        }
+
+        /// <summary>The session is saved on the way out: a game interrupted mid-hand is still reviewable.</summary>
+        private void OnApplicationQuit() => SaveReplay();
+
         // ---------------------------------------------------------------- view
 
         private void ClearViews()
@@ -954,7 +1231,17 @@ namespace Mahjong.Unity
         /// </summary>
         private void Rebuild()
         {
-            var state = session.State!;
+            RebuildFrom(session.State!);
+            status.text = DescribeState();
+        }
+
+        /// <summary>
+        /// Lays the table out from any engine state. The live hand passes its own state; the review of
+        /// a saved game passes the state the replay cursor is standing on, which is why the review
+        /// needs no renderer of its own.
+        /// </summary>
+        private void RebuildFrom(GameState state)
+        {
             var hand = state.Players[humanSeat];
             var used = new HashSet<int>();
             handTiles.Clear();
@@ -1012,7 +1299,6 @@ namespace Mahjong.Unity
 
             HighlightHand(state.CurrentPlayer == humanSeat && state.Phase == GamePhase.AwaitingDiscard);
             RefreshSeatPlates(state);
-            status.text = DescribeState();
 
             // autoSyncTransforms is off in this project: without a sync the colliders of the hand stay
             // where the tiles were before this rebuild, and a click on a tile is resolved at its old

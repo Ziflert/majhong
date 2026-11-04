@@ -87,6 +87,7 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "hand: waiting tiles cover the special patterns", () => SpecialPatternWaits(report));
             Run(report, "session: a forfeited player takes no table points", () => ForfeitedRanking(report));
             NetAndUiGroups(report);
+            ReplayGroups(report);
 
             return report;
         }

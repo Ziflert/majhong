@@ -94,8 +94,8 @@ namespace Mahjong.Localization
             // ----------------------------------------------------------------- HUD
             Add("hud.header", "Рука {0} из {1} · Раунд {2} · Место {3}", "Hand {0}/{1} · Round {2} · Seat {3}");
             Add("hud.yourTurn", "Ваш ход: щёлкните кость для сноса", "Your turn: click a tile to discard");
-            Add("hud.keys", "1–9 — действие, R — правила, F — свободная игра",
-                "1-9 — an action, R — rules, F — free play");
+            Add("hud.keys", "1–9 — действие, R — правила, F — свободная игра, V — просмотр партии, F5 — сохранить",
+                "1-9 — an action, R — rules, F — free play, V — review a saved game, F5 — save");
             Add("hud.waiting", "Ход игрока {0}", "Waiting for player {0}");
             Add("hud.wall", "В стене: {0}", "Wall: {0}");
             Add("hud.points", "Очки: {0}", "Points: {0}");
@@ -180,6 +180,17 @@ namespace Mahjong.Localization
             // ---------------------------------------------------------------- net
             Add("net.rejected", "Ход отклонён: {0}", "Move rejected: {0}");
             Add("net.seatTaken", "Место {0} занято", "Seat {0} is taken");
+
+            // -------------------------------------------------------------- replay
+            Add("replay.title", "Просмотр партии: {0}", "Replay: {0}");
+            Add("replay.move", "Ход: {0}", "Move: {0}");
+            Add("replay.deal", "Раздача, ходов ещё нет", "The deal, no moves yet");
+            Add("replay.keys",
+                "← → — ход, ↑ ↓ — рука, Home/End — начало и конец, V — вернуться за стол",
+                "Arrow keys step a move or a hand, Home/End jump, V returns to the table");
+            Add("replay.saved", "Партия сохранена: {0}", "Game saved: {0}");
+            Add("replay.nothing", "Сохранять пока нечего: партия ещё не началась", "Nothing to review yet: no game has been played");
+            Add("replay.unreadable", "Сохранение не читается: {0}", "The save does not read: {0}");
 
             return table;
         }

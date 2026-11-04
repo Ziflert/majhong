@@ -14,15 +14,16 @@
 | `Assets/Scripts/Mahjong/Bots/` | `HeuristicBot` — бот уровней 1–3 (`BotLevel`), `DangerModel` — чтение стола, `WaitQuality` — оценка ожиданий через `Scoring`, `BotTable` — прогон сессии и передача отставания по очкам |
 | `Assets/Scripts/Mahjong/Controls/` | `ActionPrompt` — что человеку предлагают в панели действий и в каком порядке; `PlayClock` / `ClockExpiry` — окна 20/10/3 секунды |
 | `Assets/Scripts/Mahjong/Net/` | Сетевой договор без сети: `TileNotation` (нотация кости), `ActionCodec` (ход строкой), `SeatView` (проекция на место), `AuthoritativeTable` (единственный владелец `GameState` + лог ходов + `Replay`), `InProcessTable` (транспорт в процессе), `FreeTable` (общий стол «переставь кости») |
+| `Assets/Scripts/Mahjong/Replay/` | Сохранение и просмотр партии: `SessionLog` (формат файла `majhong-save v1`, запись/чтение, переигрывание рук), `ReplayCursor` (позиция внутри партии: ход вперёд/назад, соседняя рука, описание хода структурой `SavedMove`) |
 | `Assets/Scripts/Mahjong/Localization/` | `Loc` — каталог строк RU/EN, `Text` — сборка фраз из структурных данных движка |
 | `Assets/Scripts/Mahjong/Knowledge/` | `RulesBook` — справочник правил внутри игры (страницы по `rule.pdf` + таблица фан из `Fans.All`) |
 | `Assets/Scripts/Mahjong/Compat/` | Полифилл `IsExternalInit` — без него `record`/`init` не собираются в Unity |
 | `Assets/Scripts/MahjongView/` | Unity-слой: `TileObject` (3D-тайл), `ActionBar`/`ActionButton`, `RulesPanel` (справочник), `FreePlayTable` (свободный стол), `UiFont` (шрифт с кириллицей), `MahjongGame` (сборка стола, ввод, часы) |
 | `Assets/Tests/Editor/` | Обёртка над `RulesSelfTest`, `ActionPromptTests`, `FansTableTests` (таблица фан из `rule.pdf`) |
-| `Assets/Tests/PlayMode/` | PlayMode-проверки сцены: тайлы, шрифты, порядок руки, панель и попадание лучом, часы руки, анимации, атлас лиц, справочник, свободный стол, язык |
+| `Assets/Tests/PlayMode/` | PlayMode-проверки сцены: тайлы, шрифты, порядок руки, панель и попадание лучом, часы руки, анимации, атлас лиц, справочник, свободный стол, язык, сохранение в файл и просмотр партии |
 | `Assets/Editor/PrototypeCapture.cs` | Прогон прототипа из CLI: Play, скриншоты Game view, коды выхода |
 | `Assets/Editor/ActionBarPreview.cs` | Скриншот панели действий на заданном наборе кнопок |
-| `Assets/Editor/InterfaceCapture.cs` | Скриншоты стола целиком, справочника и свободного стола из CLI |
+| `Assets/Editor/InterfaceCapture.cs` | Скриншоты стола целиком, справочника, свободного стола, середины руки и просмотра партии из CLI |
 | `Tools/RulesCheck/` | Консольный прогон проверок без Unity (`dotnet run`) |
 | `Tools/BotBench/` | Замер силы ботов: игровые очки, победы, сносы «в руку» по уровням (`dotnet run --project Tools/BotBench -- 60`) |
 | `Tools/HandScore/` | Подсчёт одной руки из текстовой нотации для сверки с внешним калькулятором |
@@ -50,6 +51,8 @@
 | `Controls/ActionPrompt.cs` | Панель действий: какие действия человека становятся кнопками, подписи, горячие клавиши |
 | `Net/AuthoritativeTable.cs` | Серверный стол: проверка хода по `GetLegalActions`, отказ без изменений, лог и `Replay(dealer, seed, log)` |
 | `Net/SeatView.cs` | Что видит одно место: свои закрытые кости, у остальных только число; `Describe()` — текстовая форма для логов |
+| `Replay/SessionLog.cs` | Формат сохранения: шапка, `hand\|dealer\|seed\|wind` на руку, строки ходов; `Parse` называет битую строку, `ReplayHand` пересобирает руку из сида |
+| `Replay/ReplayCursor.cs` | Курсор просмотра: `Next`/`Back`/`NextHand`/`PreviousHand`, `PositionText`, `LastStep` (`SavedMove`: место, вид хода, лица костей) |
 | `Localization/Loc.cs` | Строки интерфейса RU/EN; `Loc.Current`, `Loc.Toggle()`, переменная `MAHJONG_LANG` |
 | `Knowledge/RulesBook.cs` | Страницы справочника правил и таблица фан для экрана `R` |
 | `Settlement.cs` | Выплаты за руку: самобор и выигрыш со сноса (3.9.1.2–3.9.1.3) |
@@ -76,6 +79,8 @@
 - `AuthoritativeTable.Replay(dealer, seed, logLines)` — восстановить стол из лога ходов.
 - `RulesBook.Sections` / `RulesBook.FanTableText()` — страницы справочника и таблица фан.
 - `Loc.Toggle()` / `Text.ActionHint(action)` — язык интерфейса и подписи действий.
+- `SessionLog.Save(path)` / `SessionLog.Load(path)` — запись и чтение сохранённой партии.
+- `new ReplayCursor(log)` → `Next()` / `Back()` / `ToEnd()` → `cursor.State` — просмотр партии по ходам.
 
 ## Команды
 ```bash
