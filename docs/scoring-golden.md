@@ -8,7 +8,9 @@
 |---|---|---|
 | Pure Straight | «Чистый ряд» не складывается с `Short Straight`; `Two Terminal Chows` также исключается из этой комбинации | `pure-straight-mixed-chow` |
 | Four Concealed Pungs | По `rule.pdf` подавляет `All Pungs` и `Concealed Hand`; `Single Wait` явно не исключён и сохраняется | `ScoreGoldenInterpretationBoundaries` |
-| Last Tile | Выигрышная кость включается в число видимых копий; три копии в сбросе + выигрышная кость дают `Last Tile` | `ScoreGoldenInterpretationBoundaries`, `last-copy` |
+| Last Tile | Выигрышная кость включается в число видимых копий; три копии в сбросе + выигрышная кость дают `Last Tile`. Свои комбинации считаются один раз (они уже входят в кости руки); при самоборе выигрышная кость не добавляется второй раз | `ScoreGoldenInterpretationBoundaries`, `score: last tile fans need the real last tile` |
+| Ожидания и самобор | Фаны 77–79 начисляются и при выигрыше со стены: `ScoringContext.WinningTileInHand` сообщает подсчёту, что выигрышная кость уже в руке (пример фана 56 в 3.8.1) | `score: a self-draw keeps the wait fans` |
+| Переплетённые руки | «Полностью закрытая» совмещается с оба фана Greater/Lesser Honors and Knitted Tiles при самоборе, как требует 3.8.1 | `ScoreKnittedTiles` |
 | Flowers | Цветы не участвуют в пороге 8 очков, но добавляются к общей сумме по 1 очку | `ScoreFlowers`, `flower-addition` |
 | Seven Pairs | Четыре одинаковые кости могут образовать две пары | `SevenPairsWithQuad` |
 | Thirteen Orphans | Фан подавляет `All Terminals and Honors`, `All Types`, `Single Wait` и закрытую руку | `ScoreThirteenOrphans` |

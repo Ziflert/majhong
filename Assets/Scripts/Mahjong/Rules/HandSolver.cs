@@ -40,11 +40,15 @@ namespace Mahjong.Rules
     {
         private static readonly HashSet<TileType> Orphans = BuildOrphans();
 
-        /// <summary>Checks a complete hand. Pass <paramref name="winningTile"/> to also describe the wait.</summary>
-        public static HandAnalysis Analyse(PlayerHand hand, TileType? winningTile = null)
+        /// <summary>
+        /// Checks a complete hand. Pass <paramref name="winningTile"/> to also describe the wait;
+        /// set <paramref name="winningTileInHand"/> when that tile is already one of the tiles of
+        /// <paramref name="hand"/> (a self-drawn win), so it is neither added twice nor lost.
+        /// </summary>
+        public static HandAnalysis Analyse(PlayerHand hand, TileType? winningTile = null, bool winningTileInHand = false)
         {
             var concealed = hand.Concealed.Select(t => t.Type).ToList();
-            if (winningTile.HasValue) concealed.Add(winningTile.Value);
+            if (winningTile.HasValue && !winningTileInHand) concealed.Add(winningTile.Value);
 
             var expected = 14 - hand.Melds.Count * 3;
             if (concealed.Count != expected)
@@ -66,19 +70,19 @@ namespace Mahjong.Rules
             return HandAnalysis.Ok(special ?? WinningPattern.Standard, decompositions, waitTiles, wait);
         }
 
-        /// <summary>All faces that turn the waiting hand into a complete one.</summary>
+        /// <summary>
+        /// All faces that turn the waiting hand into a complete one. Uses the same test as
+        /// <see cref="CanComplete"/>, so the special patterns (seven pairs, thirteen orphans,
+        /// seven shifted pairs, knitted hands) are included: a hand waiting on a knitted straight
+        /// has waits, and a bot that reads them must not be told otherwise.
+        /// </summary>
         public static IReadOnlyList<TileType> WaitingTiles(PlayerHand hand)
         {
-            var concealed = hand.Concealed.Select(t => t.Type).ToList();
-            if (concealed.Count != 13 - hand.Melds.Count * 3) return Array.Empty<TileType>();
+            if (hand.Concealed.Count != 13 - hand.Melds.Count * 3) return Array.Empty<TileType>();
 
             var result = new List<TileType>();
             foreach (var candidate in TileTypes.All)
-            {
-                var counts = CountOf(concealed);
-                counts[candidate] = counts.GetValueOrDefault(candidate) + 1;
-                if (Completes(counts, 4 - hand.Melds.Count)) result.Add(candidate);
-            }
+                if (CanComplete(hand, candidate)) result.Add(candidate);
             return result;
         }
 

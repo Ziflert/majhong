@@ -76,10 +76,16 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "clock: three, ten and twenty-second windows", () => HandClockRules(report));
             Run(report, "clock: silence becomes a pass or a discard, never a Hu", () => ClockExpiryRules(report));
             Run(report, "claims: priority of Hu, kong, pung, chow and seat order", () => ClaimPriorityRules(report));
+            Run(report, "claims: every offered chow can be played as offered", () => ChowIdentity(report));
             Run(report, "bots: the danger read follows the tiles on the table", () => DangerReads(report));
             Run(report, "bots: the cautious level throws safer tiles without wrecking shape", () => BotDefense(report));
             Run(report, "bots: the strategic level values the hand and the match", () => BotStrategy(report));
             Run(report, "state: every mechanic is reachable in random play", () => RandomPlayInvariants(report));
+            Run(report, "state: a kong on the last wall tile keeps the turn alive", () => KongAtWallEnd(report));
+            Run(report, "score: a self-draw keeps the wait fans", () => SelfDrawWaits(report));
+            Run(report, "score: last tile fans need the real last tile", () => LastTileBoundaries(report));
+            Run(report, "hand: waiting tiles cover the special patterns", () => SpecialPatternWaits(report));
+            Run(report, "session: a forfeited player takes no table points", () => ForfeitedRanking(report));
 
             return report;
         }
@@ -175,6 +181,22 @@ namespace Mahjong.Rules.Diagnostics
 
         private static bool Has(ScoreResult result, Fan fan) => result.Fans.Any(f => f.Fan.Id == fan.Id);
         private static string Ids(ScoreResult result) => string.Join(", ", result.Fans.Select(f => f.Fan.Id));
+
+        /// <summary>
+        /// Scores a hand whose winning tile is already one of its tiles, the way a self-drawn win reaches
+        /// the scorer. Kept here so the tests do not have to remember the flag themselves.
+        /// </summary>
+        private static ScoreResult ScoreSelfDrawn(PlayerHand hand, TileType winningTile, bool lastTileOfWall = false) =>
+            Scoring.Evaluate(new ScoringContext
+            {
+                Hand = hand,
+                WinningTile = winningTile,
+                WinningTileInHand = true,
+                Source = ClaimSource.SelfDraw,
+                RoundWind = Wind.East,
+                SeatWind = Wind.East,
+                LastTileOfWall = lastTileOfWall
+            });
 
         // ---------------------------------------------------------------- tests
 
@@ -377,6 +399,15 @@ namespace Mahjong.Rules.Diagnostics
             var greaterScore = Score(greater, null, ClaimSource.Discard);
             report.Check(Has(greaterScore, Fans.GreaterHonorsKnitted), $"expected greater honors knitted, got [{Ids(greaterScore)}]");
             report.Check(!Has(greaterScore, Fans.LesserHonorsKnitted), "greater replaces lesser");
+
+            // Rule 3.8.1 for both knitted hands: "may be combined with Fully Concealed on a self-draw".
+            var lesserSelfDraw = Score(lesser, null, ClaimSource.SelfDraw);
+            report.Check(Has(lesserSelfDraw, Fans.FullyConcealed),
+                $"a self-drawn knitted hand also earns fully concealed, got [{Ids(lesserSelfDraw)}]");
+            var greaterSelfDraw = Score(greater, null, ClaimSource.SelfDraw);
+            report.Check(Has(greaterSelfDraw, Fans.FullyConcealed),
+                $"the same for the greater hand, got [{Ids(greaterSelfDraw)}]");
+            report.Check(!Has(greaterScore, Fans.FullyConcealed), "a claimed knitted hand is not fully concealed");
         }
 
         private static void ScoreKnittedStraight(SelfTestReport report)
@@ -797,6 +828,7 @@ namespace Mahjong.Rules.Diagnostics
 
                     var current = state.GetLegalActions(state.CurrentPlayer);
                     report.Check(current.Count > 0, $"seed {seed}: no legal action for the current player in {state.Phase}");
+                    CheckTurnInvariants(report, state, seed);
                     state.Apply(Choose(current, random, state.Players[state.CurrentPlayer]));
                 }
 
@@ -1274,7 +1306,10 @@ namespace Mahjong.Rules.Diagnostics
             report.Check(cheapWait.Value < flushWait.Value,
                 $"a mixed hand must read cheaper than a flush ({cheapWait.Value:0.0} vs {flushWait.Value:0.0})");
 
-            var notWaiting = WaitQuality.Of(Tiles("1c 4c 7c 2d 5d 8d 3b 6b 9b E S W N").Select(tile => tile.Type).ToList(),
+            // A hand with no shape at all: no set, no pair, no knitted pattern. (The knitted hand
+            // 1c 4c 7c 2d 5d 8d 3b 6b 9b E S W N does wait — on the three dragons — so it is the
+            // wrong example here and is checked in SpecialPatternWaits.)
+            var notWaiting = WaitQuality.Of(Tiles("1c 4c 7c 2d 5d 8d 3b 6b 9b E E S W").Select(tile => tile.Type).ToList(),
                 Array.Empty<Meld>());
             report.Equal(0, notWaiting.Waits, "a scattered hand has no waits");
             report.Equal(0.0, notWaiting.AveragePoints, "a hand without waits is worth nothing");
@@ -1347,6 +1382,289 @@ namespace Mahjong.Rules.Diagnostics
                 if (score < bestScore) { bestScore = score; best = option; }
             }
             return best;
+        }
+
+        /// <summary>
+        /// Rule 3.6.6: a discard can allow two different chows. The action carries the tiles it wants,
+        /// and the engine has to consume exactly those. Matching only on the discarded face used to take
+        /// the first chow offered and quietly replace the player's choice.
+        /// </summary>
+        private static void ChowIdentity(SelfTestReport report)
+        {
+            var checkedWindows = 0;
+            for (var seed = 0; seed < 200 && checkedWindows < 25; seed++)
+            {
+                var state = new GameState();
+                var random = new Random(seed * 31 + 7);
+                state.StartHand(seed % 4, 5000 + seed);
+                var steps = 0;
+                while (state.Phase != GamePhase.HandFinished && steps++ < 600)
+                {
+                    if (state.Phase == GamePhase.AwaitingClaims)
+                    {
+                        var claimant = -1;
+                        LegalAction? wanted = null;
+                        for (var player = 0; player < 4; player++)
+                        {
+                            var chows = state.GetLegalActions(player)
+                                .Where(action => action.Kind == ActionKind.Chow).ToList();
+                            if (chows.Count < 2) continue;
+                            claimant = player;
+                            wanted = chows[chows.Count - 1];
+                            break;
+                        }
+
+                        if (claimant >= 0)
+                        {
+                            checkedWindows++;
+                            // Everyone else passes first, so the chow is the only live claim in the window.
+                            for (var player = 0; player < 4; player++)
+                            {
+                                if (player == claimant) continue;
+                                foreach (var pass in state.GetLegalActions(player)
+                                             .Where(action => action.Kind == ActionKind.Pass).ToList())
+                                    state.Apply(pass);
+                            }
+
+                            state.Apply(wanted!);
+                            var meld = state.Players[claimant].Melds.Last();
+                            var expected = wanted!.RequiredTiles.Select(tile => tile.InstanceId).OrderBy(id => id).ToList();
+                            var taken = meld.Tiles
+                                .Where(tile => tile.InstanceId != wanted.Tile!.Value.InstanceId)
+                                .Select(tile => tile.InstanceId).OrderBy(id => id).ToList();
+                            report.Equal(MeldKind.Chow, meld.Kind, $"seed {seed}: the claim became a chow");
+                            report.Check(expected.SequenceEqual(taken),
+                                $"seed {seed}: the chow that was played must be the chow that was offered");
+                            break;
+                        }
+                    }
+
+                    if (state.Phase is GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)
+                    {
+                        for (var player = 0; player < 4; player++)
+                        {
+                            var options = state.GetLegalActions(player);
+                            if (options.Count == 0) continue;
+                            state.Apply(Choose(options, random, state.Players[player]));
+                            if (state.Phase is not (GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)) break;
+                        }
+                        continue;
+                    }
+
+                    var current = state.GetLegalActions(state.CurrentPlayer);
+                    if (current.Count == 0) break;
+                    state.Apply(Choose(current, random, state.Players[state.CurrentPlayer]));
+                }
+            }
+
+            report.Check(checkedWindows > 0, "random play must offer two chows on one discard");
+        }
+
+        /// <summary>
+        /// Two invariants of a turn that the engine has to keep on every state it offers:
+        /// Hu only while the player holds a freshly taken tile (a claim cannot be "upgraded" to Hu
+        /// afterwards), and the last-wall-tile flag of the draw it describes.
+        /// </summary>
+        private static void CheckTurnInvariants(SelfTestReport report, GameState state, int seed)
+        {
+            if (state.Phase != GamePhase.AwaitingDiscard) return;
+
+            report.Equal(state.Wall.IsExhausted, state.LastDrawWasLastWallTile,
+                $"seed {seed}: the last wall tile flag describes the draw that was just made");
+
+            if (state.LastDrawSource.HasValue) return;
+            var current = state.GetLegalActions(state.CurrentPlayer);
+            report.Check(current.All(action => action.Kind != ActionKind.Win),
+                $"seed {seed}: Hu is not offered after a chow or a pung claim");
+        }
+
+        /// <summary>
+        /// Rule 3.8.1 (the example of fan 56): a self-drawn win combines with the wait fans. The engine
+        /// used to score a self-draw without a winning tile, so the wait could never be described.
+        /// </summary>
+        private static void SelfDrawWaits(SelfTestReport report)
+        {
+            var hand = Hand("1c 1c 1c 3c 3c 3c 5d 5d 5d 7b 7b 7b 9d 9d");
+            var claimed = Score(Hand("1c 1c 1c 3c 3c 3c 5d 5d 5d 7b 7b 7b 9d"), ParseTile("9d"), ClaimSource.Discard);
+            var selfDrawn = ScoreSelfDrawn(hand, ParseTile("9d"));
+
+            report.Check(Has(claimed, Fans.SingleWait), "the claimed win of this hand waits on the pair alone");
+            report.Check(Has(selfDrawn, Fans.SingleWait), "a self-drawn win keeps the single wait fan");
+            report.Check(Has(selfDrawn, Fans.FourConcealedPungs), "a self-drawn win still reads four concealed pungs");
+            report.Check(Has(selfDrawn, Fans.FullyConcealed), "a closed self-drawn hand is fully concealed");
+            report.Check(!Has(selfDrawn, Fans.SelfDrawn), "fully concealed replaces self-drawn, as before");
+            report.Check(selfDrawn.Analysis.Wait == WaitType.Single, "the self-drawn wait is described");
+            report.Check(selfDrawn.Analysis.WaitTiles.Count == 1, "the self-drawn hand has exactly one wait");
+
+            var openHand = new PlayerHand();
+            openHand.AddMeld(new Meld(MeldKind.Pung, Tiles("7b 7b 7b"), 1));
+            foreach (var tile in Tiles("1c 1c 1c 3c 3c 3c 5d 5d 5d 9d 9d")) openHand.AddConcealed(tile);
+            var openSelfDraw = ScoreSelfDrawn(openHand, ParseTile("9d"));
+            report.Check(!Has(openSelfDraw, Fans.ConcealedHand), "an open hand is not concealed");
+            report.Check(Has(openSelfDraw, Fans.SelfDrawn), "an open self-drawn hand still earns self-drawn");
+        }
+
+        /// <summary>
+        /// Fans 44, 45 and 58: the wall-based fans need the real last tile, and "last tile" counts how
+        /// many copies of the winning face are visible — never the winner's own melds twice.
+        /// </summary>
+        private static void LastTileBoundaries(SelfTestReport report)
+        {
+            var hand = Hand("1c 1c 1c 3c 3c 3c 5d 5d 5d 7b 7b 7b 9d 9d");
+            var lastDraw = ScoreSelfDrawn(hand, ParseTile("9d"), lastTileOfWall: true);
+            report.Check(Has(lastDraw, Fans.LastTileDraw), "fan 44 is awarded when the wall gave its last tile");
+            report.Check(!Has(lastDraw, Fans.SelfDrawn), "fan 44 replaces self-drawn (3.8.1)");
+
+            var ordinaryDraw = ScoreSelfDrawn(hand, ParseTile("9d"));
+            report.Check(!Has(ordinaryDraw, Fans.LastTileDraw), "no fan 44 while the wall still has tiles");
+
+            var lastClaim = Score(Hand("1c 1c 1c 3c 3c 3c 5d 5d 5d 7b 7b 7b 9d"), ParseTile("9d"),
+                ClaimSource.Discard, lastDiscard: true);
+            report.Check(Has(lastClaim, Fans.LastTileClaim), "fan 45 is awarded on the last discard of the hand");
+
+            // One copy of 5d sits in the winner's own chow (4d 5d 6d), one in the concealed hand and the
+            // win itself is the third: the fourth copy still exists, so there is no Last Tile. Counting
+            // the winner's own melds a second time used to award it anyway.
+            var ownCopy = new PlayerHand();
+            ownCopy.AddMeld(new Meld(MeldKind.Chow, Tiles("4d 5d 6d"), 1));
+            foreach (var tile in Tiles("1c 1c 1c 7b 7b 7b 9c 9c 9c 5d")) ownCopy.AddConcealed(tile);
+            var counted = Scoring.Evaluate(new ScoringContext
+            {
+                Hand = ownCopy,
+                WinningTile = ParseTile("5d"),
+                Source = ClaimSource.Discard,
+                DiscardPile = Array.Empty<TileType>(),
+                OtherMelds = Array.Empty<Meld>()
+            });
+            report.Check(!Has(counted, Fans.LastTile),
+                "the winner's own meld must not be counted twice for the last tile");
+
+            var fourth = Scoring.Evaluate(new ScoringContext
+            {
+                Hand = ownCopy,
+                WinningTile = ParseTile("5d"),
+                Source = ClaimSource.Discard,
+                DiscardPile = new[] { ParseTile("5d") },
+                OtherMelds = Array.Empty<Meld>()
+            });
+            report.Check(Has(fourth, Fans.LastTile), "the fourth visible copy of the winning face earns fan 58");
+        }
+
+        /// <summary>
+        /// The waits of a hand must be read with the same test that decides whether a face completes it:
+        /// a knitted or thirteen-orphans hand has waits even though it never splits into four sets.
+        /// </summary>
+        private static void SpecialPatternWaits(SelfTestReport report)
+        {
+            var knitted = WaitQuality.Of(Tiles("1c 4c 7c 2d 5d 8d 3b 6b 9b E S W N").Select(tile => tile.Type).ToList(),
+                Array.Empty<Meld>());
+            report.Equal(3, knitted.Waits, "a knitted hand waits on the three dragons");
+            report.Check(knitted.AveragePoints >= 24, $"and it is worth a knitted hand, got {knitted.AveragePoints:0.0}");
+
+            var orphans = Tiles("1c 9c 1d 9d 1b 9b E S W N Rd Gd Wd").Select(tile => tile.Type).ToList();
+            var orphanWaits = HandSolver.WaitingTiles(WaitingHand(orphans));
+            report.Equal(13, orphanWaits.Count, "thirteen orphans waits on all thirteen orphans");
+
+            var pairs = Tiles("1c 1c 3c 3c 5d 5d 7b 7b 9b 9b E E Wd").Select(tile => tile.Type).ToList();
+            var pairWaits = HandSolver.WaitingTiles(WaitingHand(pairs));
+            report.Equal(1, pairWaits.Count, "seven pairs with one single waits on its own face");
+            report.Check(pairWaits[0] == ParseTile("Wd"), "and the wait is the unpaired tile");
+
+            // The same check has to run through the scorer, which is what the bots use.
+            var ordinary = WaitQuality.Of(Tiles("1d 1d 1d 2d 3d 4d 5d 6d 7d 8d 9d 9d 9d").Select(t => t.Type).ToList(),
+                Array.Empty<Meld>());
+            report.Equal(9, ordinary.Waits, "a nine gates hand waits on every dot");
+        }
+
+        private static PlayerHand WaitingHand(IEnumerable<TileType> types)
+        {
+            var hand = new PlayerHand();
+            var id = 0;
+            foreach (var type in types) hand.AddConcealed(new Tile(type, id++));
+            return hand;
+        }
+
+        /// <summary>
+        /// Rule 3.11.2: a player more than fifteen minutes late has missed the session. He must not
+        /// receive table points, and the seats that did play share the places among themselves.
+        /// </summary>
+        private static void ForfeitedRanking(SelfTestReport report)
+        {
+            var session = new GameSession();
+            session.Apply(new Settlement(0, 100, true,
+                new List<Payment> { new(1, 0, 108), new(2, 0, 108), new(3, 0, 108) }, 324, "self-test"));
+            session.ReportLateArrival(2, TimeSpan.FromMinutes(20));
+
+            var standings = session.Standings();
+            var missing = standings.Single(row => row.Player == 2);
+            report.Check(missing.Forfeited, "the table marks the missed session");
+            report.Equal(4, missing.Place, "a player who did not come is ranked last");
+            report.Equal(0d, missing.TablePoints, "and receives no table points");
+            report.Equal(1, standings.Single(row => row.Player == 0).Place, "the leading seat keeps place one");
+            report.Equal(1.5d, standings.Single(row => row.Player == 1).TablePoints, "the two tied seats share 2 and 1");
+            report.Equal(1.5d, standings.Single(row => row.Player == 3).TablePoints, "both tied seats get the same share");
+            report.Equal(7d, standings.Sum(row => row.TablePoints), "4 / 2 / 1 stay on the table");
+
+            // Nobody may win table points by not showing up, even when every playing seat is in the red.
+            var red = new GameSession();
+            red.Apply(new Settlement(0, 10, false,
+                new List<Payment> { new(0, 1, 18), new(0, 2, 8), new(0, 3, 8) }, 34, "self-test"));
+            red.ReportLateArrival(1, TimeSpan.FromMinutes(30));
+            report.Equal(0d, red.Standings().Single(row => row.Player == 1).TablePoints,
+                "a forfeited seat cannot take table points out of a losing table");
+        }
+
+        /// <summary>
+        /// Fan 46 and rule 3.6.8: when the kong replacement is the last tile of the wall, the hand
+        /// must not stop as a draw — the player may win on that very tile or discard it, and only
+        /// that discard can end the hand. The line below (never claim, always discard) burns the
+        /// wall, and seed 1308 of that line reaches a kong with exactly one tile left.
+        /// </summary>
+        private static void KongAtWallEnd(SelfTestReport report)
+        {
+            for (var seed = 1250; seed < 1350; seed++)
+            {
+                var state = new GameState();
+                state.StartHand(seed % 4, seed);
+                var steps = 0;
+                while (state.Phase != GamePhase.HandFinished && steps++ < 1000)
+                {
+                    if (state.Phase is GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)
+                    {
+                        for (var player = 0; player < 4; player++)
+                        {
+                            var options = state.GetLegalActions(player);
+                            if (options.Count == 0) continue;
+                            state.Apply(options.First(action => action.Kind == ActionKind.Pass));
+                            if (state.Phase is not (GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)) break;
+                        }
+                        continue;
+                    }
+
+                    var current = state.GetLegalActions(state.CurrentPlayer);
+                    if (current.Count == 0) break;
+                    var kong = current.FirstOrDefault(action =>
+                        action.Kind is ActionKind.ClosedKong or ActionKind.AddedKong);
+                    if (kong != null && state.Wall.Remaining == 1)
+                    {
+                        var player = state.CurrentPlayer;
+                        state.Apply(kong);
+                        report.Equal(GamePhase.AwaitingDiscard, state.Phase,
+                            $"seed {seed}: the last kong replacement keeps the turn alive");
+                        report.Check(state.Wall.IsExhausted, $"seed {seed}: and it did take the last tile of the wall");
+                        report.Check(state.LastDrawWasLastWallTile,
+                            $"seed {seed}: the replacement is the last wall tile");
+                        report.Equal(14, state.Players[player].HandSize,
+                            $"seed {seed}: the player holds a full hand and has to discard");
+                        return;
+                    }
+
+                    var discard = kong ?? current.FirstOrDefault(action => action.Kind == ActionKind.Discard);
+                    state.Apply(discard ?? current[0]);
+                }
+            }
+
+            report.Check(false, "no hand reached a kong on the last wall tile; adjust the seed range if the deal changed");
         }
 
         private static int Usefulness(TileType type, List<TileType> hand)

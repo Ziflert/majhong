@@ -216,11 +216,17 @@ namespace Mahjong.Rules
         /// <summary>
         /// Rule 3.9.2 plus 3.10.1: players are ranked by game points, ties share the places
         /// and the table points of those places are split between them.
+        ///
+        /// A player who missed the session (3.11.2) takes no part in the ranking: he is listed
+        /// after everybody who played and receives no table points. Scoring him as a zero would
+        /// otherwise hand him 4/2/1 points whenever the table finished in the red or share a place
+        /// with a real player.
         /// </summary>
         public IReadOnlyList<Standing> Standings()
         {
-            var order = Enumerable.Range(0, 4)
-                .OrderByDescending(player => EffectiveScore(player))
+            var active = Enumerable.Range(0, 4).Where(player => !forfeited.Contains(player)).ToList();
+            var order = active
+                .OrderByDescending(player => scores[player])
                 .ThenBy(player => player)
                 .ToList();
 
@@ -229,10 +235,10 @@ namespace Mahjong.Rules
             while (index < order.Count)
             {
                 var player = order[index];
-                var score = EffectiveScore(player);
+                var score = scores[player];
                 var tied = new List<int> { player };
                 var next = index + 1;
-                while (next < order.Count && EffectiveScore(order[next]) == score)
+                while (next < order.Count && scores[order[next]] == score)
                 {
                     tied.Add(order[next]);
                     next++;
@@ -242,17 +248,19 @@ namespace Mahjong.Rules
                 var share = 0.0;
                 for (var slot = index; slot < next; slot++) share += PlacePoints(slot);
                 foreach (var tiedPlayer in tied)
-                    result.Add(new Standing(place, tiedPlayer, score, share / tied.Count, tied.Count > 1,
-                        forfeited.Contains(tiedPlayer)));
+                    result.Add(new Standing(place, tiedPlayer, score, share / tied.Count, tied.Count > 1, false));
 
                 index = next;
             }
+
+            var missing = active.Count + 1;
+            foreach (var player in Enumerable.Range(0, 4).Where(forfeited.Contains))
+                result.Add(new Standing(missing++, player, scores[player], 0d, false, true));
+
             return result;
         }
 
         public int? PlaceOf(int player) => Standings().FirstOrDefault(s => s.Player == player)?.Place;
-
-        private int EffectiveScore(int player) => forfeited.Contains(player) ? 0 : scores[player];
 
         private static int PlacePoints(int place) => place switch
         {

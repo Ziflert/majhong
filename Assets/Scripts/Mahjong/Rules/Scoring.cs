@@ -8,7 +8,16 @@ namespace Mahjong.Rules
     public sealed class ScoringContext
     {
         public PlayerHand Hand { get; set; } = null!;
+
+        /// <summary>The face that completed the hand, for both a claim and a self-draw.</summary>
         public TileType? WinningTile { get; set; }
+
+        /// <summary>
+        /// True when <see cref="WinningTile"/> is already one of the tiles of <see cref="Hand"/>.
+        /// A self-drawn winning tile sits in the concealed hand; a claimed or robbed one does not.
+        /// </summary>
+        public bool WinningTileInHand { get; set; }
+
         public ClaimSource Source { get; set; }
         public Wind RoundWind { get; set; } = Wind.East;
         public Wind SeatWind { get; set; } = Wind.East;
@@ -16,6 +25,8 @@ namespace Mahjong.Rules
         public bool LastDiscard { get; set; }
         public bool RobbedKong { get; set; }
         public IReadOnlyCollection<TileType> DiscardPile { get; set; } = Array.Empty<TileType>();
+
+        /// <summary>Melds of the opponents. Must not repeat the melds of <see cref="Hand"/>.</summary>
         public IReadOnlyCollection<Meld> OtherMelds { get; set; } = Array.Empty<Meld>();
     }
 
@@ -60,7 +71,7 @@ namespace Mahjong.Rules
 
         public static ScoreResult Evaluate(ScoringContext context)
         {
-            var analysis = HandSolver.Analyse(context.Hand, context.WinningTile);
+            var analysis = HandSolver.Analyse(context.Hand, context.WinningTile, context.WinningTileInHand);
             if (!analysis.IsComplete)
                 return new ScoreResult(false, 0, 0, Array.Empty<ScoredFan>(), analysis, analysis.Error);
 
@@ -150,7 +161,9 @@ namespace Mahjong.Rules
                         Add(Fans.KnittedStraight, "147, 258 and 369 in three suits plus one set and a pair");
                         break;
                 }
-                if (shape.Pattern != WinningPattern.KnittedTiles && closed && isSelfDraw)
+                // Rule 3.8.1: seven pairs, the shifted pairs, thirteen orphans and both knitted hands
+                // all say "may be combined with Fully Concealed when won on a self-draw".
+                if (closed && isSelfDraw)
                     Add(Fans.FullyConcealed, "closed hand won by self-draw");
                 if (isSelfDraw) Add(Fans.SelfDrawn, "won from the wall");
                 AddCompositionFans(context, Add);
@@ -345,7 +358,7 @@ namespace Mahjong.Rules
         private static void AddCompositionFans(ScoringContext context, System.Action<Fan, string> add)
         {
             var tiles = context.Hand.Concealed.Select(t => t.Type).ToList();
-            if (context.WinningTile.HasValue) tiles.Add(context.WinningTile.Value);
+            if (context.WinningTile.HasValue && !context.WinningTileInHand) tiles.Add(context.WinningTile.Value);
             foreach (var meld in context.Hand.Melds) tiles.AddRange(meld.Types);
             if (tiles.Count == 0) return;
 
@@ -374,7 +387,7 @@ namespace Mahjong.Rules
         private static void EvaluateKnittedTiles(ScoringContext context, System.Action<Fan, string> add)
         {
             var tiles = context.Hand.Concealed.Select(t => t.Type).ToList();
-            if (context.WinningTile.HasValue) tiles.Add(context.WinningTile.Value);
+            if (context.WinningTile.HasValue && !context.WinningTileInHand) tiles.Add(context.WinningTile.Value);
 
             var suited = tiles.Where(t => t.IsNumbered).ToList();
             var honors = tiles.Where(t => t.IsHonor).ToList();
@@ -390,7 +403,7 @@ namespace Mahjong.Rules
         {
             if (context.Hand.Melds.Count > 0) return false;
             var tiles = context.Hand.Concealed.Select(t => t.Type).ToList();
-            if (context.WinningTile.HasValue) tiles.Add(context.WinningTile.Value);
+            if (context.WinningTile.HasValue && !context.WinningTileInHand) tiles.Add(context.WinningTile.Value);
             if (tiles.Count != 14 || !tiles.All(t => t.IsNumbered)) return false;
             if (tiles.Select(t => t.Suit).Distinct().Count() != 1) return false;
             var counts = tiles.GroupBy(t => t.Rank).ToDictionary(g => g.Key, g => g.Count());
@@ -545,7 +558,7 @@ namespace Mahjong.Rules
             var counts = new Dictionary<TileType, int>();
             foreach (var type in context.Hand.AllTypes())
                 counts[type] = counts.GetValueOrDefault(type) + 1;
-            if (context.WinningTile.HasValue)
+            if (context.WinningTile.HasValue && !context.WinningTileInHand)
                 counts[context.WinningTile.Value] = counts.GetValueOrDefault(context.WinningTile.Value) + 1;
 
             foreach (var entry in counts.Where(c => c.Value >= 4))
@@ -556,11 +569,11 @@ namespace Mahjong.Rules
         private static int visibleCopies(ScoringContext context)
         {
             var type = context.WinningTile!.Value;
-            // The winning tile is not part of Hand.Concealed when the caller supplies it
-            // separately. Count it explicitly; otherwise a win on the fourth visible copy can
-            // never satisfy the Last Tile fan.
+            // Own tiles (concealed + own melds) already contain the winning tile when it came from
+            // the wall; a claimed or robbed tile is not in the hand and is counted once here.
+            // OtherMelds are the opponents' melds only: the own ones are already inside AllTypes().
             var count = context.Hand.AllTypes().Count(t => t == type)
-                        + (context.WinningTile == type ? 1 : 0)
+                        + (context.WinningTileInHand ? 0 : 1)
                         + context.DiscardPile.Count(t => t == type)
                         + context.OtherMelds.SelectMany(m => m.Types).Count(t => t == type);
             return count;
@@ -609,8 +622,8 @@ namespace Mahjong.Rules
             ["four-pure-shifted-chows"] = new[] { "short-straight" },
             ["three-kongs"] = new[] { "two-concealed-kongs", "two-melded-kongs", "concealed-kong", "melded-kong", "concealed-and-melded-kong" },
             ["all-terminals-and-honors"] = new[] { "pung-of-terminals-or-honors", "outside-hand", "all-pungs" },
-            ["greater-honors-knitted"] = new[] { "concealed-hand", "fully-concealed", "all-types", "single-wait", "lesser-honors-knitted" },
-            ["lesser-honors-knitted"] = new[] { "concealed-hand", "fully-concealed", "all-types", "single-wait" },
+            ["greater-honors-knitted"] = new[] { "concealed-hand", "all-types", "single-wait", "lesser-honors-knitted" },
+            ["lesser-honors-knitted"] = new[] { "concealed-hand", "all-types", "single-wait" },
             ["all-even-pungs"] = new[] { "all-pungs", "all-simples" },
             ["full-flush"] = new[] { "no-honors" },
             ["pure-triple-chow"] = new[] { "pure-shifted-pungs", "pure-double-chow" },
