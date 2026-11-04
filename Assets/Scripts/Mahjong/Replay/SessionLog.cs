@@ -45,8 +45,18 @@ namespace Mahjong.Replay
             public IEnumerable<string> LogLines() => Moves.Select(move => $"{move.Seat}|{move.Wire}");
         }
 
+        /// <summary>
+        /// Session-wide facts a resumed game needs: the clock as it stood at the save and the limit it
+        /// runs against (rule 3.5.6). Scores are not stored — they are recomputed from the replayed
+        /// hands, so a save cannot claim a score its moves do not produce.
+        /// </summary>
+        public sealed record SessionInfo(TimeSpan Elapsed, TimeSpan TimeLimit);
+
         private readonly List<HandRecord> hands = new();
         private readonly List<string> notes = new();
+
+        /// <summary>Session-wide facts; null for a file written before they were stored.</summary>
+        public SessionInfo? Info { get; set; }
 
         public IReadOnlyList<HandRecord> Hands => hands;
 
@@ -80,6 +90,8 @@ namespace Mahjong.Replay
         public string SaveText()
         {
             var lines = new List<string> { Header };
+            if (Info != null)
+                lines.Add($"session|elapsed={Seconds(Info.Elapsed)}|limit={Seconds(Info.TimeLimit)}");
             lines.AddRange(notes.Select(note => "# " + note));
             foreach (var hand in hands)
             {
@@ -126,6 +138,12 @@ namespace Mahjong.Replay
                 if (line.StartsWith("hand|"))
                 {
                     log.hands.Add(ParseHand(line, number));
+                    continue;
+                }
+
+                if (line.StartsWith("session|"))
+                {
+                    log.Info = ParseSession(line, number);
                     continue;
                 }
 
@@ -184,6 +202,44 @@ namespace Mahjong.Replay
             {
                 throw new InvalidOperationException($"hand {index + 1} does not replay: {failure.Message}", failure);
             }
+        }
+
+        private static string Seconds(TimeSpan span) =>
+            span.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture);
+
+        /// <summary>
+        /// Reads the session line: <c>session|elapsed=seconds|limit=seconds</c>. Keys that this version
+        /// does not know are skipped, so an older build can still read a newer save.
+        /// </summary>
+        private static SessionInfo ParseSession(string line, int number)
+        {
+            var elapsed = GameSession.DefaultTimeLimit;
+            var limit = GameSession.DefaultTimeLimit;
+            var sawElapsed = false;
+
+            foreach (var field in line.Split('|').Skip(1))
+            {
+                var parts = field.Split('=', 2);
+                if (parts.Length != 2) continue;
+                if (!double.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture,
+                        out var seconds) || seconds < 0)
+                    throw new FormatException($"line {number}: '{parts[1]}' is not a number of seconds");
+
+                switch (parts[0].Trim())
+                {
+                    case "elapsed":
+                        elapsed = TimeSpan.FromSeconds(seconds);
+                        sawElapsed = true;
+                        break;
+                    case "limit":
+                        limit = TimeSpan.FromSeconds(seconds);
+                        break;
+                }
+            }
+
+            if (!sawElapsed)
+                throw new FormatException($"line {number}: the session line has no elapsed time");
+            return new SessionInfo(elapsed, limit);
         }
 
         private static HandRecord ParseHand(string line, int number)

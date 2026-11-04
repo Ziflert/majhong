@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Linq;
 using Mahjong.Replay;
+using Mahjong.Rules;
 using Mahjong.Unity;
 using NUnit.Framework;
 using UnityEngine;
@@ -126,6 +128,64 @@ namespace Mahjong.PlayTests
             Assert.IsNotEmpty(game.Status.text, "the table HUD did not come back after the review");
 
             File.Delete(path);
+            Environment.SetEnvironmentVariable("MAHJONG_REPLAY", previousReplay);
+            Time.timeScale = previousScale;
+        }
+
+        [UnityTest]
+        public IEnumerator SavedSessionResumesWithTheSameScoreSheet()
+        {
+            var path = Path.Combine(Path.GetTempPath(), "mahjong-playmode-resume.mahjong");
+            var previousSave = Environment.GetEnvironmentVariable("MAHJONG_SAVE");
+            var previousReplay = Environment.GetEnvironmentVariable("MAHJONG_REPLAY");
+            var previousScale = Time.timeScale;
+            Time.timeScale = 100f;
+
+            var game = Game();
+            yield return null;
+            yield return null;
+
+            // Play until a hand is settled: an empty score sheet would prove nothing about a resume.
+            var frames = 0;
+            while (frames++ < 20000 && game.HandsPlayed < 1)
+            {
+                if (game.HandClock.IsRunning) game.AdvanceClock(60);
+                yield return null;
+            }
+
+            Assert.GreaterOrEqual(game.HandsPlayed, 1, $"no hand was finished:\n{game.Status.text}");
+
+            Environment.SetEnvironmentVariable("MAHJONG_SAVE", path);
+            Environment.SetEnvironmentVariable("MAHJONG_REPLAY", path);
+            Assert.IsNotEmpty(game.SaveReplay(), "the session was not saved");
+
+            var handsPlayed = game.HandsPlayed;
+            var scores = game.Scores.ToArray();
+            var handsInLog = game.MoveLog.Hands.Count;
+            var movesInLog = game.MoveLog.MoveCount;
+            var movesInSavedHand = game.MoveLog.Hands[handsInLog - 1].Moves.Count;
+
+            Assert.IsTrue(game.ResumeSavedSession(), "the saved session did not resume:\n" + game.Status.text);
+            Assert.AreEqual(handsPlayed, game.HandsPlayed,
+                "the resumed session counts another number of hands as played");
+            CollectionAssert.AreEqual(scores, game.Scores.ToArray(),
+                "the resumed session has a different score sheet");
+            // The saved hand was already settled, so the game deals the next one: the log keeps every
+            // move it was resumed from and grows by that new deal, never shrinks.
+            Assert.GreaterOrEqual(game.MoveLog.Hands.Count, handsInLog,
+                "the resumed session threw away the log it was resumed from");
+            Assert.AreEqual(movesInSavedHand, game.MoveLog.Hands[handsInLog - 1].Moves.Count,
+                "the saved hand lost moves on the way through the resume");
+            Assert.GreaterOrEqual(game.MoveLog.MoveCount, movesInLog, "the resumed log lost moves");
+            Assert.AreNotEqual(GamePhase.NotStarted, game.Phase, "the resumed session has no hand on the table");
+            Assert.Greater(game.TableTileCount, 0, "the resumed table is empty");
+
+            // The saved hand was already settled: the resume must not settle it a second time.
+            for (var frame = 0; frame < 5; frame++) yield return null;
+            Assert.AreEqual(handsPlayed, game.HandsPlayed, "the resumed session settled a hand twice");
+
+            File.Delete(path);
+            Environment.SetEnvironmentVariable("MAHJONG_SAVE", previousSave);
             Environment.SetEnvironmentVariable("MAHJONG_REPLAY", previousReplay);
             Time.timeScale = previousScale;
         }

@@ -52,6 +52,12 @@ namespace Mahjong.Unity
         /// <summary>File the session was last written to; empty until the first save.</summary>
         public string LastSavePath => sessionSavePath ?? string.Empty;
 
+        /// <summary>Game points of the four seats, as the score sheet has them. Exposed for tests.</summary>
+        public IReadOnlyList<int> Scores => session?.Scores ?? new int[4];
+
+        /// <summary>Hands already settled in this session. Exposed for tests and tools.</summary>
+        public int HandsPlayed => session?.HandsPlayed ?? 0;
+
         /// <summary>True while the human is to choose a discard: the game is waiting for him.</summary>
         public bool IsYourTurn =>
             session?.State != null && session.State.Phase == GamePhase.AwaitingDiscard
@@ -206,11 +212,18 @@ namespace Mahjong.Unity
         private readonly PlayClock clock = new();
 
         /// <summary>Every accepted move of the session, in order; a save file is this log as text.</summary>
-        private readonly SessionLog moveLog = new();
+        private SessionLog moveLog = new();
 
         private ReplayCursor replay = null!;
         private bool replayOpen;
         private string sessionSavePath;
+
+        /// <summary>A one-line notice under the HUD: "game saved", "game resumed".</summary>
+        private string statusNote = string.Empty;
+        private float statusNoteUntil;
+
+        /// <summary>Names the save file of this session; fixed at the start so every save overwrites it.</summary>
+        private readonly string sessionStamp = System.DateTime.Now.ToString("yyyyMMdd-HHmmss");
 
         private float nextBotAction;
         private float nextHandAt;
@@ -252,7 +265,7 @@ namespace Mahjong.Unity
 
             BuildScene();
             session = new GameSession(SessionTimeLimit());
-            StartHand(random.Next());
+            if (!ResumeFromEnvironment()) StartHand(random.Next());
         }
 
         /// <summary>
@@ -441,6 +454,20 @@ namespace Mahjong.Unity
 
         private void StartHand(int seed)
         {
+            session.StartNextHand(seed);
+            // The hand is logged from the deal that produced it, so a save replays from seeds alone.
+            var dealt = session.State!;
+            moveLog.BeginHand(dealt.Dealer, seed, dealt.RoundWind);
+            BotTable.UpdateMatchContext(session, bots);
+            BeginHandView();
+        }
+
+        /// <summary>
+        /// Resets what belongs to one hand rather than to the session: the flags, the clock, the prompt
+        /// and the tile views. Shared by a fresh deal and by a resumed hand.
+        /// </summary>
+        private void BeginHandView()
+        {
             waitingForNextHand = false;
             humanDiscardedThisHand = false;
             resultPresented = false;
@@ -449,11 +476,6 @@ namespace Mahjong.Unity
             clock.Stop();
             clockKey = string.Empty;
             ClosePrompt();
-            session.StartNextHand(seed);
-            // The hand is logged from the deal that produced it, so a save replays from seeds alone.
-            var dealt = session.State!;
-            moveLog.BeginHand(dealt.Dealer, seed, dealt.RoundWind);
-            BotTable.UpdateMatchContext(session, bots);
             announcedMelds.Clear();
             ClearViews();
             Rebuild();
@@ -585,7 +607,14 @@ namespace Mahjong.Unity
 
             if (Input.GetKeyDown(KeyCode.F5))
             {
-                SaveReplay();
+                var saved = SaveReplay();
+                if (saved.Length > 0) RenderStatus(Loc.Format("replay.saved", Path.GetFileName(saved)));
+                return true;
+            }
+
+            if (Input.GetKeyDown(KeyCode.F9))
+            {
+                ResumeSavedSession();
                 return true;
             }
 
@@ -988,9 +1017,13 @@ namespace Mahjong.Unity
         public string SaveReplay()
         {
             if (moveLog.IsEmpty) return string.Empty;
+            // The clock is stamped at the save, so a resumed game lands on the same minute of the session.
+            moveLog.Info = new SessionLog.SessionInfo(session.Elapsed, session.TimeLimit);
             try
             {
-                sessionSavePath ??= ReplaySavePath();
+                // The path is worked out on every save: MAHJONG_SAVE may be set after the game started,
+                // and the file name itself is stable for the whole session (see sessionStamp).
+                sessionSavePath = ReplaySavePath();
                 moveLog.Save(sessionSavePath);
                 return sessionSavePath;
             }
@@ -1002,13 +1035,12 @@ namespace Mahjong.Unity
             }
         }
 
-        /// <summary>Where a save goes: MAHJONG_SAVE, else a timestamped file in the save directory.</summary>
-        private static string ReplaySavePath()
+        /// <summary>Where a save goes: MAHJONG_SAVE, else a file named after the moment the game began.</summary>
+        private string ReplaySavePath()
         {
             var forced = System.Environment.GetEnvironmentVariable("MAHJONG_SAVE");
             if (!string.IsNullOrWhiteSpace(forced)) return forced;
-            var name = $"replay-{System.DateTime.Now:yyyyMMdd-HHmmss}.mahjong";
-            return Path.Combine(SaveDirectory(), name);
+            return Path.Combine(SaveDirectory(), $"replay-{sessionStamp}.mahjong");
         }
 
         /// <summary>Saves live next to the player data; MAHJONG_REPLAY_DIR moves them for a capture run.</summary>
@@ -1056,6 +1088,99 @@ namespace Mahjong.Unity
             replayOpen = true;
             RenderReplay();
             return true;
+        }
+
+        /// <summary>
+        /// Continues the saved session: the same hands, the points those hands pay, the same session
+        /// clock, and the hand that was in progress left where it stopped.
+        /// </summary>
+        public bool ResumeSavedSession()
+        {
+            // Only a file can be resumed: the game in progress has no session clock to come back to.
+            var path = ReplaySourcePath();
+            if (path.Length == 0)
+            {
+                status.text = Loc.Get("replay.nothing");
+                return false;
+            }
+
+            SessionLog log;
+            try
+            {
+                log = SessionLog.Load(path);
+            }
+            catch (System.Exception failure)
+                when (failure is IOException or System.FormatException or System.UnauthorizedAccessException)
+            {
+                status.text = Loc.Format("replay.unreadable", failure.Message);
+                return false;
+            }
+
+            if (log.IsEmpty)
+            {
+                status.text = Loc.Get("replay.nothing");
+                return false;
+            }
+
+            GameSession resumed;
+            SessionRestore.Outcome outcome;
+            try
+            {
+                resumed = SessionRestore.Restore(log, out outcome, SessionTimeLimit());
+            }
+            catch (System.Exception failure)
+                when (failure is System.InvalidOperationException or System.ArgumentException)
+            {
+                Debug.LogWarning($"[replay] the saved session cannot be resumed: {failure.Message}");
+                status.text = Loc.Format("replay.unreadable", failure.Message);
+                return false;
+            }
+
+            session = resumed;
+            // The loaded log becomes the session's log, so the next save holds the whole game.
+            moveLog = log;
+            BotTable.UpdateMatchContext(session, bots);
+            replayOpen = false;
+            BeginHandView();
+
+            var summary = Loc.Format("session.resumed", outcome.HandsCompleted, outcome.MovesReplayed);
+            if (outcome.HandInProgress)
+            {
+                // The first-discard window of the resumed hand is long over.
+                humanDiscardedThisHand = session.State!.Discards.Count > 0;
+                RenderStatus(summary);
+            }
+            else if (session.IsFinished)
+            {
+                status.text = Loc.Get(session.EndedByTimeLimit ? "session.timeUp" : "session.complete")
+                              + "\n" + Text.Standings(session.Standings(), humanSeat) + "\n" + summary;
+            }
+            else
+            {
+                // The saved hand was already settled: the game goes on with the next deal.
+                StartHand(new System.Random().Next());
+                RenderStatus(summary);
+            }
+
+            Debug.Log($"[replay] resumed {outcome}");
+            return true;
+        }
+
+        /// <summary>The table HUD with one line about the resume under it, kept for a few seconds.</summary>
+        private void RenderStatus(string note)
+        {
+            statusNote = note;
+            statusNoteUntil = Time.time + 6f;
+            status.text = DescribeState();
+        }
+
+        /// <summary>MAHJONG_RESUME=1 continues the newest save instead of dealing a new game.</summary>
+        private bool ResumeFromEnvironment()
+        {
+            var raw = System.Environment.GetEnvironmentVariable("MAHJONG_RESUME");
+            if (string.IsNullOrWhiteSpace(raw)) return false;
+            var asked = raw.Trim().ToLowerInvariant() is not ("0" or "false" or "no" or "off");
+            return asked && ResumeSavedSession();
         }
 
         /// <summary>Returns to the live table exactly where the hand was paused.</summary>
@@ -1175,8 +1300,7 @@ namespace Mahjong.Unity
             log = null!;
             problem = string.Empty;
 
-            var forced = System.Environment.GetEnvironmentVariable("MAHJONG_REPLAY");
-            var path = string.IsNullOrWhiteSpace(forced) ? NewestSave() : forced;
+            var path = ReplaySourcePath();
             if (path.Length == 0)
             {
                 // Nothing saved yet: the game in progress is the game to review.
@@ -1195,6 +1319,13 @@ namespace Mahjong.Unity
                 problem = Loc.Format("replay.unreadable", failure.Message);
                 return false;
             }
+        }
+
+        /// <summary>Which file the review or a resume reads: MAHJONG_REPLAY, else the newest save.</summary>
+        private static string ReplaySourcePath()
+        {
+            var forced = System.Environment.GetEnvironmentVariable("MAHJONG_REPLAY");
+            return string.IsNullOrWhiteSpace(forced) ? NewestSave() : forced;
         }
 
         /// <summary>The session is saved on the way out: a game interrupted mid-hand is still reviewable.</summary>
@@ -1479,6 +1610,8 @@ namespace Mahjong.Unity
 
             if (state.IsWinForbidden(humanSeat))
                 lines.Add(Loc.Format("hud.huForbidden", state.WinForbiddenReason(humanSeat)));
+
+            if (statusNote.Length > 0 && Time.time < statusNoteUntil) lines.Add(statusNote);
 
             return string.Join("\n", lines);
         }

@@ -26,6 +26,10 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "replay: a corrupt save names the line it died on", () => CorruptSaveRejected(report));
             Run(report, "replay: a forged move in the log refuses to replay", () => ForgedMoveRejected(report));
             Run(report, "replay: the cursor steps forward and back to the same states", () => CursorStepping(report));
+            Run(report, "replay: a saved session resumes with the same scores and clock", () => SessionResumes(report));
+            Run(report, "replay: a hand cut mid-play resumes where it stopped", () => SessionResumesMidHand(report));
+            Run(report, "replay: a spent session clock comes back spent", () => SpentClockStopsTheSession(report));
+            Run(report, "replay: a save dealt out of order refuses to resume", () => WrongDealRefused(report));
         }
 
         // -------------------------------------------------------------- saving
@@ -217,6 +221,162 @@ namespace Mahjong.Rules.Diagnostics
             report.Check(crossed.PreviousHand(), "the first hand comes back");
             report.Equal(0, crossed.HandIndex, "the cursor is on the first hand again");
             report.Check(!crossed.PreviousHand(), "the first hand has no hand before it");
+        }
+
+        // ------------------------------------------------------------- restore
+
+        private static void SessionResumes(SelfTestReport report)
+        {
+            var elapsed = TimeSpan.FromMinutes(37.5);
+            var limit = TimeSpan.FromMinutes(90);
+            var log = new SessionLog { Info = new SessionLog.SessionInfo(elapsed, limit) };
+            var expected = new int[4];
+
+            for (var hand = 0; hand < 4; hand++)
+            {
+                var table = new InProcessTable(hand, 61000 + hand * 101, Wind.East,
+                    BotLevel.Strategic, 0, 1, 2, 3);
+                table.PlayOut();
+                log.BeginHand(table.Server.Dealer, table.Server.Seed, table.Server.RoundWind);
+                foreach (var (seat, wire) in table.Server.Log)
+                    log.RecordWire(seat, wire);
+
+                // What those hands pay, worked out apart from the session: this is the score the
+                // resumed session has to arrive at by replaying, not by trusting the file.
+                var settlement = table.State.Result != null
+                    ? Settlements.ForWin(table.State.Result)
+                    : Settlements.ForDraw();
+                foreach (var payment in settlement.Payments)
+                {
+                    expected[payment.FromPlayer] -= payment.Points;
+                    expected[payment.ToPlayer] += payment.Points;
+                }
+            }
+
+            var saved = SessionLog.Parse(log.SaveText());
+            report.Equal(elapsed, saved.Info?.Elapsed, "the session clock survives the file");
+            report.Equal(limit, saved.Info?.TimeLimit, "the session limit survives the file");
+
+            var resumed = SessionRestore.Restore(saved, out var outcome);
+            for (var seat = 0; seat < 4; seat++)
+                report.Equal(expected[seat], resumed.Scores[seat], $"seat {seat} resumes with the points of its hands");
+            report.Equal(4, resumed.HandsPlayed, "four hands are counted as played");
+            report.Equal(elapsed, resumed.Elapsed, "the clock comes back where it stopped");
+            report.Equal(limit, resumed.TimeLimit, "the session keeps its own limit");
+            report.Equal(4, resumed.History.Count, "four settled hands in the history");
+            report.Check(!outcome.TimeUp, "the clock is not spent: " + outcome);
+            report.Check(!outcome.HandInProgress, "the restore stops between hands: " + outcome);
+            report.Check(!resumed.IsFinished, "four of sixteen hands leave the session running");
+
+            // The session goes on: the fifth hand is dealt to the next dealer in the next round.
+            resumed.StartNextHand(4242);
+            report.Equal(0, resumed.State!.Dealer, "the fifth hand goes to the fourth seat of the round");
+            report.Equal(Wind.South, resumed.State!.RoundWind, "the fifth hand opens the next round");
+        }
+
+        private static void SessionResumesMidHand(SelfTestReport report)
+        {
+            var table = new InProcessTable(0, 4242, Wind.East, BotLevel.Strategic, 0, 1, 2, 3);
+            table.PlayOut();
+            var all = table.Server.Log.ToList();
+            var cut = Math.Min(24, all.Count - 1);
+
+            var log = new SessionLog();
+            log.BeginHand(table.Server.Dealer, table.Server.Seed, table.Server.RoundWind);
+            foreach (var (seat, wire) in all.Take(cut))
+                log.RecordWire(seat, wire);
+
+            var resumed = SessionRestore.Restore(log, out var outcome);
+            report.Check(outcome.HandInProgress, "a cut log resumes a hand in progress: " + outcome);
+            report.Equal(0, resumed.HandsPlayed, "a hand in progress is not a hand played yet");
+            report.Check(resumed.State!.Phase != GamePhase.HandFinished, "the resumed hand is still running");
+
+            // The hand resumes exactly where the log stopped: the same four projections, not just
+            // "some state with thirteen tiles".
+            var expected = AuthoritativeTable.Replay(table.Server.Dealer, table.Server.Seed,
+                table.Server.RoundWind, log.Hands[0].LogLines());
+            for (var seat = 0; seat < 4; seat++)
+                report.Equal(SeatView.For(expected.State, seat).Describe(),
+                    SeatView.For(resumed.State!, seat).Describe(),
+                    $"seat {seat} resumes where the hand stopped");
+
+            // And it can be played on to the end, which is what "continue" has to mean.
+            foreach (var (seat, wire) in all.Skip(cut))
+            {
+                report.Check(ActionCodec.TryDecode(wire, out var intent, out var error), $"{wire} decodes: {error}");
+                var action = ActionCodec.Resolve(resumed.State!.GetLegalActions(seat), intent);
+                report.Check(action != null, $"{wire} is still offered to seat {seat} after the resume");
+                resumed.State!.Apply(action!);
+            }
+
+            report.Equal(GamePhase.HandFinished, resumed.State!.Phase, "the rest of the hand plays out");
+            var settlement = resumed.CompleteHand();
+            report.Equal(1, resumed.HandsPlayed, "the continued hand is counted as played");
+
+            var original = table.State.Result != null
+                ? Settlements.ForWin(table.State.Result)
+                : Settlements.ForDraw();
+            report.Equal(original.WinnerPlayer, settlement.WinnerPlayer,
+                "the continued hand has the winner the hand had");
+            report.Equal(original.TotalPaid, settlement.TotalPaid,
+                "the continued hand pays what it paid when it was first played");
+        }
+
+        private static void SpentClockStopsTheSession(SelfTestReport report)
+        {
+            var table = new InProcessTable(0, 31337, Wind.East, BotLevel.Strategic, 0, 1, 2, 3);
+            table.PlayOut();
+            var log = new SessionLog { Info = new SessionLog.SessionInfo(TimeSpan.FromMinutes(31), TimeSpan.FromMinutes(30)) };
+            log.BeginHand(table.Server.Dealer, table.Server.Seed, table.Server.RoundWind);
+            foreach (var (seat, wire) in table.Server.Log)
+                log.RecordWire(seat, wire);
+
+            var resumed = SessionRestore.Restore(log, out var outcome);
+            report.Check(outcome.TimeUp, "a spent clock comes back spent: " + outcome);
+            report.Check(resumed.EndedByTimeLimit, "the session ended when its clock ran out");
+            report.Check(resumed.IsTimeUp, "the restored clock is past its limit");
+            report.Check(!outcome.HandInProgress, "nothing is in progress once play has stopped");
+
+            // Rule 3.5.6: a stopped session deals no further hand.
+            try
+            {
+                resumed.StartNextHand(1);
+                report.Check(false, "a session stopped by the clock must not deal another hand");
+            }
+            catch (InvalidOperationException)
+            {
+                report.Check(true, "a session stopped by the clock refuses to deal another hand");
+            }
+        }
+
+        private static void WrongDealRefused(SelfTestReport report)
+        {
+            var first = PlayOneHand(0, 70707);
+            var second = PlayOneHand(0, 80808);   // the session deals the second hand to seat 1
+
+            var log = new SessionLog();
+            foreach (var hand in first.Hands)
+            {
+                log.BeginHand(hand.Dealer, hand.Seed, hand.RoundWind);
+                foreach (var move in hand.Moves) log.RecordWire(move.Seat, move.Wire);
+            }
+
+            foreach (var hand in second.Hands)
+            {
+                log.BeginHand(hand.Dealer, hand.Seed, hand.RoundWind);
+                foreach (var move in hand.Moves) log.RecordWire(move.Seat, move.Wire);
+            }
+
+            try
+            {
+                SessionRestore.Restore(log, out _);
+                report.Check(false, "a save whose hand is dealt to the wrong seat must not resume");
+            }
+            catch (InvalidOperationException failure)
+            {
+                report.Check(failure.Message.Contains("hand 2"),
+                    "the refusal names the hand that does not fit: " + failure.Message);
+            }
         }
 
         // -------------------------------------------------------------- helpers
