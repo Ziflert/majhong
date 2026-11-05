@@ -21,12 +21,12 @@
 | `Assets/Scripts/Mahjong/Localization/` | `Loc` — каталог строк RU/EN, `Text` — сборка фраз из структурных данных движка |
 | `Assets/Scripts/Mahjong/Knowledge/` | `RulesBook` — справочник правил внутри игры (страницы по `rule.pdf` + таблица фан из `Fans.All`) |
 | `Assets/Scripts/Mahjong/Compat/` | Полифилл `IsExternalInit` — без него `record`/`init` не собираются в Unity |
-| `Assets/Scripts/MahjongView/` | Unity-слой: `TileObject` (3D-тайл), `ActionBar`/`ActionButton`, `ControlsPanel`/`ControlTile` (трей экранных кнопок: правила, пауза, просмотр, сохранить, язык, песочница), `RulesPanel` (справочник), `FreePlayTable` (свободный стол), `MenuPanel` (меню на `Esc`), `TitlePanel` (приветственный экран: кадр, строки, попадание лучом), `DiceTray` (две кости в середине), `TableLayout` (где что стоит на столе), `UiFont` (шрифт с кириллицей), `MahjongGame` (сборка стола, ввод, часы, открытие руки) |
+| `Assets/Scripts/MahjongView/` | Unity-слой: `TileObject` (3D-тайл), `ActionBar`/`ActionButton`, `ControlsPanel`/`ControlTile` (трей экранных кнопок: правила, пауза, просмотр, сохранить, язык, песочница), `RulesPanel` (справочник: содержание с кликом по строке, плитки-стрелки `◀`/`▶`, счётчик страницы), `FreePlayTable` (свободный стол), `MenuPanel` (меню на `Esc`), `TitlePanel` (приветственный экран: кадр, строки, попадание лучом), `DiceTray` (две кости в середине), `TableLayout` (где что стоит на столе), `UiFont` (шрифт с кириллицей), `MahjongGame` (сборка стола, ввод, часы, открытие руки) |
 | `Assets/Tests/Editor/` | Обёртка над `RulesSelfTest`, `ActionPromptTests`, `FansTableTests` (таблица фан из `rule.pdf`) |
-| `Assets/Tests/PlayMode/` | PlayMode-проверки сцены: тайлы, шрифты, порядок руки, панель и попадание лучом, часы руки, анимации, атлас лиц, справочник, свободный стол, язык, сохранение в файл, просмотр и продолжение партии, меню (строки, пауза, настройки, пути из меню), стена и кубики (`WallTests`), приветственный экран (`TitleTests`: экран на запуске, кадр, настройки доходят до стола, новая игра, справочник, «ещё в работе», продолжение из файла) |
+| `Assets/Tests/PlayMode/` | PlayMode-проверки сцены: тайлы, шрифты, порядок руки, панель и попадание лучом, часы руки, анимации, атлас лиц, справочник (`InterfaceTests`, `RulebookTests`: содержание, плитки-стрелки, возврат в меню), свободный стол, язык, сохранение в файл, просмотр и продолжение партии, меню (строки, пауза, настройки, пути из меню), стена и кубики (`WallTests`), приветственный экран (`TitleTests`: экран на запуске, кадр, настройки доходят до стола, новая игра, справочник, «ещё в работе», продолжение из файла) |
 | `Assets/Editor/PrototypeCapture.cs` | Прогон прототипа из CLI: Play, скриншоты Game view, коды выхода |
 | `Assets/Editor/ActionBarPreview.cs` | Скриншот панели действий на заданном наборе кнопок |
-| `Assets/Editor/InterfaceCapture.cs` | Скриншоты стола целиком, середины руки, меню, справочника, свободного стола и просмотра партии из CLI |
+| `Assets/Editor/InterfaceCapture.cs` | Скриншоты стола целиком, середины руки, меню, справочника (содержание и страница), свободного стола и просмотра партии из CLI |
 | `Tools/RulesCheck/` | Консольный прогон проверок без Unity (`dotnet run`) |
 | `Tools/BotBench/` | Замер силы ботов: игровые очки, победы, сносы «в руку» по уровням (`dotnet run --project Tools/BotBench -- 60`) |
 | `Tools/HandScore/` | Подсчёт одной руки из текстовой нотации для сверки с внешним калькулятором |
@@ -66,7 +66,7 @@
 | `Replay/ReplayCursor.cs` | Курсор просмотра: `Next`/`Back`/`NextHand`/`PreviousHand`, `PositionText`, `LastStep` (`SavedMove`: место, вид хода, лица костей) |
 | `Replay/SessionRestore.cs` | Восстановление сессии из сохранения: разыгрывающий и раунд сверяются с сессией, счёт считается из переигранных рук, часы и лимит берутся из файла |
 | `Localization/Loc.cs` | Строки интерфейса RU/EN; `Loc.Current`, `Loc.Toggle()`, переменная `MAHJONG_LANG` |
-| `Knowledge/RulesBook.cs` | Страницы справочника правил и таблица фан для экрана `R` |
+| `Knowledge/RulesBook.cs` | Страницы справочника правил и таблица фан для экрана `R` (содержание собирает `RulesPanel`) |
 | `Controls/GameSettings.cs` | Настройки стола: профиль правил (`RuleVariant`, `MAHJONG_VARIANT`), язык, сила ботов (`BotLevel`), темп (`Speeds` ×0.25…×4, `ScaledDelay`); разбор переменных окружения в инвариантной культуре |
 | `Controls/GameMenu.cs` | Меню как модель: восемь строк, курсор с переносом, `Adjust` (шаг настройки) и `Activate` (команда строки), подписи из `Loc` |
 | `Controls/TitleScreen.cs` | Приветственный экран как модель: 12 строк на главной странице и страница сохранений, `TitleRowState.Unavailable` для непостроенных режимов, `StepVariant` по пресетам правил, `TitleCommand` для игры (`MahjongGame.TitleActivate`) |
@@ -101,6 +101,7 @@
 - `new AuthoritativeTable(dealer, seed)` → `Accept(seat, "discard|17")` → `ViewFor(seat)` — ход через сетевой договор.
 - `AuthoritativeTable.Replay(dealer, seed, logLines)` — восстановить стол из лога ходов.
 - `RulesBook.Sections` / `RulesBook.FanTableText()` — страницы справочника и таблица фан.
+- `game.OpenRules(fromMenu)` → `game.ClickRules(ray)` / `game.CloseRules()` — книга правил: клик по содержанию и плиткам, возврат туда, откуда открыли (У-5).
 - `Loc.Toggle()` / `Text.ActionHint(action)` — язык интерфейса и подписи действий.
 - `SessionLog.Save(path)` / `SessionLog.Load(path)` — запись и чтение сохранённой партии.
 - `new ReplayCursor(log)` → `Next()` / `Back()` / `ToEnd()` → `cursor.State` — просмотр партии по ходам.
@@ -146,7 +147,7 @@ $env:MAHJONG_SHOT_DIR="D:\Temprary\game\Screenshots"
   -executeMethod Mahjong.EditorTools.ActionBarPreview.CaptureAndExit
 ```
 
-Проверено на 2026-11-05: `RulesCheck` — 79 групп, 122 654 проверки; EditMode 13/13; PlayMode 55/55;
+Проверено на 2026-11-06: `RulesCheck` — 79 групп, 122 674 проверки; EditMode 13/13; PlayMode 58/58;
 скриншоты `PrototypeCapture` и `InterfaceCapture` снимаются.
 
 ⚠ Под bash (Git Bash) те же команды запускать с путями **прямыми слэшами и в кавычках**:

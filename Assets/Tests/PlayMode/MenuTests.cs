@@ -192,7 +192,11 @@ namespace Mahjong.PlayTests
             yield return null;
             Assert.IsFalse(game.IsMenuOpen, "The menu stayed open over the rulebook.");
             Assert.IsTrue(game.Rules.IsOpen, "The rules row did not open the rulebook.");
-            game.Rules.Close();
+            // У-5: a book opened from the menu closes back into the menu.
+            game.CloseRules();
+            yield return null;
+            Assert.IsTrue(game.IsMenuOpen, "The book dropped the player at the table instead of the menu.");
+            game.CloseMenu();
             yield return null;
 
             // The review row opens the review of the game in progress.

@@ -215,7 +215,7 @@ namespace Mahjong.PlayTests
             Assert.IsFalse(game.TitlePanel.gameObject.activeInHierarchy,
                 "The rows are drawn over the rulebook page.");
 
-            game.Rules.Close();
+            game.CloseRules();
             yield return null;
 
             Assert.IsTrue(game.TitlePanel.gameObject.activeInHierarchy,

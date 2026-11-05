@@ -182,8 +182,15 @@ namespace Mahjong.Localization
 
             // ------------------------------------------------------- interface chrome
             Add("ui.rules", "Правила", "Rules");
-            Add("ui.rulesLine", "{0} · с. {1}/{2} · ← → листать, R закрыть",
-                "{0} · p. {1}/{2} · arrow keys to turn, R to close");
+            Add("ui.rulesLine", "{0} · R / Esc — закрыть", "{0} · R / Esc to close");
+            Add("ui.rulesPage", "с. {0} / {1}", "p. {0} / {1}");
+            Add("ui.rulesHint", "← → листать · Home — содержание · R / Esc — закрыть",
+                "← → turn the pages · Home — contents · R / Esc to close");
+            // У-5: the book opens on its table of contents, and a row of it opens its page.
+            Add("ui.rulesContents", "Содержание", "Contents");
+            Add("ui.rulesContentsHint",
+                "Щёлкните строку, чтобы открыть раздел, или листайте стрелками внизу страницы.",
+                "Click a line to open that page, or use the arrows at the bottom of the page.");
             Add("ui.rulesClosed", "Открыть правила — R", "Open the rules — R");
             Add("ui.language", "Язык", "Language");
             Add("ui.freeMode", "Свободная игра", "Free play");

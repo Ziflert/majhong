@@ -282,6 +282,9 @@ namespace Mahjong.Unity
         private TextMesh status = null!;
         private ActionBar bar = null!;
         private RulesPanel rules = null!;
+
+        /// <summary>True when the book was opened from the menu: closing it puts the menu back (У-5).</summary>
+        private bool rulesFromMenu;
         private MenuPanel menu = null!;
         private ResultPanel resultPanel = null!;
         private readonly ResultScreen resultScreen = new();
@@ -734,9 +737,7 @@ namespace Mahjong.Unity
                 switch (tile.Type)
                 {
                     case ControlType.Rulebook:
-                        ClosePrompt();
-                        StopClock();
-                        rules.SetOpen(true);
+                        OpenRules();
                         return true;
                     case ControlType.Menu:
                         OpenMenu();
@@ -762,8 +763,10 @@ namespace Mahjong.Unity
 
             if (rules.IsOpen)
             {
-                // A turned page is not a closed book: the arrows only page through (У-5).
-                if (rules.HandleKeys() == RulesKey.Close) rules.Close();
+                // У-5: the page carries its own arrows and a table of contents, so a click is read
+                // here as well; a turned page is not a closed book.
+                if (Input.GetMouseButtonDown(0) && ClickRules(MouseRay())) return true;
+                if (rules.HandleKeys() == RulesKey.Close) CloseRules();
                 return true;
             }
 
@@ -776,9 +779,7 @@ namespace Mahjong.Unity
 
             if (Input.GetKeyDown(KeyCode.R))
             {
-                ClosePrompt();
-                StopClock();
-                rules.SetOpen(true);
+                OpenRules();
                 return true;
             }
 
@@ -860,6 +861,62 @@ namespace Mahjong.Unity
             else RefreshStatus();
             RefreshResultTexts();
             return Loc.Current;
+        }
+
+        /// <summary>
+        /// Opens the rulebook (У-5). The book hangs over the paused hand; when it was opened from the
+        /// menu, closing it puts the menu back where the player left it instead of dropping him at the table.
+        /// </summary>
+        public void OpenRules(bool fromMenu = false)
+        {
+            ClosePrompt();
+            StopClock();
+            rulesFromMenu = fromMenu;
+            rules.SetOpen(true);
+            SyncInterfaceVisibility();
+        }
+
+        /// <summary>Closes the book and brings back the screen it was opened from.</summary>
+        public void CloseRules()
+        {
+            var backToMenu = rulesFromMenu;
+            rulesFromMenu = false;
+            rules.Close();
+
+            if (backToMenu && menu != null)
+            {
+                menu.SetOpen(true);
+                menu.Refresh(gameMenu);
+            }
+
+            SyncInterfaceVisibility();
+            RefreshStatus();
+        }
+
+        /// <summary>
+        /// Reads a click inside the open book: the two plates of the bottom line and the rows of the
+        /// table of contents. Public because raw mouse input cannot be pressed from a test — the test
+        /// casts the same ray a player's cursor would.
+        /// </summary>
+        public bool ClickRules(Ray ray)
+        {
+            if (rules == null || !rules.IsOpen) return false;
+
+            var click = rules.TryPick(ray);
+            switch (click.Kind)
+            {
+                case RulesClickKind.Previous:
+                    rules.Turn(-1);
+                    return true;
+                case RulesClickKind.Next:
+                    rules.Turn(1);
+                    return true;
+                case RulesClickKind.Page:
+                    rules.GoToPage(click.Page);
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         /// <summary>Opens free play: the whole set on the table, movable by any seat.</summary>
@@ -969,7 +1026,7 @@ namespace Mahjong.Unity
                     }
                     break;
                 case TitleCommand.Rules:
-                    rules.SetOpen(true);
+                    OpenRules();
                     break;
                 case TitleCommand.Quit:
                     QuitGame();
@@ -1009,7 +1066,8 @@ namespace Mahjong.Unity
             // The rulebook opened from the welcome screen closes back to it, not to a hand nobody dealt.
             if (rules.IsOpen)
             {
-                if (rules.HandleKeys() == RulesKey.Close) rules.Close();
+                if (Input.GetMouseButtonDown(0) && ClickRules(MouseRay())) return;
+                if (rules.HandleKeys() == RulesKey.Close) CloseRules();
                 return;
             }
 
@@ -1701,7 +1759,7 @@ namespace Mahjong.Unity
                     break;
                 case MenuCommand.Rules:
                     CloseMenu();
-                    rules.SetOpen(true);
+                    OpenRules(fromMenu: true);
                     break;
                 case MenuCommand.Close:
                     CloseMenu();

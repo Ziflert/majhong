@@ -43,6 +43,9 @@ namespace Mahjong.EditorTools
             // the shot is taken while a hand is dealt so the tray is shown and all tiles are active.
             ("controls-panel", "burn", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f), SettleSeconds),
             ("rules-panel", "rules", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f), SettleSeconds),
+            // У-5: the same book one page in — the text of a page, the two plates of the bottom line
+            // and the counter between them; the contents page above shows the rows instead.
+            ("rules-page", "ruletext", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f), SettleSeconds),
             ("free-play", "free", new Vector3(0f, 2.70f, -2.60f), new Vector3(0f, 0f, 0.18f), SettleSeconds),
             // No player sits at a capture run, so this step runs the human windows out and the shot
             // shows the table mid-hand; the review after it then has real moves to step through.
@@ -217,7 +220,11 @@ namespace Mahjong.EditorTools
             switch (open)
             {
                 case "rules":
-                    game.Rules.SetOpen(true);
+                    game.OpenRules();
+                    break;
+                case "ruletext":
+                    game.OpenRules();
+                    game.Rules.GoTo("score");
                     break;
                 case "free":
                     game.OpenFreePlay();
@@ -250,7 +257,11 @@ namespace Mahjong.EditorTools
             {
                 "welcome" => $"welcome screen, {game.Title.RowCount} rows, on '{game.Title.RowAt(game.Title.Index)}',"
                              + $" panel {(game.TitlePanel.IsOpen ? "open" : "closed")}",
-                "rules" => $"rulebook page {game.Rules.Page + 1}/{game.Rules.PageCount}: {game.Rules.CurrentTitle}",
+                "rules" => $"rulebook page {game.Rules.Page + 1}/{game.Rules.PageCount}: {game.Rules.CurrentTitle},"
+                           + $" {game.Rules.RowCount} rows of contents,"
+                           + $" rows {(game.Rules.RowsShown(0) ? "drawn" : "put away")}",
+                "ruletext" => $"rulebook page {game.Rules.Page + 1}/{game.Rules.PageCount}: {game.Rules.CurrentTitle},"
+                              + $" counter '{game.Rules.Counter.text}'{(game.Rules.IsContents ? ", contents" : "")}",
                 "free" => $"free play {game.FreePlay.TileViewCount} tiles, seat {game.FreePlay.ActiveSeat}",
                 "replay" => $"review {game.Replay.PositionText}, last {game.Replay.LastMoveText}",
                 "controls-panel" => $"controls tray open, {game.Controls?.Tiles?.Count ?? 0} tiles visible, phase {game.Phase}",
@@ -274,7 +285,10 @@ namespace Mahjong.EditorTools
             switch (step.Open)
             {
                 case "rules":
-                    game.Rules.Close();
+                    game.CloseRules();
+                    break;
+                case "ruletext":
+                    game.CloseRules();
                     break;
                 case "free":
                     game.CloseFreePlay();

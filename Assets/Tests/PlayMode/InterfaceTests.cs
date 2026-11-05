@@ -47,8 +47,8 @@ namespace Mahjong.PlayTests
             Assert.IsNotEmpty(rules.Title.text, "The first page has no title.");
             Assert.IsNotEmpty(rules.Body.text, "The first page has no text.");
             StringAssert.IsMatch("[А-Яа-яЁё]", rules.Body.text, "The rulebook is not in Russian.");
-            StringAssert.Contains("1/" + rules.PageCount, rules.Footer.text,
-                "The footer does not say which page is on screen: " + rules.Footer.text);
+            StringAssert.Contains("1 / " + rules.PageCount, rules.Counter.text,
+                "The counter does not say which page is on screen: " + rules.Counter.text);
 
             // The panel hangs half a metre in front of the camera, where the frame is only about
             // 0.61 x 0.31: a page that is bigger than that is cropped, and the player loses the first
