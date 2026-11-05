@@ -168,7 +168,9 @@ namespace Mahjong.PlayTests
             while (frames++ < 3000 && game.Opening.Step != OpeningStep.Deal)
             {
                 var open = Tiles()
-                    .Where(tile => tile.IsFaceUp && OnTheWallSquare(tile.transform.position))
+                    // A tile that already has somewhere to go is on its way out of the wall, not standing
+                    // in it: its face may open while its first frames are still inside the square.
+                    .Where(tile => tile.IsFaceUp && tile.IsSettled && OnTheWallSquare(tile.transform.position))
                     .Select(tile => tile.gameObject.name)
                     .ToList();
                 Assert.IsEmpty(open, "A tile standing in the wall shows its face before the deal has started.");
