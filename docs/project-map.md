@@ -21,7 +21,7 @@
 | `Assets/Scripts/Mahjong/Localization/` | `Loc` — каталог строк RU/EN, `Text` — сборка фраз из структурных данных движка |
 | `Assets/Scripts/Mahjong/Knowledge/` | `RulesBook` — справочник правил внутри игры (страницы по `rule.pdf` + таблица фан из `Fans.All`) |
 | `Assets/Scripts/Mahjong/Compat/` | Полифилл `IsExternalInit` — без него `record`/`init` не собираются в Unity |
-| `Assets/Scripts/MahjongView/` | Unity-слой: `TileObject` (3D-тайл), `ActionBar`/`ActionButton`, `RulesPanel` (справочник), `FreePlayTable` (свободный стол), `MenuPanel` (меню на `Esc`), `TitlePanel` (приветственный экран: кадр, строки, попадание лучом), `DiceTray` (две кости в середине), `TableLayout` (где что стоит на столе), `UiFont` (шрифт с кириллицей), `MahjongGame` (сборка стола, ввод, часы, открытие руки) |
+| `Assets/Scripts/MahjongView/` | Unity-слой: `TileObject` (3D-тайл), `ActionBar`/`ActionButton`, `ControlsPanel`/`ControlTile` (трей экранных кнопок: правила, пауза, просмотр, сохранить, язык, песочница), `RulesPanel` (справочник), `FreePlayTable` (свободный стол), `MenuPanel` (меню на `Esc`), `TitlePanel` (приветственный экран: кадр, строки, попадание лучом), `DiceTray` (две кости в середине), `TableLayout` (где что стоит на столе), `UiFont` (шрифт с кириллицей), `MahjongGame` (сборка стола, ввод, часы, открытие руки) |
 | `Assets/Tests/Editor/` | Обёртка над `RulesSelfTest`, `ActionPromptTests`, `FansTableTests` (таблица фан из `rule.pdf`) |
 | `Assets/Tests/PlayMode/` | PlayMode-проверки сцены: тайлы, шрифты, порядок руки, панель и попадание лучом, часы руки, анимации, атлас лиц, справочник, свободный стол, язык, сохранение в файл, просмотр и продолжение партии, меню (строки, пауза, настройки, пути из меню), стена и кубики (`WallTests`), приветственный экран (`TitleTests`: экран на запуске, кадр, настройки доходят до стола, новая игра, справочник, «ещё в работе», продолжение из файла) |
 | `Assets/Editor/PrototypeCapture.cs` | Прогон прототипа из CLI: Play, скриншоты Game view, коды выхода |
@@ -35,6 +35,8 @@
 | `Tools/Tiles/build_atlas.py` | Сборка `tile-atlas.png` из SVG-исходников (Skia, `python Tools/Tiles/build_atlas.py`) |
 | `.github/workflows/rules.yml` | CI: `Tools/RulesCheck` на push и pull request |
 | `docs/unity-layer.md` | Как запустить 3D-прототип и что он умеет |
+| `docs/ui-design.md` | Черновик замысла: переезд интерфейса на UGUI (палитра, экраны, темы, этапы). В план не влит, решения нет — см. `docs/session-context.md` |
+| `UI/` | Черновик UGUI-слоя к `docs/ui-design.md` (`Scripts/UIManager.cs`, `Scripts/ViewModels/TitleViewModel.cs`, `Themes/*.cs`). Лежит вне `Assets/`, Unity его не компилирует |
 | `Tiles/` + `Assets/Resources/Tiles/` | SVG-исходники лиц и собранный атлас `tile-atlas.png` |
 | `.local/dotnet-sdk/` | Локальный .NET SDK 8 для headless-прогонов; в git не входит |
 | `Logs/` | Логи Unity и XML тестовых прогонов (`Logs/editmode-results.xml`, `Logs/playmode-results.xml`); в git не входит |
@@ -144,7 +146,7 @@ $env:MAHJONG_SHOT_DIR="D:\Temprary\game\Screenshots"
   -executeMethod Mahjong.EditorTools.ActionBarPreview.CaptureAndExit
 ```
 
-Проверено на 2026-11-05: `RulesCheck` — 79 групп, 122 624 проверки; EditMode 13/13; PlayMode 45/45;
+Проверено на 2026-11-05: `RulesCheck` — 79 групп, 122 654 проверки; EditMode 13/13; PlayMode 55/55;
 скриншоты `PrototypeCapture` и `InterfaceCapture` снимаются.
 
 ⚠ Под bash (Git Bash) те же команды запускать с путями **прямыми слэшами и в кавычках**:

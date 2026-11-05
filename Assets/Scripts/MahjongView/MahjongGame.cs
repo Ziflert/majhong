@@ -287,6 +287,9 @@ namespace Mahjong.Unity
         private readonly ResultScreen resultScreen = new();
         private FreePlayTable free = null!;
         private ControlsPanel controls = null!;
+
+        /// <summary>Last mouse position the tray was hit-tested at: the tray is not re-picked every frame.</summary>
+        private Vector3 lastTrayMouse = new(float.NaN, float.NaN, float.NaN);
         private Transform table = null!;
         private Transform board = null!;
         private readonly TextMesh[] seatPlates = new TextMesh[4];
@@ -606,6 +609,16 @@ namespace Mahjong.Unity
             FaceSeatPlates(Camera.main != null ? Camera.main.transform : transform);
             SyncInterfaceVisibility();
 
+            // У-6: the tray answers the cursor the way the action bar does. The ray is only cast when
+            // the mouse moved or the row was rebuilt, so an idle frame costs nothing.
+            var mouse = Input.mousePosition;
+            if (controls != null && controls.IsOpen && controls.gameObject.activeSelf
+                && mouse != lastTrayMouse)
+            {
+                controls.Hover(MouseRay());
+                lastTrayMouse = mouse;
+            }
+
             // The dice, the break and the deal come before the first decision of a hand: the engine
             // has already dealt, so the table waits for the show to finish before it asks for a tile.
             if (!IsMenuOpen && !rules.IsOpen) TickOpening();
@@ -735,7 +748,7 @@ namespace Mahjong.Unity
                         if (session?.State != null)
                         {
                             SaveReplay();
-                            StatusNote(Loc.Get("replay.saved"), 1.5);
+                            RenderStatus(Loc.Get("replay.saved"));
                         }
                         return false;
                     case ControlType.Language:
@@ -840,6 +853,8 @@ namespace Mahjong.Unity
             }
 
             bar.Hide();
+            // The tray is drawn from the catalogue, so it keeps the old language until it is rebuilt.
+            controls.Relabel();
             if (replayOpen) status.text = DescribeReplay();
             else if (free.IsOpen) status.text = free.StatusText();
             else RefreshStatus();
@@ -1236,6 +1251,25 @@ namespace Mahjong.Unity
             prompt.Count == 1
                 ? prompt.Options[0].Hint
                 : Loc.Format("hint.bar", prompt.Count);
+
+        /// <summary>
+        /// Takes the first meld the human has on offer, if any. A capture run and a test have nobody
+        /// at the keyboard: every other window is run out and passed, so the player never claims and
+        /// his own meld never appears on the table — which is exactly what a frame of the melds has to
+        /// show. Returns false when there is nothing to claim.
+        /// </summary>
+        public bool ClaimIfPossible()
+        {
+            if (!Prompt.IsOpen) return false;
+            foreach (var option in Prompt.Options)
+            {
+                if (option.Action.Kind is ActionKind.Pass or ActionKind.Win) continue;
+                Play(option.Action);
+                return true;
+            }
+
+            return false;
+        }
 
         private void Play(LegalAction action)
         {
@@ -1941,12 +1975,16 @@ namespace Mahjong.Unity
                 {
                     var meld = melds[i];
                     allMelds.Add(meld);
+                    // The newest meld of a seat stands a step higher: a meld is declared by a bot as
+                    // well, and a player has to see the declaration, not find it on the next calm turn.
+                    var stand = TableLayout.MeldStand(i, melds.Count);
                     for (var k = 0; k < meld.Tiles.Count; k++)
                     {
                         var tile = meld.Tiles[k];
                         var faceUp = meld.Kind != MeldKind.ClosedKong || (k == 1 || k == 2);
                         var sideways = IsMeldMarker(meld, k) ? 90f : 0f;
-                        Place(tile, used, "meld", TableLayout.MeldPosition(seat, i, k),
+                        var place = TableLayout.MeldPosition(seat, i, k);
+                        Place(tile, used, "meld", place + new Vector3(0f, stand, 0f),
                             TableLayout.HandRotationY(seat) + sideways, faceUp);
                     }
                 }

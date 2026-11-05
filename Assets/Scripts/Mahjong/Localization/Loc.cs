@@ -189,12 +189,15 @@ namespace Mahjong.Localization
             Add("ui.freeMode", "Свободная игра", "Free play");
 
             // --------------------------------------------------------- on-screen controls
-            Add("controls.rulebook", "Правила · R", "Rules · R");
-            Add("controls.menu", "Пауза · Esc", "Pause · Esc");
-            Add("controls.replay", "Просмотр · V", "Review · V");
-            Add("controls.save", "Сохранить · F5", "Save · F5");
-            Add("controls.language", "Язык · L", "Language · L");
-            Add("controls.freeplay", "Свободная игра · F", "Free play · F");
+            // The tiles are narrow: the caption is the name alone and the hot key is printed in the
+            // corner of the tile (ControlTile.KeyLabel), so a long "label · key" never shrinks the
+            // text below what a player can read.
+            Add("controls.rulebook", "Правила", "Rules");
+            Add("controls.menu", "Пауза", "Pause");
+            Add("controls.replay", "Просмотр", "Review");
+            Add("controls.save", "Сохранить", "Save");
+            Add("controls.language", "Язык", "Language");
+            Add("controls.freeplay", "Песочница", "Sandbox");
 
             // ------------------------------------------------------------ free play
             Add("free.title", "Свободная игра: перетаскивайте кости, F — вернуться за стол",

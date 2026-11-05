@@ -126,14 +126,34 @@ namespace Mahjong.PlayTests
         }
 
         [Test]
+        public void TheNewestMeldOfASeatStandsHigher()
+        {
+            // A meld is declared by a bot as often as by the player, so the new one has to announce
+            // itself: it stands a step higher than the melds before it. Only the last one — a lift
+            // on all of them would break the row apart and say nothing about which is new.
+            Assert.Greater(TableLayout.MeldStand(0, 1), 0f, "A seat's only meld is its newest and must stand higher.");
+            Assert.AreEqual(0f, TableLayout.MeldStand(0, 2), "The older meld must lie flat.");
+            Assert.Greater(TableLayout.MeldStand(1, 2), 0f, "The second meld must stand higher than the first.");
+            Assert.Greater(TableLayout.MeldStand(2, 3), 0f, "The third meld must stand higher than the two before it.");
+
+            // The step has to be seen from the camera, so it is worth a visible part of a tile: a
+            // hairline lift reads as nothing at all from the far side of the table.
+            Assert.GreaterOrEqual(TableLayout.MeldLift, TileObject.Height * 0.4f,
+                "The newest meld must stand high enough to be seen.");
+        }
+
+        [Test]
         public void MeldRowOfFourStaysOnTheFelt()
         {
             for (var seat = 0; seat < 4; seat++)
             {
                 var corner = TableLayout.MeldPosition(seat, 3, 3);
-                Assert.LessOrEqual(Mathf.Abs(corner.x), TableLayout.FeltHalf,
+                // The centre is not the whole tile: half a tile length hangs past it, and past the felt
+                // is what a player sees as a meld lying on the table edge.
+                var edge = TableLayout.FeltHalf - TileObject.Length * 0.5f;
+                Assert.LessOrEqual(Mathf.Abs(corner.x), edge,
                     $"The fourth meld of seat {seat} hangs off the felt.");
-                Assert.LessOrEqual(Mathf.Abs(corner.z), TableLayout.FeltHalf,
+                Assert.LessOrEqual(Mathf.Abs(corner.z), edge,
                     $"The fourth meld of seat {seat} hangs off the felt.");
             }
         }

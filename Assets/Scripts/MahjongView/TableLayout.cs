@@ -46,13 +46,27 @@ namespace Mahjong.Unity
         public const float TilePitch = 0.062f;
 
         /// <summary>
-        /// Pitch inside one exposed meld. Wider than a hand: a claimed tile is turned sideways and lies
-        /// along the row, so it is 0.072 long instead of 0.052 and used to run into its neighbours (У-3).
+        /// Pitch inside one exposed meld. The claimed tile turns sideways and lies along the row at
+        /// <see cref="TileObject.Length"/>, so the pitch must clear it: at the hand pitch of 0.062 the
+        /// sideways tile ran 0.010 into both neighbours, and at 0.080 a row of four melds grew wider
+        /// than the felt. 0.075 leaves an air gap of 0.013 and still keeps the row of four inside.
         /// </summary>
-        public const float MeldPitch = 0.070f;
+        public const float MeldPitch = 0.075f;
 
         /// <summary>Gap between two melds of the same seat, so a player can see where one ends.</summary>
-        public const float MeldGap = 0.032f;
+        public const float MeldGap = 0.026f;
+
+        /// <summary>
+        /// How much higher the newest meld of a seat stands. A meld is declared by somebody else as
+        /// well, and the sideways claimed tile says only <em>which</em> tile came from a discard, not
+        /// whether the meld is the one just made. Half a tile of height reads as "this is new" even
+        /// from the far side of the table, and it stays until the next meld replaces it.
+        /// </summary>
+        public const float MeldLift = 0.014f;
+
+        /// <summary>Height of a meld above the felt: the seat's newest meld stands a step higher.</summary>
+        public static float MeldStand(int index, int meldCount) =>
+            index == meldCount - 1 && meldCount > 0 ? MeldLift : 0f;
 
         /// <summary>How far one meld reaches along its row: four tiles at the meld pitch and the gap after them.</summary>
         public const float MeldSpan = 3f * MeldPitch + TileObject.Length + MeldGap;

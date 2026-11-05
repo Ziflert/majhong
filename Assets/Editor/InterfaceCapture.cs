@@ -60,6 +60,9 @@ namespace Mahjong.EditorTools
         /// <summary>Seconds a step is given before its shot: the deal and the panels need a frame or two.</summary>
         private const double SettleSeconds = 2.0;
 
+        /// <summary>How long the meld step plays on looking for a claim of the human's own.</summary>
+        private const double MeldPatience = 120.0;
+
         /// <summary>
         /// ScreenCapture writes the file at the end of the frame it was asked in, so the screen has
         /// to stay as it is for at least one more frame; closing the panel in the same tick would
@@ -161,13 +164,19 @@ namespace Mahjong.EditorTools
                 }
 
                 // Two open melds make the meld row worth photographing; the human windows are run
-                // out the way the table does it when a turn times out. The tiles fly to their places,
-                // so the settle is restarted once the melds are there and the frame is not taken
-                // in the middle of the flight.
-                if (steps[step].Open == "melds" && game.OpenMeldCount < 2)
+                // out the way the table does it when a turn times out. A claim the human can make is
+                // taken, because his own meld is half of what У-3 is about, and the step keeps playing
+                // until one shows up — but not forever: a hand that never offers a claim is still
+                // worth a frame, so after two minutes the shot is taken with what is on the table.
+                if (steps[step].Open == "melds")
                 {
-                    if (game.HandClock.IsRunning) game.AdvanceClock(60);
-                    return;
+                    if (game.HumanMeldCount == 0) game.ClaimIfPossible();
+                    var ready = game.OpenMeldCount >= 2 && game.HumanMeldCount >= 1;
+                    if (!ready && waited < MeldPatience)
+                    {
+                        if (game.HandClock.IsRunning) game.AdvanceClock(60);
+                        return;
+                    }
                 }
 
                 if (steps[step].Open == "melds" && !SessionState.GetBool(SettledKey, false))
