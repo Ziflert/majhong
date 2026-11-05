@@ -44,6 +44,9 @@ namespace Mahjong.Unity
         /// <summary>The Russian rulebook that opens with R. Exposed for tests and tools.</summary>
         public RulesPanel Rules => rules;
 
+        /// <summary>The on-screen tray of hot-key buttons (У-6). Exposed for tests and tools.</summary>
+        public ControlsPanel Controls => controls;
+
         /// <summary>The free-play table that opens with F. Exposed for tests and tools.</summary>
         public FreePlayTable FreePlay => free;
 
@@ -283,6 +286,7 @@ namespace Mahjong.Unity
         private ResultPanel resultPanel = null!;
         private readonly ResultScreen resultScreen = new();
         private FreePlayTable free = null!;
+        private ControlsPanel controls = null!;
         private Transform table = null!;
         private Transform board = null!;
         private readonly TextMesh[] seatPlates = new TextMesh[4];
@@ -474,6 +478,7 @@ namespace Mahjong.Unity
             BuildHudPlate(camera.transform);
 
             bar = ActionBar.Create(camera.transform);
+            controls = ControlsPanel.Create(camera.transform);
             rules = RulesPanel.Create(camera.transform);
             menu = MenuPanel.Create(camera.transform);
             titlePanel = TitlePanel.Create(camera.transform);
@@ -708,6 +713,38 @@ namespace Mahjong.Unity
             {
                 ToggleLanguage();
                 return false;
+            }
+
+            // У-6: the on-screen tray turns a click into the same actions the hot keys do.
+            if (Input.GetMouseButtonDown(0) && controls.TryPick(MouseRay(), out var tile))
+            {
+                switch (tile.Type)
+                {
+                    case ControlType.Rulebook:
+                        ClosePrompt();
+                        StopClock();
+                        rules.SetOpen(true);
+                        return true;
+                    case ControlType.Menu:
+                        OpenMenu();
+                        return true;
+                    case ControlType.Replay:
+                        OpenReplay();
+                        return true;
+                    case ControlType.Save:
+                        if (session?.State != null)
+                        {
+                            SaveReplay();
+                            StatusNote(Loc.Get("replay.saved"), 1.5);
+                        }
+                        return false;
+                    case ControlType.Language:
+                        ToggleLanguage();
+                        return false;
+                    case ControlType.FreePlay:
+                        OpenFreePlay();
+                        return true;
+                }
             }
 
             if (rules.IsOpen)
@@ -1013,6 +1050,11 @@ namespace Mahjong.Unity
             if (hudPlate != null && hudPlate.gameObject.activeSelf != hudWanted)
                 hudPlate.gameObject.SetActive(hudWanted);
 
+            // The tray rides the bottom edge of the frame and is never part of a full-screen page:
+            // it is shown whenever the table is playable and hidden only while the welcome screen is up.
+            if (controls != null && controls.gameObject.activeSelf != hudWanted)
+                controls.gameObject.SetActive(hudWanted);
+
             // Wind plates belong to the scored table. The result screen is a page over the table as
             // well, and a plate is a billboard of text drawn without a depth test: left standing, it
             // prints straight through the panel.
@@ -1234,11 +1276,13 @@ namespace Mahjong.Unity
             }
 
             if (state.Phase is GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)
-                clock.Restart(ClockWindow.Claim);
+                clock.Restart(ClockWindow.Claim, settings.Windows);
             else
                 // Rule 3.5.7.6 gives twenty seconds to arrange the tiles; the human gets them for his
-                // first discard of the hand, so a fresh hand is not rushed.
-                clock.Restart(humanDiscardedThisHand ? ClockWindow.Discard : ClockWindow.Arrange);
+                // first discard of the hand, so a fresh hand is not rushed. The windows themselves are
+                // a table setting (У-1): the rules' own 20/10/3 or a house rule that says so on the HUD.
+                clock.Restart(humanDiscardedThisHand ? ClockWindow.Discard : ClockWindow.Arrange,
+                    settings.Windows);
         }
 
         /// <summary>Names the current decision; empty when the human is not to act.</summary>
@@ -2251,13 +2295,17 @@ namespace Mahjong.Unity
                 + (session.IsTimeUp ? "  " + Loc.Get("hud.timeUp")
                     : session.IsFinalQuarterHour ? "  " + Loc.Get("hud.lastQuarter") : string.Empty),
                 Loc.Format("hud.rules", Text.VariantName(session.Variant))
+                + (ClockPaceSettings.FollowsRules(settings.ClockPace)
+                    ? string.Empty : "  " + Loc.Get("hud.notByRules"))
             };
 
             // The key list lives in the menu hint and in the rulebook: on the HUD it was the widest
             // line by far, and the plate it forced covered the far wall.
 
             if (clock.IsRunning)
-                lines.Add(Loc.Format("hud.seconds", Text.ClockLabel(clock.Window), clock.SecondsLeft));
+                lines.Add(clock.IsLimited
+                    ? Loc.Format("hud.seconds", Text.ClockLabel(clock.Window), clock.SecondsLeft)
+                    : Loc.Format("hud.secondsNone", Text.ClockLabel(clock.Window)));
 
             if (state.IsWinForbidden(humanSeat))
                 lines.Add(Loc.Format("hud.huForbidden", state.WinForbiddenReason(humanSeat)));

@@ -30,7 +30,7 @@ namespace Mahjong.Rules.Diagnostics
             var title = new TitleScreen(settings);
 
             report.Equal(TitlePage.Main, title.Page, "the screen opens on the main page");
-            report.Equal(12, title.RowCount, "the main page has twelve rows");
+            report.Equal(13, title.RowCount, "the main page has thirteen rows");
             report.Equal(TitleItem.NewGame, title.Selected, "the cursor starts on the new game");
             report.Equal("", title.Status, "a fresh screen says nothing under the rows");
 
@@ -119,12 +119,23 @@ namespace Mahjong.Rules.Diagnostics
             report.Equal(2.0, settings.Speed, "one step up is double speed");
 
             title.Move(1);
-            report.Equal(TitleItem.Result, title.Selected, "and the result screen last");
+            report.Equal(TitleItem.Result, title.Selected, "and the result screen after the tempo");
             report.Check(title.Adjust(-1), "the result screen steps");
+
+            title.Move(1);
+            report.Equal(TitleItem.Clock, title.Selected, "the time for a decision has its own row last (У-1)");
+            report.Equal(ClockPaceSettings.Text(ClockPace.Rules), title.RowAt(title.Index).Value,
+                "the clock row shows the windows of the rulebook");
+            report.Check(title.Adjust(1), "the clock row steps");
+            report.Equal(ClockPace.Calm, settings.ClockPace, "a step up gives the player a slower table");
+            while (title.Adjust(1)) { }
+            report.Equal(ClockPace.Unlimited, settings.ClockPace, "the ladder ends without a limit");
+            while (title.Adjust(-1)) { }
+            report.Equal(ClockPace.Rules, settings.ClockPace, "and starts at the rules' own windows");
 
             // Picking a setting row steps it: a click on a slider does not need a second gesture.
             var before = settings.Speed;
-            title.Move(-1);
+            title.Move(-2);
             report.Equal(TitleItem.Speed, title.Selected, "back on the tempo row");
             report.Equal(TitleCommand.None, title.Activate(), "picking a setting is not a command");
             report.Check(settings.Speed != before, "picking the tempo row steps the tempo");

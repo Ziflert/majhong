@@ -33,7 +33,10 @@ namespace Mahjong.Controls
         Rules = 10,
         Quit = 11,
         SaveSlot = 12,
-        Back = 13
+        Back = 13,
+
+        /// <summary>У-1: how long the player gets for each decision of a hand.</summary>
+        Clock = 14
     }
 
     /// <summary>
@@ -85,7 +88,7 @@ namespace Mahjong.Controls
         /// Rows the panel draws; the main page uses them all, the load page never has more than
         /// <see cref="MaxSaves"/> saves plus "back".
         /// </summary>
-        public const int MaxRows = 12;
+        public const int MaxRows = 13;
 
         /// <summary>Saved games a single page can list; more than that would not fit the frame.</summary>
         public const int MaxSaves = 10;
@@ -96,6 +99,7 @@ namespace Mahjong.Controls
             TitleItem.NewGame, TitleItem.Continue, TitleItem.LoadGame,
             TitleItem.LocalGame, TitleItem.Multiplayer,
             TitleItem.Variant, TitleItem.Language, TitleItem.Level, TitleItem.Speed, TitleItem.Result,
+            TitleItem.Clock,
             TitleItem.Rules, TitleItem.Quit
         };
 
@@ -197,6 +201,11 @@ namespace Mahjong.Controls
                     var advance = ResultAdvanceSettings.Step(settings.Result, delta);
                     if (advance == settings.Result) return false;
                     settings.Result = advance;
+                    return true;
+                case TitleItem.Clock:
+                    var pace = ClockPaceSettings.Step(settings.ClockPace, delta);
+                    if (pace == settings.ClockPace) return false;
+                    settings.ClockPace = pace;
                     return true;
                 default:
                     return false;
@@ -311,6 +320,8 @@ namespace Mahjong.Controls
                     TitleCommand.None, TitleRowState.Ready),
                 TitleItem.Result => new TitleRow(item, Loc.Get("title.result"),
                     ResultAdvanceSettings.Text(settings.Result), TitleCommand.None, TitleRowState.Ready),
+                TitleItem.Clock => new TitleRow(item, Loc.Get("title.clock"),
+                    ClockPaceSettings.Text(settings.ClockPace), TitleCommand.None, TitleRowState.Ready),
                 TitleItem.Rules => new TitleRow(item, Loc.Get("title.rules"), string.Empty,
                     TitleCommand.Rules, TitleRowState.Ready),
                 _ => new TitleRow(item, Loc.Get("title.quit"), string.Empty,

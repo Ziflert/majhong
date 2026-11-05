@@ -108,12 +108,17 @@ namespace Mahjong.Localization
             Add("hud.lastQuarter", "последние 15 минут", "last quarter of an hour");
             Add("hud.huForbidden", "Ху в этой руке запрещено: {0}", "Hu is forbidden this hand: {0}");
             Add("hud.seconds", "{0}: {1} с", "{0}: {1} s");
+            Add("hud.secondsNone", "{0}: без ограничения", "{0}: no limit");
+            Add("hud.notByRules", "не по правилам", "a house rule");
 
             // --------------------------------------------------------------- clock
             Add("clock.arrange", "Расстановка костей", "Arrange your tiles");
             Add("clock.discard", "Время на снос", "Time to discard");
             Add("clock.claim", "Время на заявку", "Time to claim");
             Add("clock.time", "Время", "Time");
+            Add("clock.pace.rules", "по правилам (20/10/3)", "as the rules say (20/10/3)");
+            Add("clock.pace.calm", "спокойно (30/20/10)", "unhurried (30/20/10)");
+            Add("clock.pace.unlimited", "без ограничения", "no limit");
 
             // ------------------------------------------------------------- results
             Add("result.handFinished", "Рука завершена", "Hand finished");
@@ -183,6 +188,14 @@ namespace Mahjong.Localization
             Add("ui.language", "Язык", "Language");
             Add("ui.freeMode", "Свободная игра", "Free play");
 
+            // --------------------------------------------------------- on-screen controls
+            Add("controls.rulebook", "Правила · R", "Rules · R");
+            Add("controls.menu", "Пауза · Esc", "Pause · Esc");
+            Add("controls.replay", "Просмотр · V", "Review · V");
+            Add("controls.save", "Сохранить · F5", "Save · F5");
+            Add("controls.language", "Язык · L", "Language · L");
+            Add("controls.freeplay", "Свободная игра · F", "Free play · F");
+
             // ------------------------------------------------------------ free play
             Add("free.title", "Свободная игра: перетаскивайте кости, F — вернуться за стол",
                 "Free play: drag the tiles, F returns to the table");
@@ -225,6 +238,7 @@ namespace Mahjong.Localization
             Add("menu.speed", "Темп ботов", "Bot speed");
             Add("menu.level", "Сила ботов", "Bot strength");
             Add("menu.result", "Экран результата", "Result screen");
+            Add("menu.clock", "Время на ход", "Time to think");
             Add("menu.save", "Сохранить партию", "Save the game");
             Add("menu.resume", "Продолжить сохранённую", "Resume the saved game");
             Add("menu.review", "Просмотр партии", "Review a saved game");
@@ -251,6 +265,7 @@ namespace Mahjong.Localization
             Add("title.level", "Сила ботов", "Bot strength");
             Add("title.speed", "Темп ботов", "Bot speed");
             Add("title.result", "Экран результата", "Result screen");
+            Add("title.clock", "Время на ход", "Time to think");
             Add("title.rules", "Справочник правил", "Rulebook");
             Add("title.quit", "Выход", "Quit");
             Add("title.back", "Назад", "Back");

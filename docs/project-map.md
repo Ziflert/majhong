@@ -15,7 +15,7 @@
 | `Assets/Scripts/Mahjong/Rules/` | Ядро правил: кости, рука, стена, кубики, разбор руки, подсчёт, состояние руки; профиль правил и классический подсчёт — отдельными файлами |
 | `Assets/Scripts/Mahjong/Diagnostics/` | `RulesSelfTest` — проверки ядра, общие для Unity и headless (`RunAll` + файлы-части по темам: `.Net`, `.Replay`, `.Menu`, `.Opening`, `.Variant`) |
 | `Assets/Scripts/Mahjong/Bots/` | `HeuristicBot` — бот уровней 1–3 (`BotLevel`), `DangerModel` — чтение стола, `WaitQuality` — оценка ожиданий через `Scoring`, `BotTable` — прогон сессии и передача отставания по очкам |
-| `Assets/Scripts/Mahjong/Controls/` | `TitleScreen` — приветственный экран: строки (новая игра, продолжить, загрузить, локальная игра, мультиплеер, настройки стола, справочник, выход), курсор, две страницы, что значит шаг и выбор; `ActionPrompt` — что человеку предлагают в панели действий и в каком порядке; `PlayClock` / `ClockExpiry` — окна 20/10/3 секунды; `HandOpening` — такты открытия руки: два броска, разрыв, раздача (0.9 / 0.9 / 0.6 / 1.1 с, `MAHJONG_OPENING_SPEED`); `GameSettings` — язык, сила и темп ботов (`MAHJONG_LANG`, `MAHJONG_BOT_LEVEL`, `MAHJONG_BOT_SPEED`), `GameMenu` — модель меню: строки, курсор, что значит шаг и выбор |
+| `Assets/Scripts/Mahjong/Controls/` | `TitleScreen` — приветственный экран: строки (новая игра, продолжить, загрузить, локальная игра, мультиплеер, настройки стола, справочник, выход), курсор, две страницы, что значит шаг и выбор; `ActionPrompt` — что человеку предлагают в панели действий и в каком порядке; `PlayClock` / `ClockExpiry` — окна времени на ход; `ClockLimits` — темп окон как настройка стола («по правилам 20/10/3», «спокойно 30/20/10», «без ограничения», `MAHJONG_CLOCK`); `HandOpening` — такты открытия руки: два броска, разрыв, раздача (0.9 / 0.9 / 0.6 / 1.1 с, `MAHJONG_OPENING_SPEED`); `GameSettings` — язык, сила и темп ботов, окна времени (`MAHJONG_LANG`, `MAHJONG_BOT_LEVEL`, `MAHJONG_BOT_SPEED`, `MAHJONG_CLOCK`), `GameMenu` — модель меню: строки, курсор, что значит шаг и выбор |
 | `Assets/Scripts/Mahjong/Net/` | Сетевой договор без сети: `TileNotation` (нотация кости), `ActionCodec` (ход строкой), `SeatView` (проекция на место), `AuthoritativeTable` (единственный владелец `GameState` + лог ходов + `Replay`), `InProcessTable` (транспорт в процессе), `FreeTable` (общий стол «переставь кости») |
 | `Assets/Scripts/Mahjong/Replay/` | Сохранение, просмотр и продолжение партии: `SaveSlots` (каталог папки сохранений для экрана: имя, число рук, профиль, свежие сверху, битый файл с причиной), `SessionLog` (формат файла `majhong-save v1`, запись/чтение, переигрывание рук), `ReplayCursor` (позиция внутри партии: ход вперёд/назад, соседняя рука, описание хода структурой `SavedMove`), `SessionRestore` (собрать `GameSession` из файла: счёт из переигранных рук, часы сессии, недоигранная рука) |
 | `Assets/Scripts/Mahjong/Localization/` | `Loc` — каталог строк RU/EN, `Text` — сборка фраз из структурных данных движка |
@@ -144,8 +144,13 @@ $env:MAHJONG_SHOT_DIR="D:\Temprary\game\Screenshots"
   -executeMethod Mahjong.EditorTools.ActionBarPreview.CaptureAndExit
 ```
 
-Проверено на 2026-11-05: `RulesCheck` — 78 групп, 122 531 проверка; EditMode 13/13; PlayMode 44/44;
+Проверено на 2026-11-05: `RulesCheck` — 79 групп, 122 624 проверки; EditMode 13/13; PlayMode 45/45;
 скриншоты `PrototypeCapture` и `InterfaceCapture` снимаются.
+
+⚠ Под bash (Git Bash) те же команды запускать с путями **прямыми слэшами и в кавычках**:
+`-testResults "D:/Temprary/game/Logs/editmode-results.xml"`. С обратными слэшами bash съедает `\`,
+Unity пишет «Test run completed. Exiting with code 0» и не обновляет XML — прочитанный старый
+файл показывает зелёный результат прошлой сессии (спотыкались 2026-11-05).
 
 ## Архитектура
 ```text

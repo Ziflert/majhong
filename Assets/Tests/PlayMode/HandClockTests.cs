@@ -62,6 +62,55 @@ namespace Mahjong.PlayTests
         }
 
         [UnityTest]
+        public IEnumerator AWindowWithoutALimitWaitsForTheHuman()
+        {
+            var game = Game();
+            yield return null;
+            yield return null;
+
+            // У-1: the player chose a table without time limits, so a quiet window must not play for him.
+            // The windows open after the opening of the hand, which the test lets run in scaled time.
+            var previousScale = Time.timeScale;
+            Time.timeScale = 30f;
+            var previousPace = game.Settings.ClockPace;
+            var discardsBefore = 0;
+            var window = ClockWindow.Idle;
+            try
+            {
+                game.Settings.ClockPace = ClockPace.Unlimited;
+
+                var frames = 0;
+                while (frames++ < 5000 && (!game.Opening.IsDone || !game.HandClock.IsRunning)) yield return null;
+
+                Assert.IsTrue(game.HandClock.IsRunning,
+                    "The human turn does not open a window:\n" + game.Status.text);
+                Assert.IsFalse(game.HandClock.IsLimited, "A table without limits still counts the window down.");
+                StringAssert.Contains(Loc.Format("hud.secondsNone", Text.ClockLabel(game.HandClock.Window)),
+                    game.Status.text, "The HUD does not show the open window without a countdown:\n" + game.Status.text);
+                StringAssert.Contains(Loc.Get("hud.notByRules"), game.Status.text,
+                    "The HUD does not say that the windows are a house rule:\n" + game.Status.text);
+
+                discardsBefore = game.DiscardTileCount;
+                window = game.HandClock.Window;
+                game.AdvanceClock(600);
+                yield return null;
+
+                Assert.AreEqual(window, game.HandClock.Window, "An hour of waiting closed a window that has no limit.");
+                Assert.AreEqual(discardsBefore, game.DiscardTileCount,
+                    "The table discarded for the human on a table without time limits.");
+            }
+            finally
+            {
+                // Leave the suite a table that plays by the rules again, whatever happened above.
+                game.Settings.ClockPace = previousPace == ClockPace.Unlimited ? ClockPace.Rules : previousPace;
+                Time.timeScale = previousScale;
+            }
+
+            game.StartNewGame(11);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator ClaimWindowGivesThreeSecondsAndThenPasses()
         {
             var game = Game();

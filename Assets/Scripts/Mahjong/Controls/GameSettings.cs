@@ -42,6 +42,15 @@ namespace Mahjong.Controls
         /// </summary>
         public ResultAdvance Result { get; set; } = ResultAdvanceSettings.Default;
 
+        /// <summary>
+        /// How much time the player gets for his decisions (У-1). The rules' own windows are 20 / 10 / 3
+        /// seconds; a slower table and a table without limits are house rules, and the HUD says so.
+        /// </summary>
+        public ClockPace ClockPace { get; set; } = ClockPaceSettings.Default;
+
+        /// <summary>The three windows of a hand that the chosen pace stands for.</summary>
+        public ClockLimits Windows => ClockPaceSettings.Limits(ClockPace);
+
         /// <summary>How much faster than normal the bots play; never zero, so a delay cannot vanish.</summary>
         public double Speed => Speeds[SpeedIndex];
 
@@ -91,6 +100,11 @@ namespace Mahjong.Controls
             // what a capture run needs; nonsense keeps the five-second default.
             var resultText = Environment.GetEnvironmentVariable("MAHJONG_RESULT_DELAY");
             if (ResultAdvanceSettings.TryParse(resultText) is { } advance) settings.Result = advance;
+
+            // MAHJONG_CLOCK=rules|calm|unlimited (or a triple of seconds) opens the windows of a
+            // capture run without touching the scene; nonsense keeps the rules' own windows.
+            var clockText = Environment.GetEnvironmentVariable("MAHJONG_CLOCK");
+            if (ClockPaceSettings.TryParse(clockText) is { } pace) settings.ClockPace = pace;
 
             return settings;
         }

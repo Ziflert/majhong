@@ -39,6 +39,9 @@ namespace Mahjong.EditorTools
             // the dice in the air, the wall still whole, the break not made yet (3.5.7.5).
             ("opening-dice", "opening", new Vector3(0f, 2.20f, -1.90f), new Vector3(0f, 0f, 0.10f), 1.1),
             ("table-overview", "none", new Vector3(0f, 2.70f, -2.60f), new Vector3(0f, 0f, 0.18f), SettleSeconds),
+            // У-6: the on-screen tray of hot-key buttons rides the bottom edge of the frame;
+            // the shot is taken while a hand is dealt so the tray is shown and all tiles are active.
+            ("controls-panel", "burn", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f), SettleSeconds),
             ("rules-panel", "rules", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f), SettleSeconds),
             ("free-play", "free", new Vector3(0f, 2.70f, -2.60f), new Vector3(0f, 0f, 0.18f), SettleSeconds),
             // No player sits at a capture run, so this step runs the human windows out and the shot
@@ -241,6 +244,7 @@ namespace Mahjong.EditorTools
                 "rules" => $"rulebook page {game.Rules.Page + 1}/{game.Rules.PageCount}: {game.Rules.CurrentTitle}",
                 "free" => $"free play {game.FreePlay.TileViewCount} tiles, seat {game.FreePlay.ActiveSeat}",
                 "replay" => $"review {game.Replay.PositionText}, last {game.Replay.LastMoveText}",
+                "controls-panel" => $"controls tray open, {game.Controls?.Tiles?.Count ?? 0} tiles visible, phase {game.Phase}",
                 "menu" => $"menu {game.MenuPanel.RowCount} rows, open {(game.MenuPanel.IsOpen ? "yes" : "no")},"
                           + $" panel {(game.MenuPanel.gameObject.activeInHierarchy ? "active" : "hidden")},"
                           + $" on {game.Menu.RowAt(game.Menu.Index)}",

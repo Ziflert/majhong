@@ -186,7 +186,7 @@ namespace Mahjong.PlayTests
             // The rules row opens the rulebook and leaves the menu closed.
             game.OpenMenu();
             game.MenuMove(-game.Menu.Index);      // the language row
-            game.MenuMove(7);                     // the rules row
+            game.MenuMove(8);                     // the rules row
             Assert.AreEqual(MenuItem.Rules, game.Menu.Selected, "The cursor is not on the rules row.");
             game.MenuActivate();
             yield return null;
@@ -198,7 +198,7 @@ namespace Mahjong.PlayTests
             // The review row opens the review of the game in progress.
             game.OpenMenu();
             game.MenuMove(-game.Menu.Index);
-            game.MenuMove(6);
+            game.MenuMove(7);
             Assert.AreEqual(MenuItem.Review, game.Menu.Selected, "The cursor is not on the review row.");
             game.MenuActivate();
             yield return null;

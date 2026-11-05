@@ -22,6 +22,7 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "menu: the settings parse, step and scale the bot delay", () => SettingsParse(report));
             Run(report, "menu: the rows step the settings and report their commands", () => MenuRows(report));
             Run(report, "result: the end-of-hand screen waits, holds and closes", () => ResultScreenRules(report));
+            Run(report, "clock: the windows step from the rules to no limit", () => ClockWindowRules(report));
         }
 
         private static void SettingsParse(SelfTestReport report)
@@ -140,17 +141,121 @@ namespace Mahjong.Rules.Diagnostics
             report.Equal(ResultAdvance.Three, settings.Result, "the ladder starts at three seconds");
             settings.Result = ResultAdvanceSettings.Default;
 
+            // The clock row (У-1): the rules' own 20/10/3, a slower table, and no limit at all.
+            menu.Move(1);
+            report.Equal(MenuItem.Clock, menu.Selected, "the fifth row is the time the player gets");
+            report.Equal(ClockPaceSettings.Text(ClockPace.Rules), menu.RowAt(4).Value,
+                "the clock row starts on the windows of the rulebook");
+            report.Check(menu.Adjust(1), "the clock row can be stepped");
+            report.Equal(ClockPace.Calm, settings.ClockPace, "a step up gives the player more time");
+            while (menu.Adjust(1)) { }
+            report.Equal(ClockPace.Unlimited, settings.ClockPace, "the ladder ends without a limit");
+            report.Check(!menu.Adjust(1), "there is nothing past a window without a limit");
+            report.Equal(MenuCommand.None, menu.Activate(), "picking the clock row is not a command");
+            report.Equal(ClockPace.Unlimited, settings.ClockPace, "picking a setting row that is at its end steps nothing");
+            while (menu.Adjust(-1)) { }
+            report.Equal(ClockPace.Rules, settings.ClockPace, "the ladder starts at the rules' own windows");
+
             // Commands: the rows that open something say what they open.
             menu.Move(1);
-            report.Equal(MenuCommand.Save, menu.Activate(), "the fifth row saves");
-            report.Equal(MenuCommand.Resume, menu.RowAt(5).Command, "the sixth row resumes");
-            report.Equal(MenuCommand.Review, menu.RowAt(6).Command, "the seventh row opens the review");
-            report.Equal(MenuCommand.Rules, menu.RowAt(7).Command, "the eighth row opens the rules");
+            report.Equal(MenuCommand.Save, menu.Activate(), "the sixth row saves");
+            report.Equal(MenuCommand.Resume, menu.RowAt(6).Command, "the seventh row resumes");
+            report.Equal(MenuCommand.Review, menu.RowAt(7).Command, "the eighth row opens the review");
+            report.Equal(MenuCommand.Rules, menu.RowAt(8).Command, "the ninth row opens the rules");
             menu.Move(4);
             report.Equal(MenuItem.Close, menu.Selected, "the last row closes the menu");
             report.Equal(MenuCommand.Close, menu.Activate(), "the last row asks to close");
 
             report.Equal(GameMenu.TotalRows, menu.AllRows().Count, "every row can be listed for the panel");
+        }
+
+        /// <summary>
+        /// У-1: the windows of a hand are a table setting now. The rules give 20 / 10 / 3 seconds, a
+        /// slower table gets 30 / 20 / 10, and a table without limits never runs a window out — the
+        /// last case is a house rule, so the HUD has to say so. Checked on the settings and on the clock
+        /// itself, with no waiting: the view feeds the clock frame deltas.
+        /// </summary>
+        private static void ClockWindowRules(SelfTestReport report)
+        {
+            // The default is the rulebook's own pace, and it is the same numbers PlayClock carries.
+            var settings = new GameSettings();
+            report.Equal(ClockPace.Rules, settings.ClockPace, "a new table plays by the rules' own windows");
+            report.Equal(PlayClock.ArrangeLimit, settings.Windows.Arrange, "twenty seconds to arrange the deal");
+            report.Equal(PlayClock.DiscardLimit, settings.Windows.Discard, "ten seconds to discard");
+            report.Equal(PlayClock.ClaimLimit, settings.Windows.Claim, "three seconds to claim");
+            report.Check(ClockPaceSettings.FollowsRules(ClockPace.Rules), "the rules' pace is the rules' pace");
+            report.Check(!ClockPaceSettings.FollowsRules(ClockPace.Calm), "a slower table is a house rule");
+            report.Check(!ClockPaceSettings.FollowsRules(ClockPace.Unlimited), "no limits are a house rule too");
+
+            // The ladder: rules, then a slower table, then no limit, and it stops at both ends.
+            report.Equal(ClockPace.Calm, ClockPaceSettings.Step(ClockPace.Rules, 1), "a step up gives more time");
+            report.Equal(ClockPace.Unlimited, ClockPaceSettings.Step(ClockPace.Calm, 1), "and then there is no limit");
+            report.Equal(ClockPace.Unlimited, ClockPaceSettings.Step(ClockPace.Unlimited, 3), "the ladder does not wrap");
+            report.Equal(ClockPace.Rules, ClockPaceSettings.Step(ClockPace.Rules, -4), "the ladder stops at the rules");
+            report.Equal(ClockPace.Calm, ClockPaceSettings.Step(ClockPace.Calm, 0), "a step of zero changes nothing");
+            report.Equal(TimeSpan.FromSeconds(30), ClockLimits.Calm.Arrange, "the slower table arranges for thirty seconds");
+            report.Equal(TimeSpan.FromSeconds(20), ClockLimits.Calm.Discard, "and discards within twenty");
+            report.Equal(TimeSpan.FromSeconds(10), ClockLimits.Calm.Claim, "and claims within ten");
+            report.Check(ClockLimits.Unlimited.IsUnlimited, "the third preset has no limit at all");
+            report.Check(!ClockLimits.Rules.IsUnlimited, "the rules' windows are limits");
+            report.Equal(TimeSpan.Zero, ClockLimits.Unlimited.LimitOf(ClockWindow.Claim),
+                "an unlimited table has no claim window to run out");
+            report.Equal(TimeSpan.Zero, ClockLimits.Rules.LimitOf(ClockWindow.Idle), "an idle window has no limit");
+
+            // MAHJONG_CLOCK goes through one parse, like every other table setting.
+            report.Equal<ClockPace?>(ClockPace.Rules, ClockPaceSettings.TryParse("rules"), "the pace can be named");
+            report.Equal<ClockPace?>(ClockPace.Rules, ClockPaceSettings.TryParse("20/10/3"),
+                "the rules' windows can be written out");
+            report.Equal<ClockPace?>(ClockPace.Calm, ClockPaceSettings.TryParse("calm"), "\"calm\" is the slower table");
+            report.Equal<ClockPace?>(ClockPace.Calm, ClockPaceSettings.TryParse("30/20/10"), "and so is its triple");
+            report.Equal<ClockPace?>(ClockPace.Unlimited, ClockPaceSettings.TryParse("unlimited"), "no limit can be named");
+            report.Equal<ClockPace?>(ClockPace.Unlimited, ClockPaceSettings.TryParse("0/0/0"), "or written out as zeros");
+            report.Equal<ClockPace?>(null, ClockPaceSettings.TryParse("12/8/5"),
+                "a pace that is on no ladder keeps the default instead of guessing");
+            report.Equal<ClockPace?>(null, ClockPaceSettings.TryParse("быстро"),
+                "a broken value must not stop the table from starting");
+            report.Equal<ClockPace?>(null, ClockPaceSettings.TryParse(null), "an empty value means nothing");
+
+            // The clock itself: an unlimited window opens, never counts down and never expires.
+            var clock = new PlayClock();
+            clock.Restart(ClockWindow.Discard, ClockLimits.Unlimited);
+            report.Check(clock.IsRunning, "a window without a limit still opens");
+            report.Check(!clock.IsLimited, "and it does not count down");
+            report.Equal(0, clock.SecondsLeft, "a window without a limit shows no seconds");
+            report.Check(!clock.Tick(TimeSpan.FromSeconds(3600)), "an hour does not expire it");
+            report.Check(!clock.IsExpired, "a window without a limit is never expired");
+            report.Equal(0d, clock.Fraction, "a window without a limit has no progress to show");
+
+            // A slower table simply starts the same window with a bigger limit.
+            clock.Restart(ClockWindow.Claim, ClockLimits.Calm);
+            report.Equal(10, clock.SecondsLeft, "the slower table gives ten seconds to claim");
+            report.Check(clock.IsLimited, "a limited window counts down");
+            report.Check(!clock.Tick(TimeSpan.FromSeconds(9.5)), "nine and a half seconds do not end it");
+            report.Check(clock.Tick(TimeSpan.FromSeconds(0.5)), "ten seconds end the claim window");
+
+            // The setting reaches the table: it is what the HUD note and the clock read.
+            settings.ClockPace = ClockPace.Calm;
+            report.Equal(TimeSpan.FromSeconds(30), settings.Windows.Arrange, "the table reads the pace it was given");
+            settings.ClockPace = ClockPace.Unlimited;
+            report.Check(settings.Windows.IsUnlimited, "a table without limits is what the clock is opened with");
+
+            var previousClock = Environment.GetEnvironmentVariable("MAHJONG_CLOCK");
+            try
+            {
+                Environment.SetEnvironmentVariable("MAHJONG_CLOCK", "calm");
+                report.Equal(ClockPace.Calm, GameSettings.FromEnvironment().ClockPace,
+                    "MAHJONG_CLOCK=calm opens a slower table for a capture run");
+                Environment.SetEnvironmentVariable("MAHJONG_CLOCK", "без ограничения");
+                report.Equal(ClockPace.Unlimited, GameSettings.FromEnvironment().ClockPace,
+                    "the pace can be asked for in Russian too");
+                Environment.SetEnvironmentVariable("MAHJONG_CLOCK", "7/7/7");
+                report.Equal(ClockPace.Rules, GameSettings.FromEnvironment().ClockPace,
+                    "a broken value keeps the rules' own windows");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("MAHJONG_CLOCK", previousClock);
+            }
         }
 
         /// <summary>
