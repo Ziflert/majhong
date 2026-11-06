@@ -36,6 +36,9 @@
 | `Tools/Tiles/build_atlas.py` | Сборка `tile-atlas.png` из SVG-исходников (Skia, `python Tools/Tiles/build_atlas.py`) |
 | `.github/workflows/rules.yml` | CI: `Tools/RulesCheck` на push и pull request |
 | `docs/unity-layer.md` | Как запустить 3D-прототип и что он умеет |
+| `Assets/Scripts/MahjongView/TableHud.cs` | Структурированный world-space HUD: партия, стена, часы, плашки игроков, подсказка, уведомление и F3-диагностика; прежний `Status` сохранён для совместимости |
+| `Assets/Tests/PlayMode/TableHudTests.cs` | Проверка источников данных HUD, локализации и opt-in диагностики |
+| `docs/Report_Stage1.md` | Отчёт начатого этапа 1 по UI audit: реализованные блоки, проверки и оставшиеся визуальные задачи |
 | `docs/ui-design.md` | ТЗ визуального слоя: минималистичный профиль как опция, новый Studio-профиль, 3D-ассеты, камера и критерии UX |
 | `docs/asset-sources.md` | Реестр внешних референсов и лицензий для новых костей, UI и окружения |
 | `docs/ui-profile-context.md` | Короткий handoff для следующей сессии: реализация профилей `minimal`/`studio`, камера, порядок чтения файлов и проверки |

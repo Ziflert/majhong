@@ -102,6 +102,11 @@ namespace Mahjong.Localization
 
             // ----------------------------------------------------------------- HUD
             Add("hud.header", "Рука {0} из {1} · Раунд {2} · Место {3}", "Hand {0}/{1} · Round {2} · Seat {3}");
+            Add("hud.handRound", "Рука {0} из {1} · Раунд {2}", "Hand {0}/{1} · Round {2}");
+            Add("hud.you", "Вы", "You");
+            Add("hud.turnName", "Ходит: {0}", "Playing: {0}");
+            Add("hud.playerScore", "Очки: {0}", "Score: {0}");
+            Add("hud.houseBadge", "домашнее правило", "house rule");
             Add("hud.yourTurn", "Ваш ход: щёлкните кость для сноса", "Your turn: click a tile to discard");
             Add("hud.keys",
                 "1–9 — действие, R — правила, F — свободная игра, V — просмотр, Esc — меню, F5 — сохранить, F9 — продолжить",

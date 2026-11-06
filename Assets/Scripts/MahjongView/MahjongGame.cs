@@ -325,6 +325,8 @@ namespace Mahjong.Unity
         private GameSession session = null!;
         private IMahjongBot[] bots = null!;
         private TextMesh status = null!;
+        private TableHud hud = null!;
+        public TableHud Hud => hud;
         private ActionBar bar = null!;
         private RulesPanel rules = null!;
 
@@ -588,6 +590,7 @@ namespace Mahjong.Unity
             status.color = Color.white;
             UiFont.Assign(status);
             BuildHudPlate(camera.transform);
+            hud = TableHud.Create(camera.transform);
 
             bar = ActionBar.Create(camera.transform);
             controls = ControlsPanel.Create(camera.transform);
@@ -2577,7 +2580,9 @@ namespace Mahjong.Unity
             {
                 if (seatPlates[seat] == null) continue;
                 var wind = Text.SeatName(state.SeatWindOf(seat));
-                seatPlates[seat].text = seat == humanSeat ? wind + " ▲" : wind;
+                // The normal HUD now owns seat names, scores and active-seat emphasis.
+                // Keep the original wind labels only in replay, whose score history differs.
+                seatPlates[seat].text = replayOpen ? (seat == humanSeat ? wind + " ▲" : wind) : string.Empty;
                 // The player's own seat is the gold line of the palette, the others are muted text.
                 seatPlates[seat].color = seat == humanSeat
                     ? UiStyle.Of(UiRole.Accent)
@@ -2610,6 +2615,23 @@ namespace Mahjong.Unity
         {
             var camera = Camera.main;
             if (camera != null && status != null && status.gameObject.activeSelf) FitHudPlate(camera);
+            if (hud == null || camera == null || session?.State == null) return;
+
+            // Preserve Status, its text, visibility and measured plate for existing tools/tests.
+            // Only its renderer is replaced during normal play; replay/free play keep their UI.
+            var structured = !free.IsOpen && !replayOpen && !session.IsFinished;
+            status.GetComponent<Renderer>().enabled = !structured;
+            hudPlateRenderer.enabled = !structured;
+            var shown = structured && status.gameObject.activeInHierarchy
+                && !titleOpen && !menu.IsOpen && !rules.IsOpen && !resultScreen.IsOpen;
+            hud.gameObject.SetActive(shown);
+            if (!shown) return;
+            // F3 is deliberately view-only: it exposes the former diagnostic block without
+            // changing the session or consuming a table click.
+            if (Input.GetKeyDown(KeyCode.F3)) hud.ToggleDebug();
+            hud.Refresh(camera, session, settings, humanSeat, IsYourTurn, clock,
+                statusNote.Length > 0 && Time.time < statusNoteUntil ? statusNote : string.Empty,
+                DescribeState());
         }
 
         private void RefreshStatus()
