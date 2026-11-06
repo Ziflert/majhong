@@ -314,6 +314,18 @@ namespace Mahjong.Unity
         private BotLevel botsLevel;
         private string sessionSavePath;
 
+        /// <summary>The seed of the game being played; what the welcome screen repeats and a save keeps.</summary>
+        private int gameSeed;
+
+        /// <summary>
+        /// The deals of one session. Every hand after the first takes its seed from here, so a fixed
+        /// seed replays the whole game (8.7) and not just its first hand.
+        /// </summary>
+        private System.Random dealRandom = new(12345);
+
+        /// <summary>True until the first hand of a game is dealt: that hand is dealt from the seed itself.</summary>
+        private bool firstDealPending = true;
+
         /// <summary>A one-line notice under the HUD: "game saved", "game resumed".</summary>
         private string statusNote = string.Empty;
         private float statusNoteUntil;
@@ -349,10 +361,10 @@ namespace Mahjong.Unity
             settings = GameSettings.FromEnvironment(InspectorLevel());
             Loc.Current = settings.Language;
             gameMenu = new GameMenu(settings);
-            bots = CreateBots(settings.Level);
+            bots = CreateBots(settings.Level, randomSeed);
 
             BuildScene();
-            session = new GameSession(SessionTimeLimit(), settings.Variant);
+            BeginSession(new System.Random(randomSeed).Next());
 
             // The game opens on the welcome screen (У-2). MAHJONG_TITLE=0 deals the first hand straight
             // away, which is what a capture run and a scripted check want.
@@ -362,14 +374,42 @@ namespace Mahjong.Unity
                 return;
             }
 
-            if (!ResumeFromEnvironment()) StartHand(new System.Random(randomSeed).Next());
+            if (!ResumeFromEnvironment()) StartHand(TakeDealSeed());
         }
 
-        /// <summary>The three bots at the requested strength; their seeds stay tied to the inspector seed.</summary>
-        private IMahjongBot[] CreateBots(BotLevel level)
+        /// <summary>
+        /// Seeds a fresh session (8.7): the deals, the three bots, the session clock and the points. The
+        /// bots are built from the same seed, so "repeat this game" repeats the whole table and not only
+        /// the hand the player saw first.
+        /// </summary>
+        private void BeginSession(int seed)
+        {
+            gameSeed = seed;
+            settings.LastSeed = seed;
+            dealRandom = new System.Random(seed);
+            firstDealPending = true;
+            bots = CreateBots(settings.Level, seed);
+            session = new GameSession(settings.SessionLimit, settings.Variant);
+            BotTable.UpdateMatchContext(session, bots);
+        }
+
+        /// <summary>
+        /// The seed of the next deal: the first hand of a game is dealt from the game's own seed, so the
+        /// number on the welcome screen is the number that game is rebuilt from; every hand after it
+        /// takes the next deal of the session.
+        /// </summary>
+        private int TakeDealSeed()
+        {
+            if (!firstDealPending) return dealRandom.Next();
+            firstDealPending = false;
+            return gameSeed;
+        }
+
+        /// <summary>The three bots at the requested strength, dealt from the seed of the game.</summary>
+        private IMahjongBot[] CreateBots(BotLevel level, int seed)
         {
             botsLevel = level;
-            var random = new System.Random(randomSeed);
+            var random = new System.Random(seed);
             return new IMahjongBot[]
             {
                 new HeuristicBot(random.Next(), level),
@@ -386,20 +426,6 @@ namespace Mahjong.Unity
             2 => BotLevel.Cautious,
             _ => BotLevel.Strategic
         };
-
-        /// <summary>
-        /// Rule 3.5.6 gives a session 150 minutes. The prototype can shorten that with
-        /// MAHJONG_SESSION_MINUTES so the time-up path can be seen in a capture run.
-        /// </summary>
-        private static System.TimeSpan? SessionTimeLimit()
-        {
-            var raw = System.Environment.GetEnvironmentVariable("MAHJONG_SESSION_MINUTES");
-            // Invariant culture: "0.2" must mean a fifth of a minute even under a Russian locale.
-            return double.TryParse(raw, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var minutes) && minutes > 0
-                ? System.TimeSpan.FromMinutes(minutes)
-                : null;
-        }
 
         private void BuildScene()
         {
@@ -959,6 +985,8 @@ namespace Mahjong.Unity
         public void SkipWelcome()
         {
             welcomeScreen = false;
+            // The inspector seed: a capture run and a scripted check want the same table every time,
+            // which is why this door does not take the deal the player chose on the screen (8.7).
             if (titleOpen) StartNewGame(new System.Random(randomSeed).Next());
         }
 
@@ -1014,7 +1042,7 @@ namespace Mahjong.Unity
             switch (command)
             {
                 case TitleCommand.NewGame:
-                    StartNewGame(new System.Random(randomSeed).Next());
+                    StartNewGame(DealSeedSettings.Resolve(settings.Seed));
                     break;
                 case TitleCommand.Continue:
                 case TitleCommand.LoadSave:
@@ -1041,11 +1069,11 @@ namespace Mahjong.Unity
         public void StartNewGame(int seed)
         {
             CloseTitle();
-            session = new GameSession(SessionTimeLimit(), settings.Variant);
+            BeginSession(seed);
             moveLog = new SessionLog();
             sessionSavePath = null;
             sessionStamp = System.DateTime.Now.ToString("yyyyMMdd-HHmmss");
-            StartHand(seed);
+            StartHand(TakeDealSeed());
             SyncInterfaceVisibility();
         }
 
@@ -1512,7 +1540,7 @@ namespace Mahjong.Unity
                 return;
             }
 
-            StartHand(new System.Random().Next());
+            StartHand(TakeDealSeed());
         }
 
         /// <summary>Puts the result screen away; the hand it describes is already in the score sheet.</summary>
@@ -1632,7 +1660,7 @@ namespace Mahjong.Unity
             SessionRestore.Outcome outcome;
             try
             {
-                resumed = SessionRestore.Restore(log, out outcome, SessionTimeLimit());
+                resumed = SessionRestore.Restore(log, out outcome, settings.SessionLimit);
             }
             catch (System.Exception failure)
                 when (failure is System.InvalidOperationException or System.ArgumentException)
@@ -1670,7 +1698,7 @@ namespace Mahjong.Unity
             else
             {
                 // The saved hand was already settled: the game goes on with the next deal.
-                StartHand(new System.Random().Next());
+                StartHand(TakeDealSeed());
                 RenderStatus(summary);
             }
 
@@ -1773,7 +1801,7 @@ namespace Mahjong.Unity
             Loc.Current = settings.Language;
             if (bots != null && botsLevel != settings.Level)
             {
-                bots = CreateBots(settings.Level);
+                bots = CreateBots(settings.Level, gameSeed != 0 ? gameSeed : randomSeed);
                 if (session != null) BotTable.UpdateMatchContext(session, bots);
             }
             if (status != null && !menu.IsOpen && !rules.IsOpen) RefreshStatus();
@@ -2387,9 +2415,12 @@ namespace Mahjong.Unity
                     Text.SeatName(state.SeatWindOf(state.DiceThrower)), state.BreakStacks),
                 Loc.Format("hud.points", string.Join("  ",
                     session.Scores.Select((score, player) => $"P{player + 1}={score}"))),
-                Loc.Format("hud.clock", Clock(session.Elapsed), Clock(session.TimeLimit))
+                Loc.Format("hud.clock", Clock(session.Elapsed),
+                    session.HasTimeLimit ? Clock(session.TimeLimit) : Loc.Get("hud.noClock"))
                 + (session.IsTimeUp ? "  " + Loc.Get("hud.timeUp")
-                    : session.IsFinalQuarterHour ? "  " + Loc.Get("hud.lastQuarter") : string.Empty),
+                    : session.IsFinalQuarterHour ? "  " + Loc.Get("hud.lastQuarter") : string.Empty)
+                + (SessionLengthSettings.FollowsRules(session.TimeLimit)
+                    ? string.Empty : "  " + Loc.Get("hud.notByRules")),
                 Loc.Format("hud.rules", Text.VariantName(session.Variant))
                 + (ClockPaceSettings.FollowsRules(settings.ClockPace)
                     ? string.Empty : "  " + Loc.Get("hud.notByRules"))

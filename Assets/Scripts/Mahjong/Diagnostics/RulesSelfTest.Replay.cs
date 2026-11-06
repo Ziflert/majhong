@@ -268,6 +268,17 @@ namespace Mahjong.Rules.Diagnostics
             report.Check(!outcome.HandInProgress, "the restore stops between hands: " + outcome);
             report.Check(!resumed.IsFinished, "four of sixteen hands leave the session running");
 
+            // A table without a clock keeps that too (8.7): no seconds is a length, not a missing line.
+            var clocklessLog = new SessionLog
+            {
+                Info = new SessionLog.SessionInfo(TimeSpan.FromMinutes(5), TimeSpan.Zero)
+            };
+            clocklessLog.BeginHand(0, 777, Wind.East);
+            var clockless = SessionLog.Parse(clocklessLog.SaveText());
+            var restoredClockless = SessionRestore.Restore(clockless, out _);
+            report.Check(!restoredClockless.HasTimeLimit, "a table without a clock comes back without one");
+            report.Check(!restoredClockless.IsTimeUp, "and five minutes are not a spent clock");
+
             // The session goes on: the fifth hand is dealt to the next dealer in the next round.
             resumed.StartNextHand(4242);
             report.Equal(0, resumed.State!.Dealer, "the fifth hand goes to the fourth seat of the round");

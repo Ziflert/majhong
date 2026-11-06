@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Linq;
 using Mahjong.Controls;
 using Mahjong.Localization;
 using Mahjong.Replay;
@@ -165,6 +166,61 @@ namespace Mahjong.PlayTests
             Loc.Current = spoken;
             game.OpenTitle();
             yield return null;
+        }
+
+        /// <summary>The deal of the human hand as one string: the same seed must deal the same one.</summary>
+        private static string HandOf(MahjongGame game) => string.Join(" ",
+            game.State.Players[game.HumanSeat].Concealed
+                .Select(tile => tile.Type.ToString())
+                .OrderBy(text => text, StringComparer.Ordinal));
+
+        [UnityTest]
+        public IEnumerator TheLengthOfTheGameAndTheSeedReachTheTable()
+        {
+            var game = Game();
+            OpenTitleIn(game, Language.Ru);
+            yield return null;
+
+            try
+            {
+                // The length of the game is the clock the session is created with (8.7).
+                Select(game, TitleItem.Session);
+                game.TitleAdjust(1);
+                yield return null;
+                Assert.AreEqual(TimeSpan.FromMinutes(90), game.Settings.SessionLimit,
+                    "The length row did not step away from the rules' 150 minutes.");
+
+                Select(game, TitleItem.NewGame);
+                game.TitleActivate();
+                yield return null;
+                Assert.AreEqual(TimeSpan.FromMinutes(90), game.Session.TimeLimit,
+                    "The session was created with a clock the screen did not show: "
+                    + game.Session.TimeLimit.TotalMinutes + " minutes.");
+
+                // The deal repeats exactly when the row says so (8.7).
+                var seed = game.Settings.LastSeed;
+                Assert.Greater(seed, 0, "A dealt game did not remember the seed it was dealt from.");
+                var first = HandOf(game);
+                game.Settings.Seed = seed;
+                game.StartNewGame(DealSeedSettings.Resolve(game.Settings.Seed));
+                yield return null;
+                Assert.AreEqual(first, HandOf(game), "One seed dealt two different hands.");
+                Assert.AreEqual(seed, game.Settings.LastSeed, "The repeated game forgot its seed.");
+
+                // And two different seeds deal two different hands, or the row would mean nothing.
+                game.StartNewGame(1);
+                var one = HandOf(game);
+                game.StartNewGame(4242);
+                yield return null;
+                Assert.AreNotEqual(one, HandOf(game), "Two seeds dealt one and the same hand.");
+            }
+            finally
+            {
+                // The suite shares one table: leave the settings and a live game behind.
+                game.Settings.SessionLimit = SessionLengthSettings.Default;
+                game.Settings.Seed = DealSeedSettings.Random;
+                game.StartNewGame(7);
+            }
         }
 
         [UnityTest]

@@ -775,6 +775,25 @@ namespace Mahjong.Rules.Diagnostics
             try { session.StartNextHand(seed: 4); }
             catch (InvalidOperationException) { started = true; }
             report.Check(started, "no hand may start after the clock ran out");
+
+            // A table without a clock (8.7): the sixteen hands decide the game, nothing ever runs out.
+            var clockless = new GameSession(TimeSpan.Zero);
+            report.Check(!clockless.HasTimeLimit, "a table without a clock has no limit to spend");
+            report.Check(!clockless.IsTimeUp && !clockless.IsFinalQuarterHour,
+                "an unlimited session announces nothing and runs out of nothing");
+            clockless.StartNextHand(seed: 5);
+            PlayHandToEnd(clockless.State!, new Random(9));
+            clockless.CompleteHand(TimeSpan.FromMinutes(500));
+            report.Check(!clockless.IsTimeUp, "five hundred minutes leave a clockless table playing");
+            report.Check(!clockless.IsFinished, "and only the sixteen hands end it");
+
+            // A session shorter than an hour cannot warn a quarter of an hour ahead (3.5.6).
+            var forty = new GameSession(TimeSpan.FromMinutes(40));
+            report.Equal(TimeSpan.FromMinutes(10), forty.ClockWarning,
+                "a short session warns a quarter of its own length ahead");
+            var rules = new GameSession();
+            report.Equal(GameSession.TimeWarning, rules.ClockWarning,
+                "a full game keeps the quarter of an hour of the rulebook");
         }
 
         private static void SessionStandings(SelfTestReport report)

@@ -75,11 +75,25 @@ namespace Mahjong.Rules
         /// <summary>Rule 3.5.6: session clock.</summary>
         public TimeSpan TimeLimit { get; }
         public TimeSpan Elapsed { get; private set; }
-        public TimeSpan TimeLeft => Elapsed >= TimeLimit ? TimeSpan.Zero : TimeLimit - Elapsed;
-        public bool IsTimeUp => Elapsed >= TimeLimit;
+
+        /// <summary>
+        /// True when the session runs on a clock. A zero limit is a table without one (8.7): the sixteen
+        /// hands decide the game, and nothing ever runs out.
+        /// </summary>
+        public bool HasTimeLimit => TimeLimit > TimeSpan.Zero;
+
+        public TimeSpan TimeLeft => !HasTimeLimit || Elapsed >= TimeLimit ? TimeSpan.Zero : TimeLimit - Elapsed;
+        public bool IsTimeUp => HasTimeLimit && Elapsed >= TimeLimit;
+
+        /// <summary>
+        /// Rule 3.5.6: the referee warns the table when a quarter of an hour is left. A session shorter
+        /// than an hour cannot be warned that way — a quarter of its own length is what is left of it.
+        /// </summary>
+        public TimeSpan ClockWarning => !HasTimeLimit ? TimeSpan.Zero
+            : TimeLimit < 4 * TimeWarning ? TimeLimit / 4 : TimeWarning;
 
         /// <summary>Rule 3.5.6: the last quarter of an hour of the session.</summary>
-        public bool IsFinalQuarterHour => !IsTimeUp && TimeLeft <= TimeWarning;
+        public bool IsFinalQuarterHour => HasTimeLimit && !IsTimeUp && TimeLeft <= ClockWarning;
 
         /// <summary>True when the session stopped on the clock instead of after sixteen hands.</summary>
         public bool EndedByTimeLimit { get; private set; }
@@ -285,8 +299,10 @@ namespace Mahjong.Rules
             var lines = Standings().Select(standing =>
                 $"P{standing.Player}: {standing.GamePoints} game points, {standing.TablePoints:0.##} table points, "
                 + $"place {standing.Place}{(standing.Tied ? " (tied)" : string.Empty)}{(standing.Forfeited ? " (forfeited)" : string.Empty)}");
-            var clock = $"Clock: {Elapsed.TotalMinutes:0} of {TimeLimit.TotalMinutes:0} minutes"
-                        + (IsTimeUp ? " - time is up" : IsFinalQuarterHour ? " - final quarter of an hour" : string.Empty);
+            var clock = HasTimeLimit
+                ? $"Clock: {Elapsed.TotalMinutes:0} of {TimeLimit.TotalMinutes:0} minutes"
+                  + (IsTimeUp ? " - time is up" : IsFinalQuarterHour ? " - final quarter of an hour" : string.Empty)
+                : $"Clock: {Elapsed.TotalMinutes:0} minutes of play, no limit";
             return string.Join(Environment.NewLine, lines.Append(clock));
         }
     }

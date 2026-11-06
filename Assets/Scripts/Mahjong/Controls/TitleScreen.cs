@@ -36,7 +36,13 @@ namespace Mahjong.Controls
         Back = 13,
 
         /// <summary>У-1: how long the player gets for each decision of a hand.</summary>
-        Clock = 14
+        Clock = 14,
+
+        /// <summary>8.7: how long the whole session runs (3.5.6).</summary>
+        Session = 15,
+
+        /// <summary>8.7: which deal a new game starts from.</summary>
+        Seed = 16
     }
 
     /// <summary>
@@ -88,7 +94,7 @@ namespace Mahjong.Controls
         /// Rows the panel draws; the main page uses them all, the load page never has more than
         /// <see cref="MaxSaves"/> saves plus "back".
         /// </summary>
-        public const int MaxRows = 13;
+        public const int MaxRows = 15;
 
         /// <summary>Saved games a single page can list; more than that would not fit the frame.</summary>
         public const int MaxSaves = 10;
@@ -99,7 +105,7 @@ namespace Mahjong.Controls
             TitleItem.NewGame, TitleItem.Continue, TitleItem.LoadGame,
             TitleItem.LocalGame, TitleItem.Multiplayer,
             TitleItem.Variant, TitleItem.Language, TitleItem.Level, TitleItem.Speed, TitleItem.Result,
-            TitleItem.Clock,
+            TitleItem.Clock, TitleItem.Session, TitleItem.Seed,
             TitleItem.Rules, TitleItem.Quit
         };
 
@@ -206,6 +212,16 @@ namespace Mahjong.Controls
                     var pace = ClockPaceSettings.Step(settings.ClockPace, delta);
                     if (pace == settings.ClockPace) return false;
                     settings.ClockPace = pace;
+                    return true;
+                case TitleItem.Session:
+                    var limit = SessionLengthSettings.Step(settings.SessionLimit, delta);
+                    if (limit == settings.SessionLimit) return false;
+                    settings.SessionLimit = limit;
+                    return true;
+                case TitleItem.Seed:
+                    var seed = DealSeedSettings.Step(settings.Seed, delta, settings.LastSeed);
+                    if (seed == settings.Seed) return false;
+                    settings.Seed = seed;
                     return true;
                 default:
                     return false;
@@ -322,6 +338,10 @@ namespace Mahjong.Controls
                     ResultAdvanceSettings.Text(settings.Result), TitleCommand.None, TitleRowState.Ready),
                 TitleItem.Clock => new TitleRow(item, Loc.Get("title.clock"),
                     ClockPaceSettings.Text(settings.ClockPace), TitleCommand.None, TitleRowState.Ready),
+                TitleItem.Session => new TitleRow(item, Loc.Get("title.session"),
+                    SessionLengthSettings.Text(settings.SessionLimit), TitleCommand.None, TitleRowState.Ready),
+                TitleItem.Seed => new TitleRow(item, Loc.Get("title.seed"),
+                    DealSeedSettings.Text(settings.Seed), TitleCommand.None, TitleRowState.Ready),
                 TitleItem.Rules => new TitleRow(item, Loc.Get("title.rules"), string.Empty,
                     TitleCommand.Rules, TitleRowState.Ready),
                 _ => new TitleRow(item, Loc.Get("title.quit"), string.Empty,

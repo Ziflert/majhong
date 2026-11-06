@@ -51,6 +51,22 @@ namespace Mahjong.Controls
         /// <summary>The three windows of a hand that the chosen pace stands for.</summary>
         public ClockLimits Windows => ClockPaceSettings.Limits(ClockPace);
 
+        /// <summary>
+        /// How long the session runs (8.7). The rules give a full game 150 minutes (3.5.6); a shorter
+        /// table and a table without a clock are house rules, and the HUD says so. A zero limit means
+        /// the sixteen hands decide the game on their own.
+        /// </summary>
+        public TimeSpan SessionLimit { get; set; } = SessionLengthSettings.Default;
+
+        /// <summary>
+        /// The deal a new game starts from (8.7): <see cref="DealSeedSettings.Random"/> means a fresh one
+        /// every time, a number repeats the deal remembered in <see cref="LastSeed"/>.
+        /// </summary>
+        public int Seed { get; set; } = DealSeedSettings.Default;
+
+        /// <summary>The seed of the last game the table dealt; the welcome screen steps the deal row back to it.</summary>
+        public int LastSeed { get; set; }
+
         /// <summary>How much faster than normal the bots play; never zero, so a delay cannot vanish.</summary>
         public double Speed => Speeds[SpeedIndex];
 
@@ -105,6 +121,15 @@ namespace Mahjong.Controls
             // capture run without touching the scene; nonsense keeps the rules' own windows.
             var clockText = Environment.GetEnvironmentVariable("MAHJONG_CLOCK");
             if (ClockPaceSettings.TryParse(clockText) is { } pace) settings.ClockPace = pace;
+
+            // MAHJONG_SESSION_MINUTES=0.2 shortens the session so the time-up path can be seen in a
+            // capture run; "unlimited" leaves the table without a clock. Nonsense keeps 150 minutes.
+            var sessionText = Environment.GetEnvironmentVariable("MAHJONG_SESSION_MINUTES");
+            if (SessionLengthSettings.TryParse(sessionText) is { } limit) settings.SessionLimit = limit;
+
+            // MAHJONG_SEED=12345 repeats a game exactly: the same deal, the same bots, the same hands.
+            var seedText = Environment.GetEnvironmentVariable("MAHJONG_SEED");
+            if (DealSeedSettings.TryParse(seedText) is { } seed) settings.Seed = seed;
 
             return settings;
         }

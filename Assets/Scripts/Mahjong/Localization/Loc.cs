@@ -105,6 +105,7 @@ namespace Mahjong.Localization
             Add("hud.points", "Очки: {0}", "Points: {0}");
             Add("hud.clock", "Часы: {0} / {1}", "Clock: {0} / {1}");
             Add("hud.timeUp", "время истекло", "time is up");
+            Add("hud.noClock", "часов нет", "no clock");
             Add("hud.lastQuarter", "последние 15 минут", "last quarter of an hour");
             Add("hud.huForbidden", "Ху в этой руке запрещено: {0}", "Hu is forbidden this hand: {0}");
             Add("hud.seconds", "{0}: {1} с", "{0}: {1} s");
@@ -119,6 +120,12 @@ namespace Mahjong.Localization
             Add("clock.pace.rules", "по правилам (20/10/3)", "as the rules say (20/10/3)");
             Add("clock.pace.calm", "спокойно (30/20/10)", "unhurried (30/20/10)");
             Add("clock.pace.unlimited", "без ограничения", "no limit");
+
+            // ---------------------------------------------------------------- session (8.7)
+            Add("session.limit.rules", "по правилам ({0} мин)", "as the rules say ({0} min)");
+            Add("session.limit.minutes", "{0} мин", "{0} min");
+            Add("session.limit.unlimited", "без часов", "without a clock");
+            Add("seed.random", "случайная", "random");
 
             // ------------------------------------------------------------- results
             Add("result.handFinished", "Рука завершена", "Hand finished");
@@ -276,6 +283,8 @@ namespace Mahjong.Localization
             Add("title.speed", "Темп ботов", "Bot speed");
             Add("title.result", "Экран результата", "Result screen");
             Add("title.clock", "Время на ход", "Time to think");
+            Add("title.session", "Длина партии", "Game length");
+            Add("title.seed", "Сид раздачи", "Deal seed");
             Add("title.rules", "Справочник правил", "Rulebook");
             Add("title.quit", "Выход", "Quit");
             Add("title.back", "Назад", "Back");

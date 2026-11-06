@@ -30,7 +30,7 @@ namespace Mahjong.Rules.Diagnostics
             var title = new TitleScreen(settings);
 
             report.Equal(TitlePage.Main, title.Page, "the screen opens on the main page");
-            report.Equal(13, title.RowCount, "the main page has thirteen rows");
+            report.Equal(15, title.RowCount, "the main page has fifteen rows");
             report.Equal(TitleItem.NewGame, title.Selected, "the cursor starts on the new game");
             report.Equal("", title.Status, "a fresh screen says nothing under the rows");
 
@@ -133,9 +133,34 @@ namespace Mahjong.Rules.Diagnostics
             while (title.Adjust(-1)) { }
             report.Equal(ClockPace.Rules, settings.ClockPace, "and starts at the rules' own windows");
 
+            // How long the whole game runs (8.7): the rules' 150 minutes, shorter house rules, no clock.
+            title.Move(1);
+            report.Equal(TitleItem.Session, title.Selected, "the length of the game has a row of its own");
+            report.Equal(SessionLengthSettings.Text(GameSession.DefaultTimeLimit), title.RowAt(title.Index).Value,
+                "the row shows the length of a game by the rulebook (3.5.6)");
+            report.Check(title.Adjust(1), "the length row steps");
+            report.Equal(TimeSpan.FromMinutes(90), settings.SessionLimit, "one step shorter is ninety minutes");
+            while (title.Adjust(1)) { }
+            report.Check(SessionLengthSettings.IsUnlimited(settings.SessionLimit),
+                "the ladder ends at a table without a clock");
+            while (title.Adjust(-1)) { }
+            report.Equal(GameSession.DefaultTimeLimit, settings.SessionLimit, "and starts at the rules' own length");
+
+            // The deal (8.7): a fresh game every time, or the game the table dealt last.
+            title.Move(1);
+            report.Equal(TitleItem.Seed, title.Selected, "the deal follows the length of the game");
+            report.Equal(DealSeedSettings.Text(DealSeedSettings.Random), title.RowAt(title.Index).Value,
+                "a fresh table deals a different game every time");
+            settings.LastSeed = 4242;
+            report.Check(title.Adjust(1), "the deal row steps");
+            report.Equal(4242, settings.Seed, "stepping it repeats the game the table just dealt");
+            report.Equal("4242", title.RowAt(title.Index).Value, "and the row shows the number of that deal");
+            report.Check(title.Adjust(-1), "the row steps back");
+            report.Check(DealSeedSettings.IsRandom(settings.Seed), "to a fresh deal every time");
+
             // Picking a setting row steps it: a click on a slider does not need a second gesture.
             var before = settings.Speed;
-            title.Move(-2);
+            title.Move(-4);
             report.Equal(TitleItem.Speed, title.Selected, "back on the tempo row");
             report.Equal(TitleCommand.None, title.Activate(), "picking a setting is not a command");
             report.Check(settings.Speed != before, "picking the tempo row steps the tempo");
