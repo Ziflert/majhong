@@ -42,7 +42,6 @@ namespace Mahjong.Controls
 
         /// <summary>How big the interface is drawn.</summary>
         Scale = 12,
-
         Profile = 14,
 
         Save = 6,

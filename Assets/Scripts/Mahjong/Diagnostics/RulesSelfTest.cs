@@ -73,6 +73,7 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "session: the 150-minute clock stops an unfinished hand", () => SessionClock(report));
             Run(report, "session: standings rank by game points and split ties", () => SessionStandings(report));
             Run(report, "bots: heuristic play finishes sessions and wins hands", () => BotSession(report));
+            Run(report, "potential: maximum and forecast stay deterministic and explicit", () => HandPotentialRules(report));
             Run(report, "controls: the action bar offers every human decision", () => ActionBarCoverage(report));
             Run(report, "clock: three, ten and twenty-second windows", () => HandClockRules(report));
             Run(report, "clock: silence becomes a pass or a discard, never a Hu", () => ClockExpiryRules(report));

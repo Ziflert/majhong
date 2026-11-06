@@ -22,6 +22,9 @@ namespace Mahjong.Controls
         /// </summary>
         public RuleVariant Variant { get; set; } = RuleVariant.Default;
 
+        /// <summary>Optional sporting-hand potential overlay; off by default to preserve immersion.</summary>
+        public HandPotentialMode Potential { get; set; } = HandPotentialMode.Off;
+
         /// <summary>Interface composition; independent from the selected colour palette.</summary>
         public UiProfile Profile { get; set; } = UiProfiles.Default;
 
@@ -189,6 +192,10 @@ namespace Mahjong.Controls
             // draws the interface bigger; both are look settings, and nonsense keeps the default.
             var themeText = Environment.GetEnvironmentVariable("MAHJONG_THEME");
             if (UiThemeSettings.TryParseTheme(themeText) is { } theme) settings.Theme = theme;
+
+            var potentialText = Environment.GetEnvironmentVariable("MAHJONG_POTENTIAL");
+            if (HandPotentialModeSettings.TryParse(potentialText) is { } potential)
+                settings.Potential = potential;
 
             var scaleText = Environment.GetEnvironmentVariable("MAHJONG_UI_SCALE");
             if (UiThemeSettings.TryParseScale(scaleText) is { } scale) settings.UiScale = scale;

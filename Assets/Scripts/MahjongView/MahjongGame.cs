@@ -2638,7 +2638,7 @@ namespace Mahjong.Unity
             if (Input.GetKeyDown(KeyCode.F3)) hud.ToggleDebug();
             hud.Refresh(camera, session, settings, humanSeat, IsYourTurn, clock,
                 statusNote.Length > 0 && Time.time < statusNoteUntil ? statusNote : string.Empty,
-                DescribeState());
+                DescribeState(), settings.Potential);
         }
 
         private void RefreshStatus()

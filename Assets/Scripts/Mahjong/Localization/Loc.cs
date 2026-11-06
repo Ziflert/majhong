@@ -107,6 +107,14 @@ namespace Mahjong.Localization
             Add("hud.turnName", "Ходит: {0}", "Playing: {0}");
             Add("hud.playerScore", "Очки: {0}", "Score: {0}");
             Add("hud.houseBadge", "домашнее правило", "house rule");
+            Add("hud.potential", "Потенциал", "Potential");
+            Add("hud.potentialMax", "Максимум: {0} · ожидание: {1:0.0} · живых: {2}", "Maximum: {0} · forecast: {1:0.0} · live: {2}");
+            Add("hud.potentialMaxOnly", "Достижимый максимум: {0} очк.", "Achievable maximum: {0} pts");
+            Add("hud.potentialForecast", "Прогноз: {0:0.0} очк. · живых: {1}", "Forecast: {0:0.0} pts · live: {1}");
+            Add("menu.potential", "Оценка руки", "Hand potential");
+            Add("menu.value.off", "выкл.", "off");
+            Add("menu.value.potential.max", "достижимый максимум", "achievable maximum");
+            Add("menu.value.potential.forecast", "прогноз ожидания", "wait forecast");
             Add("hud.hints", "Подсказки", "Hints");
             Add("hud.meldGuide", "Комбинации", "Melds");
             Add("hud.meldDefinitions", "Чоу — три подряд одной масти\nПанг — три одинаковые кости\nКонг — четыре одинаковые кости",

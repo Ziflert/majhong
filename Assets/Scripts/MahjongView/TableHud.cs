@@ -24,6 +24,7 @@ namespace Mahjong.Unity
         private Card hint = null!;
         private Card notice = null!;
         private Card debug = null!;
+        private Card potential = null!;
         private Card meldGuide = null!;
         private ControlTile hintsButton = null!;
         private ControlTile guideButton = null!;
@@ -59,6 +60,7 @@ namespace Mahjong.Unity
         public TextMesh Notice => notice.Label;
         public bool DebugOpen => debugOpen;
         public TextMesh DebugText => debug.Label;
+        public TextMesh Potential => potential.Label;
         public TextMesh PlayerLabel(int seat) => players[seat].Label;
 
         public static TableHud Create(Transform camera)
@@ -73,6 +75,7 @@ namespace Mahjong.Unity
             hud.hint = hud.CreateCard("HintBar", TextAnchor.MiddleCenter, 0.00115f);
             hud.notice = hud.CreateCard("Notice", TextAnchor.UpperCenter, 0.0013f);
             hud.debug = hud.CreateCard("DebugPanel", TextAnchor.UpperLeft, 0.0011f);
+            hud.potential = hud.CreateCard("Potential", TextAnchor.UpperRight, 0.0011f);
             for (var i = 0; i < hud.players.Length; i++)
                 hud.players[i] = hud.CreateCard($"PlayerPlate-{i}", TextAnchor.MiddleCenter, 0.00125f);
             hud.meldGuide = hud.CreateCard("MeldGuide", TextAnchor.UpperLeft, 0.00115f);
@@ -111,7 +114,7 @@ namespace Mahjong.Unity
         public void DismissNotice() => toastUntil = 0f;
 
         public void Refresh(Camera camera, GameSession session, GameSettings settings, int humanSeat,
-            bool humanTurn, PlayClock clock, string note, string diagnostic)
+            bool humanTurn, PlayClock clock, string note, string diagnostic, HandPotentialMode potentialMode = HandPotentialMode.Off)
         {
             var state = session.State;
             if (state == null) return;
@@ -195,10 +198,19 @@ namespace Mahjong.Unity
                 if (mouse.y > 0.72f) DismissNotice();
             }
             debug.Label.gameObject.SetActive(debugOpen);
+            potential.Label.gameObject.SetActive(potentialMode != HandPotentialMode.Off && session.Variant.Mode == ScoringMode.Fans);
+            if (potential.Label.gameObject.activeSelf)
+            {
+                var line = HandPotential.Evaluate(state, humanSeat);
+                var text = potentialMode == HandPotentialMode.BestAchievable
+                    ? Loc.Format("hud.potentialMaxOnly", line.MaximumPoints)
+                    : Loc.Format("hud.potentialForecast", line.ExpectedPoints, line.LiveCopies);
+                Set(potential, text, right, top - 0.045f, UiRole.Accent);
+            }
             Set(debug, diagnostic, left, top - 0.078f, UiRole.TextMuted);
 
             // Fit after the current frame's TextMesh rebuild (in LateUpdate on the following frame).
-            foreach (var card in new[] { header, wall, time, rules, hint, notice, debug, meldGuide }) Fit(card, camera);
+            foreach (var card in new[] { header, wall, time, rules, hint, notice, debug, meldGuide, potential }) Fit(card, camera);
             foreach (var card in players) Fit(card, camera);
         }
 
