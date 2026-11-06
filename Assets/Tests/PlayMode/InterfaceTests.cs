@@ -80,10 +80,10 @@ namespace Mahjong.PlayTests
             Assert.AreEqual(firstTitle, rules.Title.text, "Turning back does not return to the first page.");
             Assert.AreEqual(firstBody, rules.Body.text, "The text of the first page changed.");
 
-            // The fan reference is the last page of the book.
+            // The fan reference is the last page of the book — the catalogue takes three pages now.
             rules.Turn(-1);
             yield return null;
-            StringAssert.Contains("фан", rules.Title.text, "The fan reference page is missing.");
+            StringAssert.Contains("Фан", rules.Title.text, "The fan reference page is missing.");
 
             rules.Close();
             yield return null;

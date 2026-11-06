@@ -126,6 +126,93 @@ namespace Mahjong.PlayTests
         }
 
         [UnityTest]
+        public IEnumerator EveryPageFitsInsideThePage()
+        {
+            var game = Game();
+            yield return null;
+            yield return null;
+
+            var rules = game.Rules;
+            game.OpenRules();
+            yield return null;
+
+            var camera = Camera.main!;
+            var aspect = camera.aspect;
+            var tables = 0;
+
+            // The book is read in the same window the player resizes, and a page of prose, a page of a
+            // table and a narrow 4:3 window all have to hold their text: the panel breaks a line again
+            // for the measure it has (4.12.1), so every shape of the page is checked.
+            try
+            {
+                foreach (var shape in new[] { aspect, 4f / 3f })
+                {
+                    camera.aspect = shape;
+                    yield return null;
+
+                    for (var page = 0; page < rules.PageCount; page++)
+                    {
+                        rules.GoToPage(page);
+                        yield return null;
+                        tables += CheckPageFits(rules, page);
+                    }
+                }
+            }
+            finally
+            {
+                camera.aspect = aspect;
+            }
+
+            // The catalogue of fans is longer than a page of the book holds, so it has to arrive as
+            // tables of two columns; a book with no such page would pass every check above for nothing.
+            Assert.GreaterOrEqual(tables, 2, "No page of the book is a table of two columns.");
+
+            game.CloseRules();
+            yield return null;
+        }
+
+        /// <summary>Checks that one page stands inside its sheet; 1 when the page is a table.</summary>
+        private static int CheckPageFits(RulesPanel rules, int page)
+        {
+            var sheet = rules.Backdrop.bounds;
+            var title = rules.Title.GetComponent<Renderer>().bounds;
+            var body = rules.Body.GetComponent<Renderer>().bounds;
+            var tail = rules.Footer.GetComponent<Renderer>().bounds;
+            var where = $"page {page + 1} ({rules.CurrentTitle}) at {Camera.main!.aspect:0.00}";
+
+            // A page whose text was never drawn would pass every fit below for nothing. The contents
+            // page holds a single line of hint, so anything above one line of type will do.
+            Assert.Greater(body.size.y, 0.008f, $"The text of {where} was not drawn.");
+            Assert.Greater(body.size.x, 0.05f, $"The text of {where} was not drawn.");
+
+            // The text of a page is broken to the width of the page by the panel itself (4.12.1),
+            // so a page that runs over the edge means the measure of a line is wrong.
+            Assert.LessOrEqual(body.max.x, sheet.max.x - 0.004f,
+                $"The text of {where} runs over the right edge of the page: {body.max.x:0.000} > {sheet.max.x:0.000}.");
+            Assert.GreaterOrEqual(body.min.x, sheet.min.x,
+                $"The text of {where} starts left of the page.");
+            Assert.LessOrEqual(body.max.y, title.min.y + 0.002f,
+                $"The text of {where} runs into its heading.");
+            Assert.GreaterOrEqual(body.min.y, tail.max.y + 0.002f,
+                $"The text of {where} runs into the line at the foot of the page.");
+
+            var right = rules.BodyRight;
+            if (right.text.Length == 0) return 0;
+
+            var column = right.GetComponent<Renderer>().bounds;
+            Assert.Greater(column.size.y, 0.008f, $"The second column of {where} was not drawn.");
+
+            // A table runs down two columns: the second one must stand clear of the first.
+            Assert.GreaterOrEqual(column.min.x, body.max.x + 0.004f,
+                $"The two columns of {where} overlap: the first ends at {body.max.x:0.000}, the second starts at {column.min.x:0.000}.");
+            Assert.LessOrEqual(column.max.x, sheet.max.x - 0.004f,
+                $"The right column of {where} runs over the edge of the page.");
+            Assert.GreaterOrEqual(column.min.y, tail.max.y + 0.002f,
+                $"The right column of {where} runs into the line at the foot of the page.");
+            return 1;
+        }
+
+        [UnityTest]
         public IEnumerator TheBookComesBackToTheMenuItCameFrom()
         {
             var game = Game();

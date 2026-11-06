@@ -68,8 +68,30 @@ namespace Mahjong.Unity
         /// <summary>Share of the frame the page is allowed to take, so it never touches the edge.</summary>
         private const float FrameShare = 0.92f;
 
-        /// <summary>Width of one body line in characters; the pages are authored in long lines.</summary>
-        private const int BodyWidth = 70;
+        /// <summary>Nominal size of the body type, and the smallest the fit may shrink it to.</summary>
+        private const float BodySize = 0.0013f;
+        private const float MinBodySize = 0.00085f;
+
+        /// <summary>
+        /// First guess at the width of a character in units of the type size, and the height of a line
+        /// in the same units. The font is a system one and its metrics differ between machines, so a
+        /// guess is only a starting point: <see cref="DrawBody"/> measures what it drew and breaks the
+        /// page again until the text fits (4.12.1).
+        /// </summary>
+        private const float CharAdvance = 3.4f;
+        private const float LineAdvance = 10.2f;
+
+        /// <summary>Air between the text and the edge of the page, and between the two columns of a table.</summary>
+        private const float BodyMargin = 0.020f;
+        private const float ColumnGap = 0.024f;
+
+        /// <summary>Distance from the top edge of the page to the first line, and a line at the foot.</summary>
+        private const float BodyTop = 0.044f;
+        private const float FooterAt = 0.032f;
+
+        /// <summary>A line of the body is never shorter than this and never longer than that.</summary>
+        private const int MinLineChars = 20;
+        private const int MaxLineChars = 110;
 
         /// <summary>Index of the contents page: the first page of the book, and where Home goes.</summary>
         public const int ContentsPage = 0;
@@ -77,8 +99,8 @@ namespace Mahjong.Unity
         /// <summary>The table of contents is two columns of rows, one row per page of the book.</summary>
         private const int ContentsColumns = 2;
         private const float ContentsMargin = 0.020f;
-        private const float RowHeight = 0.016f;
-        private const float RowStep = 0.0195f;
+        private const float RowHeight = 0.014f;
+        private const float RowStep = 0.0175f;
 
         private const float ArrowWidth = 0.048f;
         private const float ArrowHeight = 0.016f;
@@ -114,6 +136,25 @@ namespace Mahjong.Unity
 
         private TextMesh title = null!;
         private TextMesh body = null!;
+
+        /// <summary>Right column of a page that is a table; empty on a page of prose.</summary>
+        private TextMesh bodyRight = null!;
+
+        /// <summary>
+        /// Where the body of the page stands and how much room it has, all in the panel's own units,
+        /// measured by <see cref="Layout"/> from the frame the page is drawn in.
+        /// </summary>
+        private float pageWidth = -1f;
+        private float pageHeight = -1f;
+        private float textWidth;
+        private float columnWidth;
+        private float columnLeft;
+        private float columnSecond;
+        private float bodyTop;
+        private float bodyBudget;
+
+        /// <summary>Width of a character in units of the type size, as measured from what was drawn.</summary>
+        private float charAdvance = CharAdvance;
         private TextMesh footer = null!;
         private TextMesh counter = null!;
         private Renderer background = null!;
@@ -134,6 +175,9 @@ namespace Mahjong.Unity
         public string CurrentBody => Page >= 0 && Page < pages.Count ? pages[Page].Body : string.Empty;
 
         public TextMesh Body => body;
+
+        /// <summary>Right column of a page that is a table; its text is empty on a page of prose.</summary>
+        public TextMesh BodyRight => bodyRight;
 
         /// <summary>The dark page behind the text; the PlayMode test checks that it fits the frame.</summary>
         public Renderer Backdrop => background;
@@ -173,7 +217,7 @@ namespace Mahjong.Unity
             var panel = root.AddComponent<RulesPanel>();
             panel.pages.Add(ContentsSection());
             panel.pages.AddRange(RulesBook.Sections);
-            panel.pages.Add(RulesBook.FanSection());
+            panel.pages.AddRange(RulesBook.FanSections());
 
             panel.cameraTransform = cameraTransform;
             panel.background = CreateBackground(root.transform);
@@ -183,6 +227,8 @@ namespace Mahjong.Unity
             // margin of the page and not its middle: a body at x = 0 started in the centre and ran
             // off the right edge of the screen.
             panel.body = CreateText(root.transform, "body", Vector3.zero,
+                0.0013f, TextAnchor.UpperLeft, new Color(0.92f, 0.93f, 0.95f));
+            panel.bodyRight = CreateText(root.transform, "body-right", Vector3.zero,
                 0.0013f, TextAnchor.UpperLeft, new Color(0.92f, 0.93f, 0.95f));
             panel.footer = CreateText(root.transform, "footer", Vector3.zero,
                 0.0013f, TextAnchor.LowerCenter, CounterColour);
@@ -317,8 +363,20 @@ namespace Mahjong.Unity
 
             background.transform.localScale = new Vector3(width, height, 1f);
             title.transform.localPosition = new Vector3(0f, height * 0.5f - 0.020f, -0.0009f);
-            body.transform.localPosition = new Vector3(-width * 0.5f + 0.02f, height * 0.5f - 0.044f, -0.0009f);
-            footer.transform.localPosition = new Vector3(0f, -height * 0.5f + 0.032f, -0.0009f);
+
+            // The body is one column by default and splits in two when a page of the fan table needs
+            // it, so both columns are always placed: a table keeps the same measure on every page.
+            bodyTop = height * 0.5f - BodyTop;
+            columnLeft = -width * 0.5f + BodyMargin;
+            columnWidth = (width - BodyMargin * 2f - ColumnGap) * 0.5f;
+            columnSecond = columnLeft + columnWidth + ColumnGap;
+            textWidth = columnWidth * 2f + ColumnGap;
+            bodyBudget = bodyTop - (-height * 0.5f + FooterAt + BodySize * LineAdvance + 0.006f);
+
+            body.transform.localPosition = new Vector3(columnLeft, bodyTop, -0.0009f);
+            bodyRight.transform.localPosition = new Vector3(columnSecond, bodyTop, -0.0009f);
+
+            footer.transform.localPosition = new Vector3(0f, -height * 0.5f + FooterAt, -0.0009f);
             counter.transform.localPosition = new Vector3(0f, -height * 0.5f + BottomLine, -0.0009f);
 
             var arrowX = width * 0.5f - ArrowWidth * 0.5f - 0.012f;
@@ -326,6 +384,16 @@ namespace Mahjong.Unity
             PlaceArrow(next, arrowX, -height * 0.5f + BottomLine);
 
             LayoutContents(width, height);
+
+            // The page grew or shrank with the window: the text has to be broken again for the new
+            // measure, otherwise a wide page keeps the short lines of a narrow one.
+            if (!Mathf.Approximately(width, pageWidth) || !Mathf.Approximately(height, pageHeight))
+            {
+                pageWidth = width;
+                pageHeight = height;
+                charAdvance = CharAdvance;
+                if (IsOpen) Refresh();
+            }
         }
 
         private static void PlaceArrow(ArrowPlate plate, float x, float y)
@@ -411,7 +479,7 @@ namespace Mahjong.Unity
 
             var page = pages[Page];
             title.text = page.Title;
-            body.text = Wrap(page.Body);
+            DrawBody(page);
             // The reference of a page is the rule it explains; the contents page explains nothing, so
             // it carries the keys instead of a number nobody could look up.
             footer.text = page.Reference.Length > 0
@@ -425,17 +493,154 @@ namespace Mahjong.Unity
         }
 
         /// <summary>
-        /// The book is authored in lines of roughly a hundred characters, which is already narrower
-        /// than the panel; this only shortens a hand-written line that ran long.
+        /// Draws the text of a page so that it fits the page it is drawn on (4.12.1). The pages are
+        /// whole paragraphs, and this is the only place that knows how wide a page is, so this is where
+        /// a line is broken — and, if the text still does not fit, where the type gets smaller, a table
+        /// splits into two columns, and the break is made again.
+        ///
+        /// The font is a system one, so the width of a character is not known in advance: the guess in
+        /// <see cref="CharAdvance"/> is corrected by the width actually drawn, and the loop runs until
+        /// the text stands inside the measure or the type reaches <see cref="MinBodySize"/>.
         /// </summary>
-        private static string Wrap(string text)
+        private void DrawBody(RulesSection page)
+        {
+            var size = BodySize;
+            var columns = 1;
+
+            for (var pass = 0; pass < 12; pass++)
+            {
+                SetBodySize(size);
+                Compose(page, size, columns);
+
+                var allow = columns == 1 ? textWidth : columnWidth;
+                var drawn = DrawnWidth();
+                if (drawn > allow + 0.001f)
+                {
+                    // The line was broken by a count of characters, and the font is wider than that
+                    // count assumed; the width that came out is the measure of the font.
+                    charAdvance = Mathf.Clamp(charAdvance * drawn / allow, 1.8f, 8f);
+                    continue;
+                }
+
+                if (DrawnHeight() <= bodyBudget + 0.001f) return;
+
+                // Too tall: a table stands in two columns, and past that only smaller type fits.
+                if (page.IsList && columns == 1)
+                {
+                    columns = 2;
+                    continue;
+                }
+
+                if (size <= MinBodySize) return;
+                size = Mathf.Max(MinBodySize, size * 0.92f);
+            }
+        }
+
+        /// <summary>
+        /// Breaks the page into the lines that are drawn: whole paragraphs of prose kept apart by a
+        /// blank line, or — on a page of the fan table — whole entries, one under another, that never
+        /// straddle the two columns.
+        /// </summary>
+        private void Compose(RulesSection page, float size, int columns)
+        {
+            if (!page.IsList)
+            {
+                bodyRight.text = string.Empty;
+                var chars = LineChars(textWidth, size);
+                var paragraphs = new List<string>();
+                foreach (var paragraph in page.Paragraphs)
+                    paragraphs.Add(string.Join("\n", Split(paragraph, chars)));
+                body.text = string.Join("\n\n", paragraphs);
+                return;
+            }
+
+            var columnChars = LineChars(columns == 1 ? textWidth : columnWidth, size);
+            var entries = new List<List<string>>();
+            var total = 0;
+            foreach (var entry in page.Paragraphs)
+            {
+                var lines = Split(entry, columnChars).ToList();
+                entries.Add(lines);
+                total += lines.Count + 1;   // the blank line under the entry
+            }
+
+            if (columns == 1)
+            {
+                body.text = Lines(entries, entries.Count);
+                bodyRight.text = string.Empty;
+                return;
+            }
+
+            // Two columns, balanced by height: an entry moves to the second column whole, and the
+            // break goes where the two columns come out closest to each other, not at a count of lines.
+            var target = total / 2;
+            var split = entries.Count;
+            var best = int.MaxValue;
+            var running = 0;
+            for (var index = 0; index <= entries.Count; index++)
+            {
+                var balance = Mathf.Abs(running - target);
+                if (balance < best)
+                {
+                    best = balance;
+                    split = index;
+                }
+
+                if (index < entries.Count) running += entries[index].Count + 1;
+            }
+
+            body.text = Lines(entries, split);
+            bodyRight.text = split >= entries.Count ? string.Empty : Lines(entries, entries.Count, split);
+        }
+
+        /// <summary>The entries of a table as the text of one column, blank lines between them.</summary>
+        private static string Lines(IReadOnlyList<List<string>> entries, int end, int start = 0)
         {
             var lines = new List<string>();
-            foreach (var source in text.Split('\n'))
-                lines.AddRange(Split(source, BodyWidth));
+            for (var index = start; index < end; index++)
+            {
+                if (lines.Count > 0) lines.Add(string.Empty);
+                lines.AddRange(entries[index]);
+            }
+
             return string.Join("\n", lines);
         }
 
+        private void SetBodySize(float size)
+        {
+            body.characterSize = size;
+            bodyRight.characterSize = size;
+        }
+
+        /// <summary>How many characters of a line this wide the font holds at this size.</summary>
+        private int LineChars(float width, float size) =>
+            Mathf.Clamp(Mathf.FloorToInt(width / (size * charAdvance)), MinLineChars, MaxLineChars);
+
+        /// <summary>The width the body actually came out at, measured from the mesh the text drew.</summary>
+        private float DrawnWidth()
+        {
+            var left = DrawnSize(body);
+            if (bodyRight.text.Length == 0) return left.x;
+            var right = DrawnSize(bodyRight);
+            return Mathf.Max(left.x, right.x);
+        }
+
+        /// <summary>The height of the taller of the two columns.</summary>
+        private float DrawnHeight()
+        {
+            var left = DrawnSize(body);
+            if (bodyRight.text.Length == 0) return left.y;
+            return Mathf.Max(left.y, DrawnSize(bodyRight).y);
+        }
+
+        /// <summary>Size of the text as it was drawn: the bounds of the mesh a TextMesh writes.</summary>
+        private static Vector2 DrawnSize(TextMesh mesh)
+        {
+            var filter = mesh.GetComponent<MeshFilter>();
+            if (filter != null && filter.sharedMesh != null) return filter.sharedMesh.bounds.size;
+            var renderer = mesh.GetComponent<Renderer>();
+            return renderer != null ? (Vector2)renderer.localBounds.size : Vector2.zero;
+        }
         private static IEnumerable<string> Split(string line, int width)
         {
             if (line.Length <= width)

@@ -46,6 +46,8 @@ namespace Mahjong.EditorTools
             // У-5: the same book one page in — the text of a page, the two plates of the bottom line
             // and the counter between them; the contents page above shows the rows instead.
             ("rules-page", "ruletext", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f), SettleSeconds),
+            // 4.12.1: a page of the fan catalogue — a table broken into two columns, so that it fits.
+            ("rules-fans", "fanlist", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f), SettleSeconds),
             ("free-play", "free", new Vector3(0f, 2.70f, -2.60f), new Vector3(0f, 0f, 0.18f), SettleSeconds),
             // No player sits at a capture run, so this step runs the human windows out and the shot
             // shows the table mid-hand; the review after it then has real moves to step through.
@@ -226,6 +228,10 @@ namespace Mahjong.EditorTools
                     game.OpenRules();
                     game.Rules.GoTo("score");
                     break;
+                case "fanlist":
+                    game.OpenRules();
+                    game.Rules.GoTo("fans-88");
+                    break;
                 case "free":
                     game.OpenFreePlay();
                     break;
@@ -262,6 +268,8 @@ namespace Mahjong.EditorTools
                            + $" rows {(game.Rules.RowsShown(0) ? "drawn" : "put away")}",
                 "ruletext" => $"rulebook page {game.Rules.Page + 1}/{game.Rules.PageCount}: {game.Rules.CurrentTitle},"
                               + $" counter '{game.Rules.Counter.text}'{(game.Rules.IsContents ? ", contents" : "")}",
+                "fanlist" => $"rulebook page {game.Rules.Page + 1}/{game.Rules.PageCount}: {game.Rules.CurrentTitle},"
+                             + $" {game.Rules.CurrentBody.Split('\n').Length} lines of the fan table",
                 "free" => $"free play {game.FreePlay.TileViewCount} tiles, seat {game.FreePlay.ActiveSeat}",
                 "replay" => $"review {game.Replay.PositionText}, last {game.Replay.LastMoveText}",
                 "controls-panel" => $"controls tray open, {game.Controls?.Tiles?.Count ?? 0} tiles visible, phase {game.Phase}",
@@ -288,6 +296,9 @@ namespace Mahjong.EditorTools
                     game.CloseRules();
                     break;
                 case "ruletext":
+                    game.CloseRules();
+                    break;
+                case "fanlist":
                     game.CloseRules();
                     break;
                 case "free":

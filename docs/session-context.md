@@ -4,9 +4,9 @@
 Постоянные записи — `docs/journal.md` (вехи), `docs/plan.md` (что сделано), `docs/rules-status.md`,
 `docs/unity-layer.md`, трактовки классики — `docs/rules-classic.md`. Здесь — только «где мы стоим».
 
-**Обновлён:** 2026-11-06, веха «справочник стал книгой (У-5)». **Дерево чистое** после коммита
-`rulebook: contents, page plates and a counter (У-5)`. Незакоммиченного кода нет; `UI/` и
-`docs/ui-design.md` по-прежнему не в git (черновик UGUI, решения нет).
+**Обновлён:** 2026-11-06, веха «страницы справочника верстает панель (4.12.1)». **Дерево чистое**
+после коммита `rulebook: the panel lays the pages out and measures them (4.12.1)`. Незакоммиченного
+кода нет; `UI/` и `docs/ui-design.md` по-прежнему не в git (черновик UGUI, решения нет).
 
 ---
 
@@ -16,9 +16,10 @@
 **У-2** (приветственный экран, 4.16), **У-3** (комбинации по кадру), **У-5** (справочник: содержание,
 плитки-стрелки, счётчик, возврат в меню), **У-6** (панель экранных кнопок), **У-7** (экран конца
 руки, 4.5), **У-11** (стена не открывается до раздачи). Плюс профиль правил (1.13, 1.14, 2.18–2.22)
-и настоящая стена из 18 стопок (4.8.1). Дальше по плану — **4.12.1** (перевёрстка страниц
-справочника), этап 2 профиля (8.7: длина партии и сид), звук (4.10), этап 3 профиля (Просящая рука,
-пенальти, лимитированные руки, 136 костей).
+и настоящая стена из 18 стопок (4.8.1). Плюс справочник доведён до книги: содержание, плитки-стрелки,
+счётчик и перенос текста по ширине страницы (У-5, 4.12.1). Дальше по плану — этап 2 профиля (8.7:
+длина партии и сид), звук (4.10), этап 3 профиля (Просящая рука, пенальти, лимитированные руки,
+136 костей).
 
 ---
 
@@ -26,10 +27,10 @@
 
 | Проверка | Когда | Результат | Файл результатов |
 |---|---|---|---|
-| `Tools/RulesCheck` | 2026-11-06 01:0x | **OK — 79 групп, 122 674 проверки** | stdout |
-| Unity PlayMode | 2026-11-06 01:04 | **58/58 Passed** | `Logs/playmode-results.xml` |
-| Unity EditMode | 2026-11-06 01:05 | **13/13 Passed** | `Logs/editmode-results.xml` |
-| `InterfaceCapture` (`rules-panel,rules-page`) | 2026-11-06 01:05 | 2 кадра | `Screenshots/rules-*.png` |
+| `Tools/RulesCheck` | 2026-11-06 03:09 | **OK — 79 групп, 122 680 проверок** | stdout |
+| Unity PlayMode | 2026-11-06 03:08 | **59/59 Passed** | `Logs/playmode-results.xml` |
+| Unity EditMode | 2026-11-06 03:09 | **13/13 Passed** | `Logs/editmode-results.xml` |
+| `InterfaceCapture` (`rules-panel,rules-page,rules-fans`) | 2026-11-06 03:08 | 3 кадра | `Screenshots/rules-*.png` |
 
 Правила экономии:
 
@@ -37,40 +38,37 @@
 - менял только `Assets/Scripts/Mahjong/**` (ядро, контролы, локализация) — хватает `RulesCheck`
   плюс EditMode (он оборачивает `RulesSelfTest` и ловит, например, совпадение RU/EN строк);
 - менял `Assets/Scripts/MahjongView/**`, `Net/**`, `Assets/Tests/PlayMode/**` — обязателен PlayMode
-  (58 тестов, ~1 мин);
+  (59 тестов, ~1 мин);
 - менял вид стола или подписи — переснять кадры `InterfaceCapture` (без `-batchmode`, иначе
   кадры не пишутся). Один экран можно переснять без всего прогона: `MAHJONG_CAPTURE_STEPS=rules-page`
   (имена шагов — из массива `Steps`, напр. `result-screen`, а не `result`).
 
 ---
 
-## Что сделано в этой вехе (У-5)
+## Что сделано в этой вехе (4.12.1)
 
 | Файл | Что сделано |
 |---|---|
-| `MahjongView/RulesPanel.cs` | Первая страница — содержание (`ContentsPage = 0`, `ContentsSection()` из `Loc`), строки `contents-*` двумя колонками (куб-лицо + `BoxCollider` + подпись) и клик по строке; две плитки-стрелки `◀`/`▶` и `TextMesh`-счётчик внизу страницы; `Layout()` раскладывает и то и другое от `fieldOfView`/`aspect`; `TryPick(Ray)` → `RulesClick` (`Previous` / `Next` / `Page`); `GoToPage`, `IsContents`, `RowsShown`, `RowPosition`, `ButtonPosition`; в `HandleKeys` добавлены `Home` (содержание) и `End` (таблица фан) |
-| `MahjongView/MahjongGame.cs` | `OpenRules(fromMenu)` / `CloseRules()` / `ClickRules(ray)`; поле `rulesFromMenu`; книга из меню возвращается в меню на той же строке, из приветственного экрана — в экран, с клавиши или трея — за стол |
-| `Localization/Loc.cs` | `ui.rulesLine` стал «{0} · R / Esc — закрыть», новые `ui.rulesPage`, `ui.rulesHint`, `ui.rulesContents`, `ui.rulesContentsHint` |
-| `Tests/PlayMode/RulebookTests.cs` | Новый файл: `TheContentsPageOpensEveryPageOfTheBook`, `ThePageButtonsTurnTheBook`, `TheBookComesBackToTheMenuItCameFrom` — клики идут лучом через `ClickRules`, потому что сырой `Input` из теста не нажать |
-| `Tests/PlayMode/InterfaceTests.cs`, `MenuTests.cs`, `TitleTests.cs` | Номер страницы проверяется по `Rules.Counter`, закрытие — через `game.CloseRules()` (меню возвращается) |
-| `Editor/InterfaceCapture.cs` | Шаг `rules-page` (`OpenRules` + `GoTo("score")`); шаг `rules-panel` снимает содержание |
+| `Knowledge/RulesBook.cs` | Страницы — целые абзацы без ручных переносов; `RulesSection.IsList` для страниц-таблиц; `FanSections()` режет каталог фан на страницы по `FanPageChars = 880`, `FanPage` называет диапазон очков (ид `fans-88`, `fans-8`), старого `FanSection()` больше нет |
+| `MahjongView/RulesPanel.cs` | `Layout()` меряет не только лист, но и место под текст (`textWidth`, `columnWidth`, `bodyTop`, `bodyBudget`); `DrawBody` рисует, меряет нарисованное (`DrawnSize` → `DrawnWidth`/`DrawnHeight`) и перебирает: строка шире листа → правится `charAdvance` по нарисованному; текст выше листа → таблица в две колонки; всё равно не влезает → кегль до `MinBodySize`; `Compose` держит абзацы прозой, а таблицу — целыми записями, что никогда не рвутся между колонками (баланс по высоте); второе поле `bodyRight` для правой колонки |
+| `Diagnostics/RulesSelfTest.Net.cs` | Проверка страниц: абзац не короче 40 знаков и без `\n`; фан — ровно две страницы, каждая таблица, иды уникальны, текст влезает, запись каталога ровно один раз |
+| `Tests/PlayMode/RulebookTests.cs` | Новый `EveryPageFitsInsideThePage`: все 17 страниц в двух пропорциях (как есть и 4:3), текст не выходит за лист / заголовок / подвал, колонки не наезжают, текст точно нарисован; `InterfaceTests` — заголовок последней страницы теперь «Фан» (две страницы) |
+| `Editor/InterfaceCapture.cs` | Новый шаг `rules-fans` (`GoTo("fans-88")`) |
 
-### Что видно на кадре и осталось
+### Что осталось по книге
 
-`RulesBook` набран короткими строками под узкую панель, а `RulesPanel.Wrap` режет по 70 символам —
-на странице текст читается рвано. Это пункт **4.12.1** в плане (собрать абзацы, переносить по
-ширине панели), в этой вехе не трогалось.
+Ничего из плана: 4.12.1 закрыт. Стилистика, которая может пойти дальше вместе со шрифтами (8.10): строки
+прозы доходят до ~100 знаков при широком кадре — если захочется классических 60–75, это `MaxLineChars`
+и выравнивание блока по центру, а не переделка вёрстки.
 
 ---
 
 ## Следующее по плану
 
-1. **4.12.1. Перевёрстка страниц справочника.** Абзацы из `RulesBook` склеивать и переносить по
-   ширине панели (`Wrap`), ручные переносы из текста убрать; проверка — кадр `rules-page.png` и
-   `RulebookTests` (страница влезает в кадр, текст не рвётся по смыслу).
-2. **У-2, этап 2.** Длина партии и сид на приветственном экране (8.7): сейчас `randomSeed` — поле
+1. **У-2, этап 2.** Длина партии и сид на приветственном экране (8.7): сейчас `randomSeed` — поле
    в инспекторе, а `MAHJONG_SESSION_MINUTES` — переменная окружения.
-3. **4.10 звук** и **У-8** (переосмыслить свободный стол).
+2. **4.10 звук.** Звука нет вовсе: раздача, снос, заявка, победа.
+3. **У-8** (переосмыслить свободный стол).
 4. **Этап 3 профиля:** Просящая рука, пенальти «заплатил за всех», 14 лимитированных рук,
    набор 136 костей (`WallGeometry.StacksPerSide` параметром вместо константы).
 5. **З-2/З-3:** эталонные руки для подсчёта MCR (21/24 сейчас), формулировка про «24/24» (У-10).
@@ -116,9 +114,9 @@ MAHJONG_SHOT_DIR=D:/Temprary/game/Screenshots "D:\Software\Unity\6000.0.85f1\Edi
   -projectPath "D:/Temprary/game" -executeMethod Mahjong.EditorTools.InterfaceCapture.CaptureAndExit
 # один-два кадра вместо всего прогона (полный — около 70 секунд):
 MAHJONG_CAPTURE_STEPS=controls-panel,melds   # имена шагов: welcome, opening-dice, table-overview,
-                                             # controls-panel, rules-panel, rules-page, free-play,
-                                             # table-midgame, melds, menu-panel, result-screen,
-                                             # replay-review
+                                             # controls-panel, rules-panel, rules-page, rules-fans,
+                                             # free-play, table-midgame, melds, menu-panel,
+                                             # result-screen, replay-review
 
 MAHJONG_VARIANT=classic144   # пресет правил для прогонов, кадров и тестов
 MAHJONG_CLOCK=calm           # окна 30/20/10 (rules по умолчанию, unlimited — без лимита)

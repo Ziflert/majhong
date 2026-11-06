@@ -509,7 +509,10 @@ namespace Mahjong.Rules.Diagnostics
             {
                 report.Check(ids.Add(section.Id), $"{section.Id} is unique");
                 report.Check(section.Title.Length > 3, $"{section.Id} has a title");
-                report.Check(section.Paragraphs.Count >= 2, $"{section.Id} has more than one paragraph");
+                report.Check(section.Paragraphs.Count >= 1
+                              && section.Paragraphs.All(paragraph => paragraph.Length >= 40
+                                                                  && !paragraph.Contains('\n')),
+                    $"{section.Id} is written in whole paragraphs, not in hand-broken lines");
                 report.Check(section.Body.Length > 200, $"{section.Id} is filled in ({section.Body.Length} chars)");
                 report.Check(!section.Body.Contains('{'), $"{section.Id} has no template placeholders");
                 report.Check(section.Reference.Length > 2, $"{section.Id} cites the rule it explains");
@@ -524,6 +527,21 @@ namespace Mahjong.Rules.Diagnostics
                 "the fan page lists every fan of the catalogue");
             report.Check(fans[0].StartsWith("88"), $"the fan page starts with the 88-point fans: {fans[0]}");
             report.Check(fans.Any(line => line.Contains("Семь пар")), "the fan page uses the russian names");
+
+            // The catalogue is split across as many pages as it takes to fit the panel, each of them a
+            // table of its own: not one page that runs off the bottom of the screen (4.12.1).
+            var fanPages = RulesBook.FanSections();
+            report.Equal(fans.Count, fanPages.Sum(page => page.Paragraphs.Count),
+                "the fan pages hold every line of the catalogue exactly once");
+            report.Check(fanPages.All(page => page.IsList && page.Reference == "3.8.1"),
+                "every fan page is a table and cites 3.8.1");
+            report.Equal(fanPages.Count, fanPages.Select(page => page.Id).Distinct().Count(),
+                "the fan pages have their own ids");
+            report.Equal(2, fanPages.Count, "the fan catalogue comes as two pages of the book");
+            report.Check(fanPages.All(page => page.Paragraphs.Sum(line => line.Length) <= 1000),
+                "no fan page holds more text than a page of two columns can show");
+            report.Check(fanPages.All(page => page.Paragraphs.Count >= 2),
+                "every fan page holds more than one entry of the catalogue");
 
             // Every reference in the book points at a rule chapter that exists in docs/rule-text.md,
             // which is the reason the page can be trusted as a summary.
