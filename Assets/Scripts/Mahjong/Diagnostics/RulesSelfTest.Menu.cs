@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Mahjong.Bots;
 using Mahjong.Controls;
@@ -156,12 +156,21 @@ namespace Mahjong.Rules.Diagnostics
             while (menu.Adjust(-1)) { }
             report.Equal(ClockPace.Rules, settings.ClockPace, "the ladder starts at the rules' own windows");
 
+            // The sound of the table (4.10): one row, one ladder from silence to full volume.
+            menu.Move(1);
+            report.Equal(MenuItem.Sound, menu.Selected, "the sixth row is the sound of the table");
+            report.Equal(SoundVolumeSettings.Text(settings.SoundVolume), menu.RowAt(5).Value,
+                "the sound row shows the volume the table is played at");
+            report.Check(menu.Adjust(-1), "the sound row can be stepped");
+            report.Check(settings.SoundVolume < SoundVolumeSettings.Default,
+                "stepping the sound row makes the table quieter");
+
             // Commands: the rows that open something say what they open.
             menu.Move(1);
-            report.Equal(MenuCommand.Save, menu.Activate(), "the sixth row saves");
-            report.Equal(MenuCommand.Resume, menu.RowAt(6).Command, "the seventh row resumes");
-            report.Equal(MenuCommand.Review, menu.RowAt(7).Command, "the eighth row opens the review");
-            report.Equal(MenuCommand.Rules, menu.RowAt(8).Command, "the ninth row opens the rules");
+            report.Equal(MenuCommand.Save, menu.Activate(), "the seventh row saves");
+            report.Equal(MenuCommand.Resume, menu.RowAt(7).Command, "the eighth row resumes");
+            report.Equal(MenuCommand.Review, menu.RowAt(8).Command, "the ninth row opens the review");
+            report.Equal(MenuCommand.Rules, menu.RowAt(9).Command, "the tenth row opens the rules");
             menu.Move(4);
             report.Equal(MenuItem.Close, menu.Selected, "the last row closes the menu");
             report.Equal(MenuCommand.Close, menu.Activate(), "the last row asks to close");

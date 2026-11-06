@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 
@@ -268,6 +268,8 @@ namespace Mahjong.Localization
             Add("menu.value.strategic", "Стратег", "Strategic");
             Add("menu.value.manual", "по кнопке", "on the button");
             Add("menu.value.seconds", "{0} с", "{0} s");
+            Add("menu.sound", "Звук", "Sound");
+            Add("sound.off", "выкл", "off");
 
             // ---------------------------------------------------------------- title
             Add("title.title", "МАДЖОНГ", "MAHJONG");
@@ -285,6 +287,7 @@ namespace Mahjong.Localization
             Add("title.clock", "Время на ход", "Time to think");
             Add("title.session", "Длина партии", "Game length");
             Add("title.seed", "Сид раздачи", "Deal seed");
+            Add("title.sound", "Звук", "Sound");
             Add("title.rules", "Справочник правил", "Rulebook");
             Add("title.quit", "Выход", "Quit");
             Add("title.back", "Назад", "Back");

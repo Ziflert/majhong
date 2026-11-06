@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Mahjong.Bots;
@@ -97,6 +97,9 @@ namespace Mahjong.Unity
 
         /// <summary>The session of the table: points, penalties, the deals and the hand being played.</summary>
         public GameSession Session => session;
+
+        /// <summary>The sounds of the table (4.10). Exposed for tests and tools.</summary>
+        public SoundPlayer Sound => sound;
 
         /// <summary>Game points of the four seats, as the score sheet has them. Exposed for tests.</summary>
         public IReadOnlyList<int> Scores => session?.Scores ?? new int[4];
@@ -291,6 +294,9 @@ namespace Mahjong.Unity
         private FreePlayTable free = null!;
         private ControlsPanel controls = null!;
 
+        /// <summary>The ears of the table: every knock, chime and rattle of a hand (4.10).</summary>
+        private SoundPlayer sound = null!;
+
         /// <summary>Last mouse position the tray was hit-tested at: the tray is not re-picked every frame.</summary>
         private Vector3 lastTrayMouse = new(float.NaN, float.NaN, float.NaN);
         private Transform table = null!;
@@ -333,6 +339,9 @@ namespace Mahjong.Unity
         /// <summary>Names the save file of this session; fixed at the start so every save overwrites it.</summary>
         private string sessionStamp = System.DateTime.Now.ToString("yyyyMMdd-HHmmss");
 
+        /// <summary>The opening beat the table has already sounded; empty after the deal (4.10).</summary>
+        private OpeningStep? openingStep;
+
         private float nextBotAction;
         private bool waitingForNextHand;
 
@@ -364,6 +373,8 @@ namespace Mahjong.Unity
             bots = CreateBots(settings.Level, randomSeed);
 
             BuildScene();
+            sound = SoundPlayer.Create(transform);
+            sound.ApplyVolume(settings.SoundVolume);
             BeginSession(new System.Random(randomSeed).Next());
 
             // The game opens on the welcome screen (У-2). MAHJONG_TITLE=0 deals the first hand straight
@@ -1373,7 +1384,26 @@ namespace Mahjong.Unity
         {
             session.State!.Apply(action);
             moveLog.Record(seat, action);
+            if (CueFor(action.Kind, seat) is { } cue) PlayCue(cue);
         }
+
+        /// <summary>
+        /// What a move sounds like (4.10). The table answers every action with its own noise, and the
+        /// win is the one cue that depends on who won: the player hears his own hand in a rising chime
+        /// and somebody else's in a falling one, before he has read a word of the result screen.
+        /// </summary>
+        private SoundCue? CueFor(ActionKind kind, int seat) => kind switch
+        {
+            ActionKind.Draw => SoundCue.Draw,
+            ActionKind.Discard => SoundCue.Discard,
+            ActionKind.Chow or ActionKind.Pung => SoundCue.Claim,
+            ActionKind.OpenKong or ActionKind.AddedKong or ActionKind.ClosedKong => SoundCue.Kong,
+            ActionKind.Win => seat == humanSeat ? SoundCue.Win : SoundCue.Defeat,
+            _ => null
+        };
+
+        /// <summary>Plays a cue if the table has ears; a table built by a test may not.</summary>
+        private void PlayCue(SoundCue cue) => sound?.Play(cue);
 
         // ----------------------------------------------------------------- clock
 
@@ -1805,6 +1835,8 @@ namespace Mahjong.Unity
                 if (session != null) BotTable.UpdateMatchContext(session, bots);
             }
             if (status != null && !menu.IsOpen && !rules.IsOpen) RefreshStatus();
+            // 4.10: the volume of the table follows the setting the moment the row is stepped.
+            if (sound != null) sound.ApplyVolume(settings.SoundVolume);
             RefreshResultTexts();
         }
 
@@ -2181,6 +2213,11 @@ namespace Mahjong.Unity
             var shown = opening.IsDone ? opening.Second : opening.First;
             dice.Settle(shown.First, shown.Second);
             diceVisible = true;
+            // 4.10: the first throw rattles as the tile wall goes up; the later beats of the opening
+            // sound as they arrive (see TickOpening), so a skipped show is silent and a slow one is
+            // heard beat by beat.
+            openingStep = opening.Step;
+            if (!opening.IsDone) PlayCue(SoundCue.Dice);
         }
 
         /// <summary>
@@ -2210,6 +2247,25 @@ namespace Mahjong.Unity
                 // A beat changed: the deal may start now, so lay the table out again and let the hand
                 // tiles set off from their places in the wall.
                 if (opening.Step == OpeningStep.Deal) Rebuild();
+            }
+
+            // Every beat of the opening has its own noise: the second throw, the break of the wall and
+            // the tiles leaving it. The sound follows the step, so it cannot sound ahead of the show.
+            if (opening.Step != openingStep)
+            {
+                openingStep = opening.Step;
+                switch (openingStep)
+                {
+                    case OpeningStep.SecondRoll:
+                        PlayCue(SoundCue.Dice);
+                        break;
+                    case OpeningStep.Break:
+                        PlayCue(SoundCue.Break);
+                        break;
+                    case OpeningStep.Deal:
+                        PlayCue(SoundCue.Deal);
+                        break;
+                }
             }
 
             dice.Show(opening);

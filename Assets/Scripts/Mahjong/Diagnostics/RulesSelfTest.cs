@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Mahjong.Bots;
@@ -93,6 +93,7 @@ namespace Mahjong.Rules.Diagnostics
             OpeningGroups(report);
             VariantGroups(report);
             TitleGroups(report);
+            SoundGroups(report);
 
             return report;
         }

@@ -1,12 +1,12 @@
-# Контекст текущей сессии (handoff)
+﻿# Контекст текущей сессии (handoff)
 
 Живой файл: состояние рабочего дерева на момент передачи. Перезаписывать в начале новой сессии.
 Постоянные записи — `docs/journal.md` (вехи), `docs/plan.md` (что сделано), `docs/rules-status.md`,
 `docs/unity-layer.md`, трактовки классики — `docs/rules-classic.md`. Здесь — только «где мы стоим».
 
-**Обновлён:** 2026-11-06, веха «длина партии и сид раздачи стали настройками стола (8.7)».
-Незакоммиченного кода нет: правки вехи ушли одним коммитом. `UI/` и `docs/ui-design.md`
-по-прежнему не в git (черновик UGUI, решения нет).
+**Обновлён:** 2026-11-06, веха «у стола появился звук (4.10)».
+Незакоммиченного кода вехи нет: правки ушли одним коммитом. `UI/` и `docs/ui-design.md`
+по-прежнему не в git (черновик UGUI, решения нет; в нём ссылки на TMP, которого в проекте нет).
 
 ---
 
@@ -15,12 +15,11 @@
 Из раздела 7 плана закрыты семь замечаний: **У-1** (окна времени 20/10/3 → настройка стола, 8.6),
 **У-2** (приветственный экран, 4.16), **У-3** (комбинации по кадру), **У-5** (справочник: содержание,
 плитки-стрелки, счётчик, возврат в меню), **У-6** (панель экранных кнопок), **У-7** (экран конца
-руки, 4.5), **У-11** (стена не открывается до раздачи). Плюс профиль правил (1.13, 1.14, 2.18–2.22)
-и настоящая стена из 18 стопок (4.8.1). Плюс справочник доведён до книги: содержание, плитки-стрелки,
-счётчик и перенос текста по ширине страницы (У-5, 4.12.1). Плюс этап 2 профиля закрыт: длина партии
-(150 / 90 / 60 / 30 / без часов) и сид раздачи — строки приветственного экрана, сид повторяет всю
-партию, а не первую руку (8.7). Дальше по плану — звук (4.10), настройки на диск (8.11), этап 3
-профиля (Просящая рука, пенальти, лимитированные руки, 136 костей).
+руки, 4.5), **У-11** (стена не открывается до раздачи). Плюс профиль правил (1.13, 1.14, 2.18–2.22),
+настоящая стена из 18 стопок (4.8.1), справочник-книга с переносом по ширине страницы (4.12.1),
+длина партии и сид раздачи (8.7) и звук стола (4.10). Дальше по плану — настройки на диск (8.11),
+музыка и звуки интерфейса (остаток 4.10), У-8, этап 3 профиля (Просящая рука, пенальти,
+лимитированные руки, 136 костей).
 
 ---
 
@@ -28,10 +27,10 @@
 
 | Проверка | Когда | Результат | Файл результатов |
 |---|---|---|---|
-| `Tools/RulesCheck` | 2026-11-06 05:06 | **OK — 79 групп, 122 736 проверок** | stdout |
-| Unity PlayMode | 2026-11-06 05:08 | **60/60 Passed** | `Logs/playmode-results.xml` |
-| Unity EditMode | 2026-11-06 05:09 | **13/13 Passed** | `Logs/editmode-results.xml` |
-| `InterfaceCapture` (`welcome`) | 2026-11-06 05:09 | кадр `welcome.png` (15 строк) | `Screenshots/welcome.png` |
+| `Tools/RulesCheck` | 2026-11-06 | **OK — 82 группы, 123 216 проверок** | stdout |
+| Unity EditMode | 2026-11-06 | **13/13 Passed** | `Logs/editmode-results.xml` |
+| Unity PlayMode | 2026-11-06 | **64/64 Passed** | `Logs/playmode-results.xml` |
+| `InterfaceCapture` (`welcome`) | 2026-11-06 | кадр `welcome.png` (16 строк, «Звук: 75%») | `Screenshots/welcome.png` |
 
 Правила экономии:
 
@@ -39,39 +38,42 @@
 - менял только `Assets/Scripts/Mahjong/**` (ядро, контролы, локализация) — хватает `RulesCheck`
   плюс EditMode (он оборачивает `RulesSelfTest` и ловит, например, совпадение RU/EN строк);
 - менял `Assets/Scripts/MahjongView/**`, `Net/**`, `Assets/Tests/PlayMode/**` — обязателен PlayMode
-  (60 тестов, ~2 мин);
+  (64 теста, ~2 мин);
 - менял вид стола или подписи — переснять кадры `InterfaceCapture` (без `-batchmode`, иначе
-  кадры не пишутся). Один экран можно переснять без всего прогона: `MAHJONG_CAPTURE_STEPS=rules-page`
+  кадры не пишутся). Один экран можно переснять без всего прогона: `MAHJONG_CAPTURE_STEPS=welcome`
   (имена шагов — из массива `Steps`, напр. `result-screen`, а не `result`).
 
 ---
 
-## Что сделано в этой вехе (8.7)
+## Что сделано в этой вехе (4.10)
 
 | Файл | Что сделано |
 |---|---|
-| `Controls/SessionLength.cs` | `SessionLengthSettings`: ступени `Steps` (150 / 90 / 60 / 30 / без часов), `Default`, `IsUnlimited`, `FollowsRules`, `Text`, `IndexOf`, `Step`, `TryParse` («rules», «90», «0.2», «20min», «unlimited») |
-| `Controls/DealSeed.cs` | `DealSeedSettings`: `Random = 0`, `IsRandom`, `Text` («случайная» / номер), `Step(seed, delta, remembered)` — два значения, `TryParse` («random», число), `Resolve` (свежий сид из часов) |
-| `Controls/GameSettings.cs` | Поля `SessionLimit`, `Seed`, `LastSeed`; разбор `MAHJONG_SESSION_MINUTES` (переехал из `MahjongGame`) и новый `MAHJONG_SEED` |
-| `Controls/TitleScreen.cs` | Две строки — `TitleItem.Session` и `TitleItem.Seed` (после «Времени на ход»), `MaxRows` 13 → 15, `Adjust` шагает обе |
-| `Rules/GameSession.cs` | Партия без часов: `HasTimeLimit`, `TimeLeft`/`IsTimeUp`/`IsFinalQuarterHour` считаются только при часах, `ClockWarning` — четверть длины у короткой партии, `Describe()` печатает «no limit» |
-| `MahjongView/MahjongGame.cs` | `BeginSession(seed)` сеет одной парой чисел раздачи, ботов и часы; `TakeDealSeed()` — первая рука играется самим сидом, следующие из его продолжения; `CreateBots(level, seed)`; HUD печатает «часов нет» и «не по правилам» для длины; `SessionTimeLimit()` удалён |
-| `Localization/Loc.cs` | `title.session`, `title.seed`, `session.limit.rules` / `.minutes` / `.unlimited`, `seed.random`, `hud.noClock` |
-| `Diagnostics/RulesSelfTest.{Title,Replay,}.cs` | Лестница длины и сид в группе `title: …`; партия без часов, короткая партия и её предупреждение в `clock: …`; длина и сид в сохранении в `replay: …` |
-| `Tests/PlayMode/TitleTests.cs` | `TheLengthOfTheGameAndTheSeedReachTheTable`: строка длины создаёт сессию с этими часами, один сид — одна рука, два сида — две разные |
+| `Controls/SoundCues.cs` | `SoundCue` (девять звуков), `SoundBurst` / `SoundTone` / `SoundRecipe` — звук как данные; `SoundCues.All` / `Recipe(cue)`; `SoundSynth.Render(recipe, rate)` — сэмплы `float[]` без UnityEngine: шум из xorshift32 с фиксированным зерном, однополюсный ФНЧ по `Brightness`, тона с атакой и второй гармоникой, фейд 4 мс на концах, нормировка **после** фейда до пика `recipe.Gain`, мягкий клип; `SoundSynth.Peak` |
+| `Controls/SoundVolume.cs` | `SoundVolumeSettings`: лестница `Steps` (0 / 0.25 / 0.5 / 0.75 / 1), `Default = 0.75`, `IsMuted`, `Clamp`, `IndexOf`, `Step`, `Text` («выкл» / «25%»), `TryParse` (`off`, `0.3`, `30%`, `on`) |
+| `Controls/GameSettings.cs` | Поле `SoundVolume` и разбор `MAHJONG_SOUND` |
+| `Controls/GameMenu.cs` | Строка `MenuItem.Sound` (пятая по порядку, 11 строк всего), `Adjust`, `ActivateSteps`, `RowAt` |
+| `Controls/TitleScreen.cs` | `TitleItem.Sound`, `MaxRows` 15 → 16, строка «Звук» перед справочником, шаг в `Adjust` |
+| `Localization/Loc.cs` | `menu.sound`, `title.sound`, `sound.off` |
+| `MahjongView/SoundPlayer.cs` | `Create(parent)` + `AudioSource` + `AudioListener`, если его нет в сцене; `ClipFor` (сэмплы → `AudioClip`, `clip.SetData`); `Play` (`PlayOneShot`, история `Played`/`LastCue`/`PlayedCount`, `SkippedCount` в тишине); `ApplyVolume`, `AppliedVolume`, `ForgetPlayed` |
+| `MahjongView/MahjongGame.cs` | Поле и свойство `Sound`, создание в `Start` после `BuildScene`, `ApplyVolume` в `ApplySettings`; `CueFor(kind, seat)` + `PlayCue` в `ApplyMove` (добор / снос / заявка / конг / победа — своя или чужая); такты открытия: Dice в `BeginOpening`, Dice/Break/Deal по смене `OpeningStep` в `TickOpening` (`openingStep`) |
+| `Diagnostics/RulesSelfTest.Sound.cs` | Группы `sound: every cue is a clip that opens and closes in silence`, `sound: the volume steps from silence to full volume`, `sound: the two screens step the volume of the table` |
+| `Tests/PlayMode/SoundTests.cs` | `EveryCueBecomesARealClip`, `ADealtHandIsHeard`, `ADiscardIsHeard`, `TheMenuRowIsTheVolumeOfTheTable` |
+| `Tests/PlayMode/MenuTests.cs`, `Diagnostics/RulesSelfTest.{Menu,Title}.cs` | Индексы строк меню сдвинулись на единицу (справочник 8 → 9, просмотр 7 → 8), на экране 16 строк |
 
-### Что осталось по 8.7
+### Что осталось по 4.10
 
-Ничего: длина и сид стоят на экране, проверены headless и в PlayMode. Файла настроек между
-запусками по-прежнему нет — это 8.11.
+Музыки нет и звуков интерфейса (меню, справочник, панель действий) нет: у них нет рецептов, а без
+ассетов музыку не синтезировать. Файла настроек между запусками по-прежнему нет — громкость живёт
+в памяти и в `MAHJONG_SOUND` (это 8.11).
 
 ---
 
 ## Следующее по плану
 
-1. **4.10 звук.** Звука нет вовсе: раздача, снос, заявка, победа.
-2. **8.11 настройки на диск.** Выбор на приветственном экране и в меню живёт только в памяти
-   и в `MAHJONG_*`; нужен файл рядом с сохранениями (`persistentDataPath`).
+1. **8.11 настройки на диск.** Выбор на приветственном экране и в меню (включая громкость) живёт
+   только в памяти и в `MAHJONG_*`; нужен файл рядом с сохранениями (`persistentDataPath`).
+2. **Остаток 4.10:** звуки интерфейса (меню, справочник, панель действий), музыка.
 3. **У-8** (переосмыслить свободный стол).
 4. **Этап 3 профиля:** Просящая рука, пенальти «заплатил за всех», 14 лимитированных рук,
    набор 136 костей (`WallGeometry.StacksPerSide` параметром вместо константы).
@@ -153,11 +155,18 @@ MAHJONG_TITLE=0              # пропустить приветственный
 - **Камера в тестах трея — 34°.** Умолчание Unity (60°) шире игрового кадра: на нём ряд, стоящий
   вне кадра игры, выглядит нормально. Поэтому `ControlsPanelTests.NewCamera` задаёт поле зрения и
   пропорции явно; новая проверка «внутри кадра» без этого ничего не значит.
-- **Строки меню и экрана адресуются индексами** в PlayMode-тестах (`MenuMove(8)` — справочник).
+- **Строки меню и экрана адресуются индексами** в PlayMode-тестах (`MenuMove(9)` — справочник).
   Новая строка в `GameMenu.Rows`/`TitleScreen.MainRows` двигает индексы: обновлять `MenuTests`,
   `RulesSelfTest.Menu.cs` (`RowAt(3)`, `RowAt(5)`…), `RulesSelfTest.Title.cs`. `RulebookTests` ищет
-  строку правил по `MenuItem.Rules`, а не по номеру. На приветственном экране сейчас 15 строк
-  (`TitleScreen.MaxRows`), `TitlePanel` раскладывает их сам — констант под число строк нет.
+  строку правил по `MenuItem.Rules`, а не по номеру. На приветственном экране сейчас 16 строк
+  (`TitleScreen.MaxRows`), в меню 11; `TitlePanel` и `MenuPanel` раскладывают строки сами — констант
+  под число строк нет.
+- **Звук проверяется без ушей.** В batchmode нет аудиоустройства, поэтому PlayMode-тест читает
+  `SoundPlayer.ClipFor` (длина, каналы, частота) и историю `Played`, а не слушает динамик. Сравнивать
+  сэмплы между прогонами можно только потому, что шум идёт из xorshift32 с фиксированным зерном:
+  `System.Random` в Unity и вне Unity даёт разные последовательности.
+- **Звук не должен зависеть от `Time.timeScale`.** Он идёт от событий (`ApplyMove`, такты открытия),
+  а не от таймера; `SoundTests` ускоряют время до 50× и всё равно слышат снос.
 - **Первая рука играется самим сидом**, следующие — из продолжения `dealRandom`
   (`MahjongGame.TakeDealSeed`). Поэтому `StartNewGame(11)` раздаёт ту же руку, что раздавал до 8.7,
   а `SkipWelcome` держится за инспекторский `randomSeed`: прогоны и тесты видят один и тот же стол.

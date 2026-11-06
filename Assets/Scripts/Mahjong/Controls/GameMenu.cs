@@ -30,11 +30,14 @@ namespace Mahjong.Controls
         Level = 2,
         Result = 3,
         Clock = 4,
-        Save = 5,
-        Resume = 6,
-        Review = 7,
-        Rules = 8,
-        Close = 9
+
+        /// <summary>4.10: how loud the table is, from silence to full volume.</summary>
+        Sound = 5,
+        Save = 6,
+        Resume = 7,
+        Review = 8,
+        Rules = 9,
+        Close = 10
     }
 
     /// <summary>
@@ -56,6 +59,7 @@ namespace Mahjong.Controls
         private static readonly MenuItem[] Rows =
         {
             MenuItem.Language, MenuItem.Speed, MenuItem.Level, MenuItem.Result, MenuItem.Clock,
+            MenuItem.Sound,
             MenuItem.Save, MenuItem.Resume, MenuItem.Review, MenuItem.Rules, MenuItem.Close
         };
 
@@ -103,6 +107,12 @@ namespace Mahjong.Controls
                     if (pace == settings.ClockPace) return false;
                     settings.ClockPace = pace;
                     return true;
+                case MenuItem.Sound:
+                    if (delta == 0) return false;
+                    var volume = SoundVolumeSettings.Step(settings.SoundVolume, delta);
+                    if (volume == settings.SoundVolume) return false;
+                    settings.SoundVolume = volume;
+                    return true;
                 default:
                     return false;
             }
@@ -132,6 +142,8 @@ namespace Mahjong.Controls
                     ResultAdvanceSettings.Text(settings.Result), MenuCommand.None, true),
                 MenuItem.Clock => new MenuRow(item, Loc.Get("menu.clock"),
                     ClockPaceSettings.Text(settings.ClockPace), MenuCommand.None, true),
+                MenuItem.Sound => new MenuRow(item, Loc.Get("menu.sound"),
+                    SoundVolumeSettings.Text(settings.SoundVolume), MenuCommand.None, true),
                 MenuItem.Save => new MenuRow(item, Loc.Get("menu.save"), string.Empty, MenuCommand.Save, false),
                 MenuItem.Resume => new MenuRow(item, Loc.Get("menu.resume"), string.Empty, MenuCommand.Resume, false),
                 MenuItem.Review => new MenuRow(item, Loc.Get("menu.review"), string.Empty, MenuCommand.Review, false),
@@ -160,7 +172,8 @@ namespace Mahjong.Controls
         });
 
         private static bool ActivateSteps(MenuItem item) =>
-            item is MenuItem.Language or MenuItem.Speed or MenuItem.Level or MenuItem.Result or MenuItem.Clock;
+            item is MenuItem.Language or MenuItem.Speed or MenuItem.Level or MenuItem.Result or MenuItem.Clock
+                or MenuItem.Sound;
 
         /// <summary>Next of the three levels, clamped: the menu has no fourth setting to step into.</summary>
         private static int NextLevel(BotLevel level, int delta)

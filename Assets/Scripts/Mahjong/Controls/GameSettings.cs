@@ -67,6 +67,12 @@ namespace Mahjong.Controls
         /// <summary>The seed of the last game the table dealt; the welcome screen steps the deal row back to it.</summary>
         public int LastSeed { get; set; }
 
+        /// <summary>
+        /// How loud the table is (4.10): 0 is silence, 1 is full volume. The ladder and its text live in
+        /// <see cref="SoundVolumeSettings"/>; the player reads the value off this field and nothing else.
+        /// </summary>
+        public double SoundVolume { get; set; } = SoundVolumeSettings.Default;
+
         /// <summary>How much faster than normal the bots play; never zero, so a delay cannot vanish.</summary>
         public double Speed => Speeds[SpeedIndex];
 
@@ -130,6 +136,11 @@ namespace Mahjong.Controls
             // MAHJONG_SEED=12345 repeats a game exactly: the same deal, the same bots, the same hands.
             var seedText = Environment.GetEnvironmentVariable("MAHJONG_SEED");
             if (DealSeedSettings.TryParse(seedText) is { } seed) settings.Seed = seed;
+
+            // MAHJONG_SOUND=off|0.3|70% sets the volume of a capture run; the table is built with
+            // sound on, so a run that must stay quiet has to say so.
+            var soundText = Environment.GetEnvironmentVariable("MAHJONG_SOUND");
+            if (SoundVolumeSettings.TryParse(soundText) is { } volume) settings.SoundVolume = volume;
 
             return settings;
         }

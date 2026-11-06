@@ -42,7 +42,10 @@ namespace Mahjong.Controls
         Session = 15,
 
         /// <summary>8.7: which deal a new game starts from.</summary>
-        Seed = 16
+        Seed = 16,
+
+        /// <summary>4.10: how loud the table is, from silence to full volume.</summary>
+        Sound = 17
     }
 
     /// <summary>
@@ -94,7 +97,7 @@ namespace Mahjong.Controls
         /// Rows the panel draws; the main page uses them all, the load page never has more than
         /// <see cref="MaxSaves"/> saves plus "back".
         /// </summary>
-        public const int MaxRows = 15;
+        public const int MaxRows = 16;
 
         /// <summary>Saved games a single page can list; more than that would not fit the frame.</summary>
         public const int MaxSaves = 10;
@@ -105,7 +108,7 @@ namespace Mahjong.Controls
             TitleItem.NewGame, TitleItem.Continue, TitleItem.LoadGame,
             TitleItem.LocalGame, TitleItem.Multiplayer,
             TitleItem.Variant, TitleItem.Language, TitleItem.Level, TitleItem.Speed, TitleItem.Result,
-            TitleItem.Clock, TitleItem.Session, TitleItem.Seed,
+            TitleItem.Clock, TitleItem.Session, TitleItem.Seed, TitleItem.Sound,
             TitleItem.Rules, TitleItem.Quit
         };
 
@@ -222,6 +225,11 @@ namespace Mahjong.Controls
                     var seed = DealSeedSettings.Step(settings.Seed, delta, settings.LastSeed);
                     if (seed == settings.Seed) return false;
                     settings.Seed = seed;
+                    return true;
+                case TitleItem.Sound:
+                    var volume = SoundVolumeSettings.Step(settings.SoundVolume, delta);
+                    if (volume == settings.SoundVolume) return false;
+                    settings.SoundVolume = volume;
                     return true;
                 default:
                     return false;
@@ -342,6 +350,8 @@ namespace Mahjong.Controls
                     SessionLengthSettings.Text(settings.SessionLimit), TitleCommand.None, TitleRowState.Ready),
                 TitleItem.Seed => new TitleRow(item, Loc.Get("title.seed"),
                     DealSeedSettings.Text(settings.Seed), TitleCommand.None, TitleRowState.Ready),
+                TitleItem.Sound => new TitleRow(item, Loc.Get("title.sound"),
+                    SoundVolumeSettings.Text(settings.SoundVolume), TitleCommand.None, TitleRowState.Ready),
                 TitleItem.Rules => new TitleRow(item, Loc.Get("title.rules"), string.Empty,
                     TitleCommand.Rules, TitleRowState.Ready),
                 _ => new TitleRow(item, Loc.Get("title.quit"), string.Empty,
