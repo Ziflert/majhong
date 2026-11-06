@@ -35,7 +35,8 @@
 | `Tools/Tiles/build_atlas.py` | Сборка `tile-atlas.png` из SVG-исходников (Skia, `python Tools/Tiles/build_atlas.py`) |
 | `.github/workflows/rules.yml` | CI: `Tools/RulesCheck` на push и pull request |
 | `docs/unity-layer.md` | Как запустить 3D-прототип и что он умеет |
-| `docs/ui-design.md` | Черновик замысла: переезд интерфейса на UGUI (палитра, экраны, темы, этапы). В план не влит, решения нет — см. `docs/session-context.md` |
+| `docs/ui-design.md` | ТЗ визуального слоя: минималистичный профиль как опция, новый Studio-профиль, 3D-ассеты, камера и критерии UX |
+| `docs/asset-sources.md` | Реестр внешних референсов и лицензий для новых костей, UI и окружения |
 | `UI/` | Черновик UGUI-слоя к `docs/ui-design.md` (`Scripts/UIManager.cs`, `Scripts/ViewModels/TitleViewModel.cs`, `Themes/*.cs`). Лежит вне `Assets/`, Unity его не компилирует |
 | `Tiles/` + `Assets/Resources/Tiles/` | SVG-исходники лиц и собранный атлас `tile-atlas.png` |
 | `.local/dotnet-sdk/` | Локальный .NET SDK 8 для headless-прогонов; в git не входит |

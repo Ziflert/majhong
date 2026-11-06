@@ -110,6 +110,24 @@ namespace Mahjong.Unity
         /// <summary>The sounds of the table (4.10). Exposed for tests and tools.</summary>
         public SoundPlayer Sound => sound;
 
+        /// <summary>Current distance of the board camera from the centre of the table.</summary>
+        public float CameraDistance => cameraDistance;
+
+        /// <summary>Current horizontal camera angle in degrees.</summary>
+        public float CameraYaw => cameraYaw;
+
+        /// <summary>Current vertical camera angle in degrees.</summary>
+        public float CameraPitch => cameraPitch;
+
+        /// <summary>Restores the comfortable default board view.</summary>
+        public void ResetCameraView()
+        {
+            cameraYaw = 180f;
+            cameraPitch = 46f;
+            cameraDistance = 3.75f;
+            ApplyCameraView();
+        }
+
         /// <summary>Game points of the four seats, as the score sheet has them. Exposed for tests.</summary>
         public IReadOnlyList<int> Scores => session?.Scores ?? new int[4];
 
@@ -212,6 +230,21 @@ namespace Mahjong.Unity
 
         /// <summary>Size of the HUD line at 100 %; the size of the interface multiplies it (8.10).</summary>
         private const float HudTextSize = 0.00125f;
+
+        // The board camera is deliberately a small, bounded orbit rather than a free-flying camera:
+        // the player can inspect a meld or lean into the table without losing the readable game view.
+        private const float CameraMinDistance = 2.35f;
+        private const float CameraMaxDistance = 4.65f;
+        private const float CameraMinPitch = 28f;
+        private const float CameraMaxPitch = 66f;
+        private const float CameraDragSensitivity = 0.18f;
+        private const float CameraWheelSensitivity = 0.28f;
+        private static readonly Vector3 CameraFocus = new(0f, 0.02f, 0.08f);
+        private float cameraYaw = 180f;
+        private float cameraPitch = 46f;
+        private float cameraDistance = 3.75f;
+        private bool cameraOrbiting;
+        private Vector3 cameraLastMouse;
 
         /// <summary>
         /// Puts the HUD in the top-left corner of the frame and sizes its plate to it. The corner is
@@ -404,6 +437,8 @@ namespace Mahjong.Unity
             BuildScene();
             sound = SoundPlayer.Create(transform);
             sound.ApplyVolume(settings.SoundVolume);
+            // The theme starts with the first screen and stays under everything (4.10).
+            sound.ApplyMusic(settings.MusicVolume);
             BeginSession(new System.Random(randomSeed).Next());
 
             // The game opens on the welcome screen (У-2). MAHJONG_TITLE=0 deals the first hand straight
@@ -485,6 +520,10 @@ namespace Mahjong.Unity
             camera.transform.position = eye;
             camera.transform.rotation = Quaternion.LookRotation(lookAt - eye, Vector3.up);
             camera.fieldOfView = 34f;
+            cameraDistance = Vector3.Distance(eye, lookAt);
+            cameraYaw = 180f;
+            cameraPitch = Mathf.Atan2(eye.y - lookAt.y,
+                new Vector2(eye.x - lookAt.x, eye.z - lookAt.z).magnitude) * Mathf.Rad2Deg;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.08f, 0.09f, 0.11f);
 
@@ -665,6 +704,57 @@ namespace Mahjong.Unity
             Rebuild();
         }
 
+        private void HandleCameraInput()
+        {
+            var camera = Camera.main;
+            if (camera == null || titleOpen || rules.IsOpen || free.IsOpen ||
+                (menu != null && menu.IsOpen) || resultScreen.IsOpen) return;
+
+            // Middle mouse rotates around the table. Left mouse remains reserved for tiles and UI.
+            if (Input.GetMouseButtonDown(2))
+            {
+                cameraOrbiting = true;
+                cameraLastMouse = Input.mousePosition;
+            }
+            if (Input.GetMouseButtonUp(2)) cameraOrbiting = false;
+            if (cameraOrbiting && Input.GetMouseButton(2))
+            {
+                var mouse = Input.mousePosition;
+                var delta = mouse - cameraLastMouse;
+                cameraLastMouse = mouse;
+                cameraYaw += delta.x * CameraDragSensitivity;
+                cameraPitch = Mathf.Clamp(cameraPitch - delta.y * CameraDragSensitivity,
+                    CameraMinPitch, CameraMaxPitch);
+                ApplyCameraView();
+            }
+
+            var wheel = Input.mouseScrollDelta.y;
+            if (Mathf.Abs(wheel) > 0.001f)
+            {
+                cameraDistance = Mathf.Clamp(cameraDistance - wheel * CameraWheelSensitivity,
+                    CameraMinDistance, CameraMaxDistance);
+                ApplyCameraView();
+            }
+
+            if (Input.GetKeyDown(KeyCode.Home)) ResetCameraView();
+        }
+
+        private void ApplyCameraView()
+        {
+            var camera = Camera.main;
+            if (camera == null) return;
+            var yaw = cameraYaw * Mathf.Deg2Rad;
+            var pitch = cameraPitch * Mathf.Deg2Rad;
+            var horizontal = Mathf.Cos(pitch) * cameraDistance;
+            var offset = new Vector3(Mathf.Sin(yaw) * horizontal,
+                Mathf.Sin(pitch) * cameraDistance,
+                Mathf.Cos(yaw) * horizontal);
+            camera.transform.position = CameraFocus + offset;
+            camera.transform.rotation = Quaternion.LookRotation(CameraFocus - camera.transform.position,
+                Vector3.up);
+            LayoutHud(camera);
+        }
+
         private void Update()
         {
             // The welcome screen owns the table until the player starts or loads a game.
@@ -677,6 +767,7 @@ namespace Mahjong.Unity
 
             if (session?.State == null) return;
 
+            HandleCameraInput();
             FaceSeatPlates(Camera.main != null ? Camera.main.transform : transform);
             SyncInterfaceVisibility();
 
@@ -782,12 +873,14 @@ namespace Mahjong.Unity
                 if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)
                     || Input.GetKeyDown(KeyCode.Space))
                 {
+                    SoundSelect();
                     NextHand();
                     return true;
                 }
 
                 if (Input.GetMouseButtonDown(0) && resultPanel.TryPick(MouseRay()))
                 {
+                    SoundSelect();
                     NextHand();
                     return true;
                 }
@@ -799,9 +892,21 @@ namespace Mahjong.Unity
                 return false;
             }
 
+            // Claim buttons are the topmost interaction layer. The tray sits in the same lower part of
+            // the frame; checking it first is essential when a claim window is open, otherwise a ray
+            // through an action button can fall through to the Free Play tray and switch modes.
+            if (Input.GetMouseButtonDown(0) && Prompt.IsOpen && bar.TryPick(MouseRay(), out var claimed))
+            {
+                SoundSelect();
+                Play(claimed);
+                return true;
+            }
+
             // У-6: the on-screen tray turns a click into the same actions the hot keys do.
             if (Input.GetMouseButtonDown(0) && controls.TryPick(MouseRay(), out var tile))
             {
+                // The tray is the interface: a plate that answers a click answers it with a click.
+                SoundSelect();
                 switch (tile.Type)
                 {
                     case ControlType.Rulebook:
@@ -834,7 +939,14 @@ namespace Mahjong.Unity
                 // У-5: the page carries its own arrows and a table of contents, so a click is read
                 // here as well; a turned page is not a closed book.
                 if (Input.GetMouseButtonDown(0) && ClickRules(MouseRay())) return true;
-                if (rules.HandleKeys() == RulesKey.Close) CloseRules();
+                var pageBefore = rules.Page;
+                var rulesKey = rules.HandleKeys();
+                if (rules.Page != pageBefore) SoundPage();
+                if (rulesKey == RulesKey.Close)
+                {
+                    SoundSelect();
+                    CloseRules();
+                }
                 return true;
             }
 
@@ -847,6 +959,7 @@ namespace Mahjong.Unity
 
             if (Input.GetKeyDown(KeyCode.R))
             {
+                SoundSelect();
                 OpenRules();
                 return true;
             }
@@ -855,6 +968,7 @@ namespace Mahjong.Unity
             {
                 if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.F))
                 {
+                    SoundSelect();
                     CloseFreePlay();
                     return true;
                 }
@@ -872,12 +986,14 @@ namespace Mahjong.Unity
 
             if (Input.GetKeyDown(KeyCode.Escape))
             {
+                SoundSelect();
                 OpenMenu();
                 return true;
             }
 
             if (Input.GetKeyDown(KeyCode.F5))
             {
+                SoundSelect();
                 var saved = SaveReplay();
                 if (saved.Length > 0) RenderStatus(Loc.Format("replay.saved", Path.GetFileName(saved)));
                 return true;
@@ -885,18 +1001,21 @@ namespace Mahjong.Unity
 
             if (Input.GetKeyDown(KeyCode.F9))
             {
+                SoundSelect();
                 ResumeSavedSession();
                 return true;
             }
 
             if (Input.GetKeyDown(KeyCode.V))
             {
+                SoundSelect();
                 OpenReplay();
                 return true;
             }
 
             if (Input.GetKeyDown(KeyCode.F))
             {
+                SoundSelect();
                 OpenFreePlay();
                 return true;
             }
@@ -975,12 +1094,15 @@ namespace Mahjong.Unity
             {
                 case RulesClickKind.Previous:
                     rules.Turn(-1);
+                    SoundPage();
                     return true;
                 case RulesClickKind.Next:
                     rules.Turn(1);
+                    SoundPage();
                     return true;
                 case RulesClickKind.Page:
                     rules.GoToPage(click.Page);
+                    SoundPage();
                     return true;
                 default:
                     return false;
@@ -1056,8 +1178,11 @@ namespace Mahjong.Unity
         public void TitleMove(int rows)
         {
             if (!titleOpen) return;
+            var before = titleScreen.Index;
             titleScreen.Move(rows);
             titlePanel.Refresh(titleScreen);
+            // 4.10: the interface answers every move of the cursor with its own short tick.
+            if (titleScreen.Index != before) SoundMove(); else SoundDenied();
         }
 
         /// <summary>Steps the setting under the cursor and puts it into effect at once.</summary>
@@ -1070,6 +1195,8 @@ namespace Mahjong.Unity
                 ApplySettings();
                 titlePanel.Refresh(titleScreen);
             }
+
+            if (changed) SoundMove(); else SoundDenied();
             return changed;
         }
 
@@ -1077,9 +1204,15 @@ namespace Mahjong.Unity
         public void TitleActivate()
         {
             if (!titleOpen) return;
+            var valueBefore = titleScreen.RowAt(titleScreen.Index).Value;
             var command = titleScreen.Activate();
             ApplySettings();
             titlePanel.Refresh(titleScreen);
+
+            // An answer is heard as an answer: something opened, something stepped, or nothing happened.
+            if (command != TitleCommand.None) SoundSelect();
+            else if (titleScreen.RowAt(titleScreen.Index).Value != valueBefore) SoundMove();
+            else SoundDenied();
 
             switch (command)
             {
@@ -1138,7 +1271,14 @@ namespace Mahjong.Unity
             if (rules.IsOpen)
             {
                 if (Input.GetMouseButtonDown(0) && ClickRules(MouseRay())) return;
-                if (rules.HandleKeys() == RulesKey.Close) CloseRules();
+                var pageBefore = rules.Page;
+                var rulesKey = rules.HandleKeys();
+                if (rules.Page != pageBefore) SoundPage();
+                if (rulesKey == RulesKey.Close)
+                {
+                    SoundSelect();
+                    CloseRules();
+                }
                 return;
             }
 
@@ -1151,6 +1291,7 @@ namespace Mahjong.Unity
             else if (Input.GetKeyDown(KeyCode.Escape))
             {
                 // Back from the list of saves, and out of the game from the main page.
+                SoundSelect();
                 if (!titleScreen.Back()) QuitGame();
                 else titlePanel.Refresh(titleScreen);
             }
@@ -1436,6 +1577,13 @@ namespace Mahjong.Unity
 
         /// <summary>Plays a cue if the table has ears; a table built by a test may not.</summary>
         private void PlayCue(SoundCue cue) => sound?.Play(cue);
+
+        // The interface has a voice of its own (4.10): a tick for a moved cursor, an answer for a
+        // picked row, a brush for a turned page and a dull knock for an input that did nothing.
+        private void SoundMove() => PlayCue(SoundCue.UiMove);
+        private void SoundSelect() => PlayCue(SoundCue.UiSelect);
+        private void SoundPage() => PlayCue(SoundCue.UiPage);
+        private void SoundDenied() => PlayCue(SoundCue.UiDenied);
 
         // ----------------------------------------------------------------- clock
 
@@ -1854,8 +2002,10 @@ namespace Mahjong.Unity
         public void MenuMove(int rows)
         {
             if (!menu.IsOpen) return;
+            var before = gameMenu.Index;
             gameMenu.Move(rows);
             menu.Refresh(gameMenu);
+            if (gameMenu.Index != before) SoundMove(); else SoundDenied();
         }
 
         /// <summary>Steps the setting under the cursor and puts it into effect at once.</summary>
@@ -1865,6 +2015,7 @@ namespace Mahjong.Unity
             var changed = gameMenu.Adjust(delta);
             if (changed) ApplySettings();
             menu.Refresh(gameMenu);
+            if (changed) SoundMove(); else SoundDenied();
             return changed;
         }
 
@@ -1872,9 +2023,14 @@ namespace Mahjong.Unity
         public void MenuActivate()
         {
             if (!menu.IsOpen) return;
+            var valueBefore = gameMenu.RowAt(gameMenu.Index).Value;
             var command = gameMenu.Activate();
             ApplySettings();
             menu.Refresh(gameMenu);
+
+            if (command != MenuCommand.None) SoundSelect();
+            else if (gameMenu.RowAt(gameMenu.Index).Value != valueBefore) SoundMove();
+            else SoundDenied();
 
             switch (command)
             {
@@ -1910,9 +2066,15 @@ namespace Mahjong.Unity
                 bots = CreateBots(settings.Level, gameSeed != 0 ? gameSeed : randomSeed);
                 if (session != null) BotTable.UpdateMatchContext(session, bots);
             }
-            if (status != null && !menu.IsOpen && !rules.IsOpen) RefreshStatus();
+            // Settings are also changed on the welcome screen, before the first hand exists. Do not
+            // rebuild the table HUD there: DescribeState() requires session.State and used to throw,
+            // so Enter/click on New Game never reached StartNewGame. The title panel is refreshed by
+            // the title input path below.
+            if (status != null && !titleOpen && !menu.IsOpen && !rules.IsOpen) RefreshStatus();
             // 4.10: the volume of the table follows the setting the moment the row is stepped.
             if (sound != null) sound.ApplyVolume(settings.SoundVolume);
+            // The music is its own setting on its own source: silence stops the loop, a step restarts it.
+            if (sound != null) sound.ApplyMusic(settings.MusicVolume);
             // 8.10: the palette and the size are the same kind of setting: stepped, they show at once.
             if (UiStyle.Theme.Id != settings.Theme.Id ||
                 System.Math.Abs(UiStyle.Scale - (float)settings.UiScale) > 0.0001f)
@@ -1983,6 +2145,7 @@ namespace Mahjong.Unity
         {
             if (Input.GetKeyDown(KeyCode.Escape))
             {
+                SoundSelect();
                 CloseMenu();
                 return;
             }
@@ -2058,6 +2221,7 @@ namespace Mahjong.Unity
         {
             if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.V))
             {
+                SoundSelect();
                 CloseReplay();
                 return;
             }

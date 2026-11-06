@@ -57,6 +57,19 @@ EditMode 13/13; PlayMode 69/69. Цифры и порядок прогонов �
 
 ---
 
+## 0. Ближайший визуальный этап
+
+| # | Задача | Статус | Где фиксируется |
+|---|---|---|---|
+| V-1 | Исправить приоритет клика: панель заявки не должна проваливаться в нижний трей/свободный стол | ✅ | `MahjongGame.HandleInterfaceKeys`: заявка проверяется до ControlsPanel |
+| V-2 | Сохранить текущий минималистичный вид как отдельный профиль | 🟡 | ТЗ в `docs/ui-design.md`; требуется добавить модель `UiProfile` и строку меню |
+| V-3 | Новый Studio / Quiet Luxury визуальный профиль без лишнего шума | ⬜ | `docs/ui-design.md`, новые UI-скины и ассеты |
+| V-4 | Перерисовать лица костей и рубашку по референсам `examples/` | ⬜ | `Tiles/`, `Tools/Tiles/build_atlas.py`, `docs/asset-sources.md` |
+| V-5 | Камера: orbit средней кнопкой, zoom колесом, Home reset | ✅ | `MahjongGame.HandleCameraInput`; обязательны PlayMode-тесты |
+| V-6 | Камера: настройки чувствительности, инверсия, пресеты вида | ⬜ | `GameSettings`, `GameMenu`, `docs/ui-design.md` |
+| V-7 | Модульные 3D-ассеты стола и мягкий свет | ⬜ | `Assets/Resources`, `MahjongGame.BuildScene` |
+| V-8 | Проверить визуальный этап скриншотами и PlayMode | ⬜ | `InterfaceCapture`, `Assets/Tests/PlayMode` |
+
 ## 1. Правила и механика
 
 | # | Задача | Статус | Где лежит / чем подтверждено |
