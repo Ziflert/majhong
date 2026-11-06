@@ -157,14 +157,18 @@ namespace Mahjong.Unity
             footer.transform.localPosition = new Vector3(0f, -height * 0.5f + 0.013f, -0.0009f);
 
             var rowWidth = Mathf.Min(RowWidth, width * 0.94f);
+            var rowsTop = height * 0.5f - 0.040f;
+            var rowsBottom = -height * 0.5f + 0.040f;
+            var rowStep = Mathf.Min(UiStyle.Row(RowStep),
+                Mathf.Max(0.008f, (rowsTop - rowsBottom) / Mathf.Max(1, rowColliders.Count)));
             for (var index = 0; index < rowColliders.Count; index++)
             {
-                var y = FirstRowY * UiStyle.Profile.PanelHeight - index * UiStyle.Row(RowStep);
+                var y = rowsTop - index * rowStep;
                 var box = rowColliders[index];
                 box.transform.localPosition = new Vector3(0f, y, 0f);
                 // The box is the whole pitch of the list: a click in the gap between two rows lands
                 // on one of them instead of on nothing.
-                box.size = new Vector3(rowWidth, RowStep, ActionButton.Depth);
+                box.size = new Vector3(rowWidth, rowStep, ActionButton.Depth);
                 rowFaces[index].transform.localScale = new Vector3(rowWidth, RowHeight, ActionButton.Depth);
                 // The label hangs on the row, and the row is what moves: its own y stays zero.
                 rowLabels[index].transform.localPosition =

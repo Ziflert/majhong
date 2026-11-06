@@ -188,7 +188,8 @@ namespace Mahjong.Unity
             // frame gets wider strips, a short one squeezes them instead of pushing them off the panel.
             var rowsTop = top - RowsOffset;
             var rowsBottom = -height * 0.5f + NoticeOffset + 0.013f;
-            var step = Mathf.Min(MaxRowStep, Mathf.Max(0.008f, (rowsTop - rowsBottom) / TitleScreen.MaxRows));
+            var step = Mathf.Min(MaxRowStep * UiStyle.Profile.RowSpacing,
+                Mathf.Max(0.008f, (rowsTop - rowsBottom) / TitleScreen.MaxRows));
             var rowHeight = Mathf.Min(MaxRowHeight, step * 0.94f);
             var rowWidth = Mathf.Min(RowWidth, width * 0.94f);
 
