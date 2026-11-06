@@ -1,4 +1,4 @@
-using Mahjong.Controls;
+﻿using Mahjong.Controls;
 using Mahjong.Rules;
 using UnityEngine;
 
@@ -18,9 +18,14 @@ namespace Mahjong.Unity
         /// <summary>How far the two dice lie from the middle, left and right of the well.</summary>
         private const float Spread = 0.042f;
 
-        private static readonly Color DieColour = new(0.96f, 0.94f, 0.88f);
-        private static readonly Color OneColour = new(0.78f, 0.16f, 0.13f);
-        private static readonly Color PipColour = new(0.10f, 0.11f, 0.13f);
+        /// <summary>A die is a small ivory tile: its colour comes from the palette, not from the code.</summary>
+        private static Color DieColour => UiStyle.Of(UiRole.TileFace);
+
+        /// <summary>The one and the four are the red throw (3.5.7.4), so the red is the refusal colour.</summary>
+        private static Color OneColour => UiStyle.Of(UiRole.Critical);
+
+        /// <summary>The rest of the pips are inked like the body text.</summary>
+        private static Color PipColour => UiStyle.Of(UiRole.TextMain);
 
         private Transform[] dice = null!;
         private TextMesh[] pips = null!;

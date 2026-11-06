@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Mahjong.Localization;
 using UnityEngine;
@@ -116,7 +116,9 @@ namespace Mahjong.Unity
 
             var slot = ControlTile.TileWidth + TileGap;
             var total = Rows.Length * slot - TileGap;
-            var scale = Mathf.Min(1f, halfWidth * 2f * FrameShare / total);
+            // The size of the interface (8.10) is a wish, the frame is a fact: the row grows with the
+            // setting, but never past its share of the frame, so no button leaves the screen.
+            var scale = Mathf.Min(UiStyle.Scale, halfWidth * 2f * FrameShare / total);
 
             transform.localScale = Vector3.one * scale;
             transform.localPosition = new Vector3(

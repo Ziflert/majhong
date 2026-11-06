@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Mahjong.Controls;
 using Mahjong.Localization;
 using UnityEngine;
@@ -36,15 +36,17 @@ namespace Mahjong.Unity
         private const float NoticeOffset = 0.030f;
         private const float FooterOffset = 0.012f;
 
-        private static readonly Color PanelColour = new(0.05f, 0.07f, 0.09f, 0.97f);
-        private static readonly Color RowColour = new(0.13f, 0.16f, 0.19f);
-        private static readonly Color SelectedRowColour = new(0.22f, 0.34f, 0.26f);
-        private static readonly Color CaptionColour = new(0.84f, 0.86f, 0.83f);
-        private static readonly Color SelectedCaptionColour = new(0.99f, 0.95f, 0.72f);
-        private static readonly Color PlannedCaptionColour = new(0.55f, 0.57f, 0.55f);
-        private static readonly Color TitleColour = new(0.98f, 0.92f, 0.74f);
-        private static readonly Color SubtitleColour = new(0.72f, 0.78f, 0.72f);
-        private static readonly Color FooterColour = new(0.66f, 0.70f, 0.66f);
+        // Every colour of the page is a role of the palette in effect (UiStyle): the panel is paint,
+        // not a place where a colour is decided. The look setting repaints the page on its next Refresh.
+        private static Color PanelColour => UiStyle.Of(UiRole.Surface, 0.97f);
+        private static Color RowColour => UiStyle.Of(UiRole.SurfaceHigh);
+        private static Color SelectedRowColour => UiStyle.Of(UiRole.Primary);
+        private static Color CaptionColour => UiStyle.Of(UiRole.TextMain);
+        private static Color SelectedCaptionColour => UiStyle.Of(UiRole.TextOnAccent);
+        private static Color PlannedCaptionColour => UiStyle.Of(UiRole.TextMuted);
+        private static Color TitleColour => UiStyle.Of(UiRole.Accent);
+        private static Color SubtitleColour => UiStyle.Of(UiRole.TextMuted);
+        private static Color FooterColour => UiStyle.Of(UiRole.TextMuted, 0.85f);
 
         private Transform cameraTransform = null!;
         private TextMesh title = null!;
@@ -58,6 +60,7 @@ namespace Mahjong.Unity
         private readonly List<TextMesh> rowLabels = new();
         private readonly List<TextMesh> rowValues = new();
         private readonly List<BoxCollider> rowColliders = new();
+        private int paintedRevision = -1;
 
         public bool IsOpen { get; private set; }
 
@@ -85,7 +88,7 @@ namespace Mahjong.Unity
             panel.subtitle = CreateText(root.transform, "subtitle", Vector3.zero, 0.0012f,
                 TextAnchor.MiddleCenter, SubtitleColour);
             panel.notice = CreateText(root.transform, "notice", Vector3.zero, 0.0011f,
-                TextAnchor.MiddleCenter, SelectedCaptionColour);
+                TextAnchor.MiddleCenter, UiStyle.Of(UiRole.Accent));
             panel.footer = CreateText(root.transform, "footer", Vector3.zero, 0.0010f,
                 TextAnchor.MiddleCenter, FooterColour);
 
@@ -194,7 +197,9 @@ namespace Mahjong.Unity
                 var y = rowsTop - index * step;
                 var box = rowColliders[index];
                 box.transform.localPosition = new Vector3(0f, y, 0f);
-                box.size = new Vector3(rowWidth, rowHeight, ActionButton.Depth);
+                // The box is the whole strip, the plate a shade shorter: a click between two rows
+                // lands on one of them instead of on nothing.
+                box.size = new Vector3(rowWidth, step, ActionButton.Depth);
                 rowFaces[index].transform.localScale = new Vector3(rowWidth, rowHeight, ActionButton.Depth);
                 // The two captions hang on the row, and the row is what moves.
                 rowLabels[index].transform.localPosition =
@@ -220,6 +225,7 @@ namespace Mahjong.Unity
         /// <summary>Redraws every row from the model: caption, value and which row the cursor is on.</summary>
         public void Refresh(TitleScreen screen)
         {
+            if (paintedRevision != UiStyle.Revision) Repaint();
             title.text = Loc.Get("title.title");
             subtitle.text = screen.Page == TitlePage.Load
                 ? Loc.Get("title.loadTitle")
@@ -245,9 +251,26 @@ namespace Mahjong.Unity
                 rowLabels[index].color = selected
                     ? SelectedCaptionColour
                     : row.Ready ? CaptionColour : PlannedCaptionColour;
-                rowValues[index].color = row.Ready ? SelectedCaptionColour : PlannedCaptionColour;
+                rowValues[index].color = selected
+                    ? SelectedCaptionColour
+                    : row.Ready ? UiStyle.Of(UiRole.Accent) : PlannedCaptionColour;
                 rowFaces[index].material.color = selected ? SelectedRowColour : RowColour;
             }
+        }
+
+        /// <summary>
+        /// Paints the page itself — the sheet, the game name, the profile line, the notice and the key
+        /// hint — in the palette that is in effect. The rows are painted by <see cref="Refresh"/>, which
+        /// knows which of them the cursor is on.
+        /// </summary>
+        private void Repaint()
+        {
+            paintedRevision = UiStyle.Revision;
+            background.material.color = PanelColour;
+            title.color = TitleColour;
+            subtitle.color = SubtitleColour;
+            notice.color = UiStyle.Of(UiRole.Accent);
+            footer.color = FooterColour;
         }
 
         /// <summary>The row as it is drawn; the tests read it instead of the screen.</summary>

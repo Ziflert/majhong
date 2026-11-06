@@ -1,14 +1,15 @@
+using Mahjong.Controls;
 using UnityEngine;
 
 namespace Mahjong.Unity
 {
     /// <summary>
-    /// One button of the on-screen controls tray (У-6): a flat cube face, the name of the action and
-    /// the hot key printed in its corner. The tray never replaces the hot keys, it adds buttons to
-    /// them for the player who cannot press one.
+    /// One button of the on-screen controls tray (У-6): a rounded plate of the palette, the name of the
+    /// action and the hot key printed in its corner. The tray never replaces the hot keys, it adds
+    /// buttons to them for the player who cannot press one.
     ///
-    /// Like <see cref="ActionButton"/>, the root carries the collider exactly: the face cube is
-    /// scaled non-uniformly, so a label parented to it would be squashed.
+    /// The root carries the collider exactly: the plate is a mesh of its own and the two captions are
+    /// children of the root, so neither of them inherits the plate's shape.
     /// </summary>
     public sealed class ControlTile : MonoBehaviour
     {
@@ -17,14 +18,6 @@ namespace Mahjong.Unity
         public const float TileWidth = 0.062f;
         public const float TileHeight = 0.036f;
         private const float TileDepth = 0.004f;
-
-        /// <summary>Colours of the three states a tile can be in. Public so a test can name the state
-        /// it expects instead of hard-coding the same colour twice.</summary>
-        public static readonly Color FaceColour = new(0.90f, 0.91f, 0.88f);
-        public static readonly Color HoverColour = new(0.72f, 0.86f, 0.66f);
-        public static readonly Color DisabledColour = new(0.55f, 0.56f, 0.55f);
-        public static readonly Color CaptionColour = new(0.10f, 0.11f, 0.13f);
-        public static readonly Color KeyColour = new(0.35f, 0.42f, 0.32f);
 
         public ControlType Type { get; private set; }
 
@@ -36,10 +29,22 @@ namespace Mahjong.Unity
 
         public KeyCode Key => key;
 
-        private Renderer face = null!;
+        /// <summary>The plate this tile is drawn on; a test reads its skin instead of a colour.</summary>
+        public UiPlate Face => face;
+
+        /// <summary>True while the pointer is over the tile.</summary>
+        public bool IsHovered => hovered;
+
+        /// <summary>False while the tile waits for a played hand.</summary>
+        public bool IsEnabled => enabled;
+
+        private UiPlate face = null!;
         private TextMesh caption = null!;
         private TextMesh keyLabel = null!;
         private KeyCode key;
+        private bool hovered;
+        private bool enabled = true;
+        private int paintedRevision = -1;
 
         /// <summary>Caption width in world units: a TextMesh glyph advance is about 4.2 units of
         /// <c>characterSize</c>, the same estimate the action bar fits its labels with.</summary>
@@ -51,11 +56,9 @@ namespace Mahjong.Unity
             var root = new GameObject($"control-{type}");
             root.transform.SetParent(parent, false);
 
-            var faceObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            faceObject.name = "face";
-            faceObject.transform.SetParent(root.transform, false);
-            faceObject.transform.localScale = new Vector3(TileWidth, TileHeight, TileDepth);
-            Object.Destroy(faceObject.GetComponent<Collider>());
+            var plate = UiPlate.Create(root.transform, UiSkin.Button, "face");
+            plate.SetSize(TileWidth, TileHeight);
+            plate.SetPosition(0f, 0f, -(TileDepth * 0.5f) - 0.0002f);
 
             var box = root.AddComponent<BoxCollider>();
             box.size = new Vector3(TileWidth, TileHeight, TileDepth);
@@ -63,10 +66,10 @@ namespace Mahjong.Unity
             var tile = root.AddComponent<ControlTile>();
             tile.Type = type;
             tile.key = key;
-            tile.face = faceObject.GetComponent<Renderer>();
-            tile.face.material.color = FaceColour;
+            tile.face = plate;
             tile.caption = CreateCaption(root.transform, label, captionSize);
             tile.keyLabel = CreateKeyLabel(root.transform, key);
+            tile.Repaint();
             return tile;
         }
 
@@ -88,7 +91,7 @@ namespace Mahjong.Unity
             var obj = new GameObject("caption");
             obj.transform.SetParent(parent, false);
             // The caption sits above the middle of the face: the corner below it belongs to the key.
-            obj.transform.localPosition = new Vector3(0f, TileHeight * 0.13f, -(TileDepth * 0.5f) - 0.0008f);
+            obj.transform.localPosition = new Vector3(0f, TileHeight * 0.15f, -(TileDepth * 0.5f) - 0.0008f);
             obj.transform.localRotation = Quaternion.identity;
 
             var mesh = obj.AddComponent<TextMesh>();
@@ -96,7 +99,7 @@ namespace Mahjong.Unity
             mesh.alignment = TextAlignment.Center;
             mesh.fontSize = 64;
             mesh.characterSize = size > 0f ? size : CaptionSizeFor(text.Length);
-            mesh.color = CaptionColour;
+            mesh.color = Color.white;
             mesh.text = text;
             UiFont.Assign(mesh);
             return mesh;
@@ -115,7 +118,7 @@ namespace Mahjong.Unity
             mesh.alignment = TextAlignment.Center;
             mesh.fontSize = 48;
             mesh.characterSize = 0.0018f;
-            mesh.color = KeyColour;
+            mesh.color = Color.white;
             mesh.text = KeyString(key);
             UiFont.Assign(mesh);
             return mesh;
@@ -135,16 +138,45 @@ namespace Mahjong.Unity
             };
         }
 
-        public void SetHovered(bool hovered)
+        public void SetHovered(bool isHovered)
         {
-            face.material.color = hovered ? HoverColour : FaceColour;
+            if (hovered == isHovered) return;
+            hovered = isHovered;
+            Repaint();
         }
 
-        public void SetEnabled(bool enabled)
+        public void SetEnabled(bool isEnabled)
         {
-            face.material.color = enabled ? FaceColour : DisabledColour;
-            caption.color = enabled ? CaptionColour : new Color(0.25f, 0.25f, 0.25f);
-            keyLabel.color = enabled ? KeyColour : new Color(0.20f, 0.20f, 0.20f);
+            if (enabled == isEnabled) return;
+            enabled = isEnabled;
+            Repaint();
+        }
+
+        private void Update()
+        {
+            // The palette can change while the tray is on screen; one frame later the tile follows it.
+            if (paintedRevision != UiStyle.Revision) Repaint();
+        }
+
+        /// <summary>
+        /// Paints the tile from three things and nothing else: whether it can be pressed, whether the
+        /// pointer is on it and which palette is in effect. The three states are the three skins of the
+        /// interface, so a tray tile looks like an action button and like a menu row.
+        /// </summary>
+        private void Repaint()
+        {
+            paintedRevision = UiStyle.Revision;
+            if (face == null) return;
+
+            var skin = !enabled && !hovered
+                ? UiSkin.ButtonDisabled
+                : hovered ? UiSkin.ButtonHover : UiSkin.Button;
+            face.SetSkin(skin);
+
+            var onAccent = skin == UiSkin.ButtonHover;
+            var textRole = onAccent ? UiRole.TextOnAccent : enabled ? UiRole.TextMain : UiRole.TextMuted;
+            caption.color = UiStyle.Of(textRole);
+            keyLabel.color = UiStyle.Of(onAccent ? UiRole.TextOnAccent : UiRole.Accent, enabled ? 1f : 0.45f);
         }
     }
 

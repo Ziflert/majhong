@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Mahjong.Controls;
 using Mahjong.Localization;
 using UnityEngine;
@@ -27,11 +27,14 @@ namespace Mahjong.Unity
         private const float RowStep = 0.0205f;
         private const float FirstRowY = 0.082f;
 
-        private static readonly Color PanelColour = new(0.06f, 0.08f, 0.10f, 0.96f);
-        private static readonly Color RowColour = new(0.13f, 0.16f, 0.19f);
-        private static readonly Color SelectedRowColour = new(0.22f, 0.34f, 0.26f);
-        private static readonly Color CaptionColour = new(0.84f, 0.86f, 0.83f);
-        private static readonly Color SelectedCaptionColour = new(0.99f, 0.95f, 0.72f);
+        // The colours of the menu are roles of the palette in effect (UiStyle), never constants: the
+        // theme row of this very menu is what changes them.
+        private static Color PanelColour => UiStyle.Of(UiRole.Surface, 0.96f);
+        private static Color RowColour => UiStyle.Of(UiRole.SurfaceHigh);
+        private static Color SelectedRowColour => UiStyle.Of(UiRole.Primary);
+        private static Color CaptionColour => UiStyle.Of(UiRole.TextMain);
+        private static Color SelectedCaptionColour => UiStyle.Of(UiRole.TextOnAccent);
+        private static Color FooterColour => UiStyle.Of(UiRole.TextMuted);
 
         private Transform cameraTransform = null!;
         private TextMesh title = null!;
@@ -41,6 +44,8 @@ namespace Mahjong.Unity
         private readonly List<Renderer> rowFaces = new();
         private readonly List<TextMesh> rowLabels = new();
         private readonly List<BoxCollider> rowColliders = new();
+        private GameMenu? lastMenu;
+        private int paintedRevision = -1;
 
         public bool IsOpen { get; private set; }
 
@@ -65,7 +70,7 @@ namespace Mahjong.Unity
             panel.title = CreateText(root.transform, "title", Vector3.zero, 0.0021f,
                 TextAnchor.MiddleCenter, SelectedCaptionColour);
             panel.footer = CreateText(root.transform, "footer", Vector3.zero, 0.0012f,
-                TextAnchor.MiddleCenter, new Color(0.70f, 0.73f, 0.70f));
+                TextAnchor.MiddleCenter, FooterColour);
 
             for (var index = 0; index < GameMenu.TotalRows; index++)
                 panel.CreateRow(root.transform, index);
@@ -157,7 +162,9 @@ namespace Mahjong.Unity
                 var y = FirstRowY - index * RowStep;
                 var box = rowColliders[index];
                 box.transform.localPosition = new Vector3(0f, y, 0f);
-                box.size = new Vector3(rowWidth, RowHeight, ActionButton.Depth);
+                // The box is the whole pitch of the list: a click in the gap between two rows lands
+                // on one of them instead of on nothing.
+                box.size = new Vector3(rowWidth, RowStep, ActionButton.Depth);
                 rowFaces[index].transform.localScale = new Vector3(rowWidth, RowHeight, ActionButton.Depth);
                 // The label hangs on the row, and the row is what moves: its own y stays zero.
                 rowLabels[index].transform.localPosition =
@@ -167,7 +174,10 @@ namespace Mahjong.Unity
 
         private void Update()
         {
-            if (IsOpen) Layout();
+            if (!IsOpen) return;
+            Layout();
+            // The theme row of this menu repaints every page: one frame later the menu follows it.
+            if (paintedRevision != UiStyle.Revision && lastMenu != null) Refresh(lastMenu);
         }
 
         public void SetOpen(bool open)
@@ -181,6 +191,8 @@ namespace Mahjong.Unity
         /// <summary>Redraws every row from the model: caption, value, and which row the cursor is on.</summary>
         public void Refresh(GameMenu menu)
         {
+            lastMenu = menu;
+            Repaint();
             title.text = Loc.Get("menu.title");
             footer.text = Loc.Get("menu.hint");
             for (var index = 0; index < rowLabels.Count; index++)
@@ -196,6 +208,15 @@ namespace Mahjong.Unity
                 rowLabels[index].color = selected ? SelectedCaptionColour : CaptionColour;
                 rowFaces[index].material.color = selected ? SelectedRowColour : RowColour;
             }
+        }
+
+        /// <summary>Paints the sheet, the title and the hint in the palette that is in effect.</summary>
+        private void Repaint()
+        {
+            paintedRevision = UiStyle.Revision;
+            background.material.color = PanelColour;
+            title.color = SelectedCaptionColour;
+            footer.color = FooterColour;
         }
 
         /// <summary>The caption of one row as it is drawn; the tests read it instead of the screen.</summary>

@@ -38,6 +38,15 @@ namespace Mahjong.Unity
         /// </summary>
         public TextMesh Status => status;
 
+        /// <summary>The wooden rim of the table; its colour is the palette's business (8.10).</summary>
+        public Renderer TableSurface => tableRenderer;
+
+        /// <summary>The cloth the tiles stand on; its colour is the palette's business (8.10).</summary>
+        public Renderer Cloth => feltRenderer;
+
+        /// <summary>The plate behind the HUD text; it is measured from the text the size setting draws.</summary>
+        public Transform HudPlate => hudPlate;
+
         /// <summary>The bar of legal actions offered to the human. Exposed for tests and tools.</summary>
         public ActionBar Bar => bar;
 
@@ -201,8 +210,8 @@ namespace Mahjong.Unity
         /// <summary>How much plate sticks out around the text, so the glyphs do not touch the edge.</summary>
         private const float HudPlateMargin = 0.006f;
 
-        /// <summary>Nearly opaque: the HUD is read against a busy table, not against the sky.</summary>
-        private static readonly Color HudPlateColour = new(0.05f, 0.07f, 0.09f, 0.88f);
+        /// <summary>Size of the HUD line at 100 %; the size of the interface multiplies it (8.10).</summary>
+        private const float HudTextSize = 0.00125f;
 
         /// <summary>
         /// Puts the HUD in the top-left corner of the frame and sizes its plate to it. The corner is
@@ -300,6 +309,13 @@ namespace Mahjong.Unity
         /// <summary>Last mouse position the tray was hit-tested at: the tray is not re-picked every frame.</summary>
         private Vector3 lastTrayMouse = new(float.NaN, float.NaN, float.NaN);
         private Transform table = null!;
+
+        // The surfaces of the table whose colour is the palette's business (8.10): the wooden rim, the
+        // cloth, the well in the middle and the plate behind the HUD text.
+        private Renderer tableRenderer = null!;
+        private Renderer feltRenderer = null!;
+        private Renderer wellRenderer = null!;
+        private Renderer hudPlateRenderer = null!;
         private Transform board = null!;
         private readonly TextMesh[] seatPlates = new TextMesh[4];
         private readonly PlayClock clock = new();
@@ -369,6 +385,10 @@ namespace Mahjong.Unity
             // everything below builds its captions from Loc, so the language is set before the scene.
             settings = GameSettings.FromEnvironment(InspectorLevel());
             Loc.Current = settings.Language;
+            // The palette and the size of the interface (8.10) are one place: every panel and the
+            // table itself ask UiStyle for a colour instead of writing one, so they are set before the
+            // scene is built and a capture run can paint the whole game light with MAHJONG_THEME.
+            UiStyle.Apply(settings);
             gameMenu = new GameMenu(settings);
             bots = CreateBots(settings.Level, randomSeed);
 
@@ -475,7 +495,7 @@ namespace Mahjong.Unity
             tableObject.name = "Table";
             tableObject.transform.position = new Vector3(0f, -0.045f, 0f);
             tableObject.transform.localScale = new Vector3(tableSide, 0.05f, tableSide);
-            tableObject.GetComponent<Renderer>().material.color = new Color(0.20f, 0.13f, 0.08f);
+            tableRenderer = tableObject.GetComponent<Renderer>();
             table = tableObject.transform;
 
             var feltObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -483,7 +503,7 @@ namespace Mahjong.Unity
             feltObject.transform.SetParent(table, false);
             feltObject.transform.localPosition = new Vector3(0f, 0.58f, 0f);
             feltObject.transform.localScale = new Vector3(feltSide / tableSide, 0.25f, feltSide / tableSide);
-            feltObject.GetComponent<Renderer>().material.color = new Color(0.09f, 0.32f, 0.20f);
+            feltRenderer = feltObject.GetComponent<Renderer>();
 
             // A slightly lighter square in the middle marks the well where the discards go.
             var wellSide = 0.66f;
@@ -493,7 +513,7 @@ namespace Mahjong.Unity
             wellObject.transform.localPosition = new Vector3(0f, 0.83f, 0f);
             wellObject.transform.localScale =
                 new Vector3(wellSide / tableSide, 0.03f, wellSide / tableSide);
-            wellObject.GetComponent<Renderer>().material.color = new Color(0.07f, 0.26f, 0.16f);
+            wellRenderer = wellObject.GetComponent<Renderer>();
             well = wellObject;
 
             // The table cube is scaled non-uniformly; tiles live in an unscaled container so they
@@ -515,7 +535,7 @@ namespace Mahjong.Unity
             status.fontSize = 64;
             // Small enough that the whole block sits above the table in the top-left corner and
             // large enough to read at 720p, where one line is about eleven pixels high.
-            status.characterSize = 0.00125f;
+            status.characterSize = HudTextSize * UiStyle.Scale;
             status.color = Color.white;
             UiFont.Assign(status);
             BuildHudPlate(camera.transform);
@@ -531,6 +551,7 @@ namespace Mahjong.Unity
             breakMarker = BuildBreakMarker();
 
             BuildSeatPlates(camera.transform);
+            PaintTable();
         }
 
         /// <summary>
@@ -559,7 +580,7 @@ namespace Mahjong.Unity
                 mesh.alignment = TextAlignment.Center;
                 mesh.fontSize = 64;
                 mesh.characterSize = 0.0075f;
-                mesh.color = new Color(0.86f, 0.88f, 0.82f);
+                mesh.color = UiStyle.Of(UiRole.TextMain);
                 UiFont.Assign(mesh);
                 seatPlates[seat] = mesh;
             }
@@ -598,7 +619,7 @@ namespace Mahjong.Unity
             Destroy(quad.GetComponent<Collider>());
             var renderer = quad.GetComponent<Renderer>();
             renderer.material = new Material(Shader.Find("Unlit/Color"));
-            renderer.material.color = HudPlateColour;
+            hudPlateRenderer = renderer;
             hudPlate = quad.transform;
             LayoutHud(cameraTransform.GetComponent<Camera>());
         }
@@ -1837,7 +1858,56 @@ namespace Mahjong.Unity
             if (status != null && !menu.IsOpen && !rules.IsOpen) RefreshStatus();
             // 4.10: the volume of the table follows the setting the moment the row is stepped.
             if (sound != null) sound.ApplyVolume(settings.SoundVolume);
+            // 8.10: the palette and the size are the same kind of setting: stepped, they show at once.
+            if (UiStyle.Theme.Id != settings.Theme.Id ||
+                System.Math.Abs(UiStyle.Scale - (float)settings.UiScale) > 0.0001f)
+                PaintLook();
             RefreshResultTexts();
+        }
+
+        /// <summary>
+        /// Paints the table and the HUD in the palette that is in effect: the background behind the
+        /// table, the wooden rim, the cloth, the well, the plate behind the HUD text, the wind names and
+        /// the marker of the break. Called once the scene stands and again whenever the look changes.
+        /// </summary>
+        private void PaintTable()
+        {
+            var camera = Camera.main;
+            if (camera != null) camera.backgroundColor = UiStyle.Of(UiRole.Background);
+
+            if (tableRenderer != null) tableRenderer.material.color = UiStyle.Of(UiRole.Wood);
+            if (feltRenderer != null) feltRenderer.material.color = UiStyle.Of(UiRole.Felt);
+            // The well is the same cloth a shade deeper, so the middle of the table reads as a pit.
+            if (wellRenderer != null) wellRenderer.material.color = UiStyle.Sink(UiStyle.Of(UiRole.Felt), 0.3f);
+            if (hudPlateRenderer != null) hudPlateRenderer.material.color = UiStyle.Of(UiRole.Surface, 0.88f);
+            if (status != null)
+            {
+                status.color = UiStyle.Of(UiRole.TextMain);
+                // The size of the interface reaches the HUD as well: the plate is measured from the
+                // text, so a bigger line gets a bigger plate by itself.
+                status.characterSize = HudTextSize * UiStyle.Scale;
+                if (camera != null) LayoutHud(camera);
+            }
+
+            var marker = breakMarker != null ? breakMarker.GetComponent<Renderer>() : null;
+            if (marker != null) marker.material.color = UiStyle.Of(UiRole.Accent);
+
+            if (session?.State != null) RefreshSeatPlates(session.State);
+        }
+
+        /// <summary>
+        /// Puts the look in effect on everything that is already drawn. The panels watch the revision of
+        /// <see cref="UiStyle"/> on their own and repaint themselves on their next frame; what they
+        /// cannot watch is the table, so the table repaints the tiles it holds.
+        /// </summary>
+        public void PaintLook()
+        {
+            UiStyle.Apply(settings);
+            PaintTable();
+            foreach (var tile in tilesById.Values)
+                if (tile != null) tile.Repaint();
+            foreach (var tile in free.Views)
+                if (tile != null) tile.Repaint();
         }
 
         /// <summary>
@@ -2166,7 +2236,7 @@ namespace Mahjong.Unity
             Destroy(marker.GetComponent<Collider>());
             var renderer = marker.GetComponent<Renderer>();
             renderer.material = new Material(Shader.Find("Unlit/Color"));
-            renderer.material.color = new Color(0.95f, 0.80f, 0.25f);
+            renderer.material.color = UiStyle.Of(UiRole.Accent);
             marker.SetActive(false);
             return marker.transform;
         }
@@ -2282,9 +2352,10 @@ namespace Mahjong.Unity
                 if (seatPlates[seat] == null) continue;
                 var wind = Text.SeatName(state.SeatWindOf(seat));
                 seatPlates[seat].text = seat == humanSeat ? wind + " ▲" : wind;
+                // The player's own seat is the gold line of the palette, the others are muted text.
                 seatPlates[seat].color = seat == humanSeat
-                    ? new Color(0.98f, 0.94f, 0.72f)
-                    : new Color(0.80f, 0.83f, 0.78f);
+                    ? UiStyle.Of(UiRole.Accent)
+                    : UiStyle.Of(UiRole.TextMuted);
             }
         }
 

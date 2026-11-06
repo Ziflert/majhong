@@ -73,6 +73,19 @@ namespace Mahjong.Controls
         /// </summary>
         public double SoundVolume { get; set; } = SoundVolumeSettings.Default;
 
+        /// <summary>
+        /// The palette the interface is painted with. A name from <see cref="UiThemes.All"/>, not a set
+        /// of colours: a player chooses a look, and every panel, the cloth of the table and the tiles
+        /// follow it.
+        /// </summary>
+        public UiTheme Theme { get; set; } = UiThemeSettings.DefaultTheme;
+
+        /// <summary>
+        /// How big the interface is drawn, one step of <see cref="UiThemeSettings.Scales"/>. The layout
+        /// numbers stay written for 100% and every panel multiplies them by this.
+        /// </summary>
+        public double UiScale { get; set; } = UiThemeSettings.DefaultScale;
+
         /// <summary>How much faster than normal the bots play; never zero, so a delay cannot vanish.</summary>
         public double Speed => Speeds[SpeedIndex];
 
@@ -141,6 +154,14 @@ namespace Mahjong.Controls
             // sound on, so a run that must stay quiet has to say so.
             var soundText = Environment.GetEnvironmentVariable("MAHJONG_SOUND");
             if (SoundVolumeSettings.TryParse(soundText) is { } volume) settings.SoundVolume = volume;
+
+            // MAHJONG_THEME=ivory paints a capture run in the light palette and MAHJONG_UI_SCALE=1.15
+            // draws the interface bigger; both are look settings, and nonsense keeps the default.
+            var themeText = Environment.GetEnvironmentVariable("MAHJONG_THEME");
+            if (UiThemeSettings.TryParseTheme(themeText) is { } theme) settings.Theme = theme;
+
+            var scaleText = Environment.GetEnvironmentVariable("MAHJONG_UI_SCALE");
+            if (UiThemeSettings.TryParseScale(scaleText) is { } scale) settings.UiScale = scale;
 
             return settings;
         }

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Mahjong.Controls;
 using Mahjong.Localization;
 using Mahjong.Rules;
@@ -65,7 +65,7 @@ namespace Mahjong.Unity
             mesh.fontSize = 64;
             // slightly larger than the HUD status line, which is known to be readable on 1080p
             mesh.characterSize = 0.0018f;
-            mesh.color = new Color(0.80f, 0.82f, 0.85f);
+            mesh.color = UiStyle.Of(UiRole.TextMain);
             mesh.text = string.Empty;
             UiFont.Assign(mesh);
             return mesh;

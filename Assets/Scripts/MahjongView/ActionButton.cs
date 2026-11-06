@@ -5,50 +5,55 @@ using UnityEngine;
 namespace Mahjong.Unity
 {
     /// <summary>
-    /// One clickable button of the action bar, built from primitives: a flat cube face with a
-    /// TextMesh caption on the camera side.
+    /// One clickable button of the action bar: a rounded plate of the palette with a <c>TextMesh</c>
+    /// caption on the camera side.
     ///
     /// The root is an empty object and carries the collider, exactly like <see cref="TileObject"/>:
-    /// the face cube is scaled non-uniformly, so a label parented to it would be squashed.
+    /// the plate is a mesh of its own and the caption is a child of the root, so the caption keeps its
+    /// own shape whatever the plate is stretched to.
     /// </summary>
     public sealed class ActionButton : MonoBehaviour
     {
         /// <summary>Thickness along the camera axis; the collider follows it.</summary>
         public const float Depth = 0.004f;
 
-        private static readonly Color FaceColour = new(0.90f, 0.91f, 0.88f);
-        private static readonly Color HoverColour = new(0.72f, 0.86f, 0.66f);
-        private static readonly Color DisabledColour = new(0.55f, 0.56f, 0.55f);
-        private static readonly Color CaptionColour = new(0.10f, 0.11f, 0.13f);
-
-        private Renderer face = null!;
+        private UiPlate face = null!;
         private TextMesh label = null!;
+        private bool hovered;
+        private bool enabled = true;
+        private int paintedRevision = -1;
 
         public ActionOption Option { get; private set; } = null!;
         public LegalAction Action => Option.Action;
         public string Label => Option.Label;
         public TextMesh Caption => label;
 
+        /// <summary>The plate the button is drawn on; a test reads its skin instead of a colour.</summary>
+        public UiPlate Face => face;
+
+        /// <summary>True while the pointer is over the button.</summary>
+        public bool IsHovered => hovered;
+
+        /// <summary>False while the button cannot be pressed.</summary>
+        public bool IsEnabled => enabled;
+
         public static ActionButton Create(Transform parent, ActionOption option, float width, float height)
         {
             var root = new GameObject($"action-{option.Number}");
             root.transform.SetParent(parent, false);
 
-            var faceObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            faceObject.name = "face";
-            faceObject.transform.SetParent(root.transform, false);
-            faceObject.transform.localScale = new Vector3(width, height, Depth);
-            // picking goes through the root collider, so the cube's own one is removed
-            Object.Destroy(faceObject.GetComponent<Collider>());
+            var plate = UiPlate.Create(root.transform, UiSkin.Button, "face");
+            plate.SetSize(width, height);
+            plate.SetPosition(0f, 0f, -(Depth * 0.5f) - 0.0002f);
 
             var box = root.AddComponent<BoxCollider>();
             box.size = new Vector3(width, height, Depth);
 
             var button = root.AddComponent<ActionButton>();
             button.Option = option;
-            button.face = faceObject.GetComponent<Renderer>();
-            button.face.material.color = FaceColour;
+            button.face = plate;
             button.label = CreateLabel(root.transform, width, height, $"{option.Number}. {option.Label}");
+            button.Repaint();
             return button;
         }
 
@@ -70,21 +75,48 @@ namespace Mahjong.Unity
             // fitted to the label length: short labels stay big, long ones shrink to fit the face.
             var fitWidth = (width * 0.92f) / Mathf.Max(3, text.Length) / 4.2f;
             mesh.characterSize = Mathf.Min(height * 0.11f, fitWidth);
-            mesh.color = CaptionColour;
             mesh.text = text;
             UiFont.Assign(mesh);
             return mesh;
         }
 
-        public void SetHovered(bool hovered)
+        public void SetHovered(bool isHovered)
         {
-            face.material.color = hovered ? HoverColour : FaceColour;
+            if (hovered == isHovered) return;
+            hovered = isHovered;
+            Repaint();
         }
 
-        public void SetEnabled(bool enabled)
+        public void SetEnabled(bool isEnabled)
         {
-            face.material.color = enabled ? FaceColour : DisabledColour;
-            label.color = enabled ? CaptionColour : new Color(0.25f, 0.25f, 0.25f);
+            if (enabled == isEnabled) return;
+            enabled = isEnabled;
+            Repaint();
+        }
+
+        private void Update()
+        {
+            // The palette can change while the bar is on screen; one frame later the bar follows it.
+            if (paintedRevision != UiStyle.Revision) Repaint();
+        }
+
+        /// <summary>
+        /// Paints the button from three things and nothing else: whether it can be pressed, whether the
+        /// pointer is on it and which palette is in effect — the same three states a tray tile has.
+        /// </summary>
+        private void Repaint()
+        {
+            paintedRevision = UiStyle.Revision;
+            if (face == null) return;
+
+            var skin = !enabled && !hovered
+                ? UiSkin.ButtonDisabled
+                : hovered ? UiSkin.ButtonHover : UiSkin.Button;
+            face.SetSkin(skin);
+
+            label.color = skin == UiSkin.ButtonHover
+                ? UiStyle.Of(UiRole.TextOnAccent)
+                : UiStyle.Of(enabled ? UiRole.TextMain : UiRole.TextMuted);
         }
 
         public override string ToString() => Option.ToString();

@@ -94,6 +94,7 @@ namespace Mahjong.Rules.Diagnostics
             VariantGroups(report);
             TitleGroups(report);
             SoundGroups(report);
+            LookGroups(report);
 
             return report;
         }

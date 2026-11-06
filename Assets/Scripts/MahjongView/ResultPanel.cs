@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Mahjong.Controls;
 using UnityEngine;
@@ -49,12 +49,14 @@ namespace Mahjong.Unity
         /// <summary>From the bottom edge of the panel to the last line: footer, button and both gaps.</summary>
         private const float BottomPad = FooterPad + FooterHeight + ButtonGap + ButtonHeight + LineGap;
 
-        private static readonly Color PanelColour = new(0.06f, 0.08f, 0.10f, 0.96f);
-        private static readonly Color ButtonColour = new(0.22f, 0.34f, 0.26f);
-        private static readonly Color TitleColour = new(0.98f, 0.94f, 0.80f);
-        private static readonly Color LineColour = new(0.90f, 0.92f, 0.90f);
-        private static readonly Color FooterColour = new(0.72f, 0.78f, 0.72f);
-        private static readonly Color ButtonCaptionColour = new(0.99f, 0.95f, 0.72f);
+        // The colours of the page are roles of the palette in effect (UiStyle): the same sheet, the
+        // same title and the same button as every other page, in whichever look the player chose.
+        private static Color PanelColour => UiStyle.Of(UiRole.Surface, 0.96f);
+        private static Color ButtonColour => UiStyle.Of(UiRole.Primary);
+        private static Color TitleColour => UiStyle.Of(UiRole.Accent);
+        private static Color LineColour => UiStyle.Of(UiRole.TextMain);
+        private static Color FooterColour => UiStyle.Of(UiRole.TextMuted);
+        private static Color ButtonCaptionColour => UiStyle.Of(UiRole.TextOnAccent);
 
         private Transform cameraTransform = null!;
         private TextMesh title = null!;
@@ -65,6 +67,7 @@ namespace Mahjong.Unity
         private BoxCollider buttonCollider = null!;
 
         private readonly List<TextMesh> lines = new();
+        private int paintedRevision = -1;
 
         /// <summary>Lines the open screen actually has; the panel is sized to them, not to the frame.</summary>
         private int contentLines;
@@ -227,6 +230,7 @@ namespace Mahjong.Unity
         /// <summary>Draws the model: title, the hand as it was paid, the table of points and the countdown.</summary>
         public void Refresh(ResultScreen screen)
         {
+            if (paintedRevision != UiStyle.Revision) Repaint();
             title.text = screen.Title;
 
             var content = screen.AllLines();
@@ -240,6 +244,21 @@ namespace Mahjong.Unity
 
             // The panel is as tall as its content, so a redrawn screen is also a resized one.
             Layout();
+        }
+
+        /// <summary>
+        /// Paints the page in the palette that is in effect: the sheet, the title, the lines of the hand,
+        /// the button and the footer. The texts stay as they are — only their colour is the look.
+        /// </summary>
+        private void Repaint()
+        {
+            paintedRevision = UiStyle.Revision;
+            background.material.color = PanelColour;
+            title.color = TitleColour;
+            footer.color = FooterColour;
+            buttonFace.material.color = ButtonColour;
+            buttonCaption.color = ButtonCaptionColour;
+            foreach (var line in lines) line.color = LineColour;
         }
 
         /// <summary>Turns a click into "deal the next hand"; false when the ray missed the button.</summary>

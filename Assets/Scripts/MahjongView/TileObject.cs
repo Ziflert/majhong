@@ -1,3 +1,4 @@
+﻿using Mahjong.Controls;
 using Mahjong.Rules;
 using UnityEngine;
 
@@ -24,8 +25,11 @@ namespace Mahjong.Unity
         /// <summary>How fast a tile turns to its new orientation, in degrees per second.</summary>
         public const float TurnSpeed = 720f;
 
-        /// <summary>Colour of the back of a tile: the green lacquer of a real set.</summary>
-        public static readonly Color BackColour = new(0.25f, 0.45f, 0.3f);
+        /// <summary>
+        /// Colour of the back of a tile: the lacquer of a real set, from the palette in effect. A tile
+        /// is part of the look, and a set of green tiles on a cream table is as wrong as a blue panel.
+        /// </summary>
+        public static Color BackColour => UiStyle.Of(UiRole.TileBody);
 
         /// <summary>How far a tile under the cursor rises; enough to read as "this one".</summary>
         public const float HoverLift = 0.012f;
@@ -67,6 +71,9 @@ namespace Mahjong.Unity
 
         private bool hovered;
         private float hoverOffset;
+
+        /// <summary>True while the hand is being shown as its result: the tiles keep the gold tint.</summary>
+        private bool victory;
 
         private float pulseElapsed;
         private float pulseDelay;
@@ -154,6 +161,7 @@ namespace Mahjong.Unity
             Type = type;
             IsFaceUp = true;
             faceSet = true;
+            victory = false;
             label.text = TileLabel.Short(type);
             label.color = TileLabel.Text(type);
             body.material.color = TileLabel.Face(type);
@@ -172,6 +180,7 @@ namespace Mahjong.Unity
         {
             IsFaceUp = false;
             faceSet = true;
+            victory = false;
             label.text = string.Empty;
             body.material.color = BackColour;
             label.gameObject.SetActive(false);
@@ -249,16 +258,33 @@ namespace Mahjong.Unity
             // would give away which tiles are about to leave.
             if (!faceSet || hasPendingFace) return;
 
+            // Gold of the palette, not of the screen: a highlight belongs to the look of the table.
+            var gold = UiStyle.Of(UiRole.Accent);
+
             // A face-down tile must stay the colour of its back: tinting it with the face colour
             // would show which tile is being highlighted even when the player cannot see the face.
             if (!IsFaceUp)
             {
-                body.material.color = highlighted ? Color.Lerp(BackColour, Color.yellow, 0.35f) : BackColour;
+                body.material.color = highlighted ? Color.Lerp(BackColour, gold, 0.35f) : BackColour;
                 return;
             }
 
             var colour = TileLabel.Face(Type);
-            body.material.color = highlighted ? Color.Lerp(colour, Color.yellow, 0.45f) : colour;
+            if (victory) colour = Color.Lerp(colour, gold, 0.7f);
+            else if (highlighted) colour = Color.Lerp(colour, gold, 0.45f);
+            body.material.color = colour;
+        }
+
+        /// <summary>
+        /// Paints the tile again in the palette that is in effect. Called by the table when the player
+        /// changes the look: a tile is not asked to watch the palette on its own, because a hand, a wall
+        /// and three discard rows are a hundred and thirty-six of them.
+        /// </summary>
+        public void Repaint()
+        {
+            if (!faceSet) return;
+            if (IsFaceUp) label.color = TileLabel.Text(Type);
+            ApplyHighlight();
         }
 
         /// <summary>Raises the tile slightly while the cursor is over it.</summary>
@@ -270,7 +296,8 @@ namespace Mahjong.Unity
         /// <summary>Persistent victory colour used while the hand-result screen is shown.</summary>
         public void SetVictoryHighlight()
         {
-            body.material.color = Color.Lerp(TileLabel.Face(Type), Color.yellow, 0.7f);
+            victory = true;
+            ApplyHighlight();
         }
 
         /// <summary>Moves the tile to a place at once; used at the deal and by tests.</summary>

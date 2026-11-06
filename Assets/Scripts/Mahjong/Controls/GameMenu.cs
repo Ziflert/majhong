@@ -33,6 +33,13 @@ namespace Mahjong.Controls
 
         /// <summary>4.10: how loud the table is, from silence to full volume.</summary>
         Sound = 5,
+
+        /// <summary>Which palette the interface is painted with.</summary>
+        Look = 11,
+
+        /// <summary>How big the interface is drawn.</summary>
+        Scale = 12,
+
         Save = 6,
         Resume = 7,
         Review = 8,
@@ -59,7 +66,7 @@ namespace Mahjong.Controls
         private static readonly MenuItem[] Rows =
         {
             MenuItem.Language, MenuItem.Speed, MenuItem.Level, MenuItem.Result, MenuItem.Clock,
-            MenuItem.Sound,
+            MenuItem.Sound, MenuItem.Look, MenuItem.Scale,
             MenuItem.Save, MenuItem.Resume, MenuItem.Review, MenuItem.Rules, MenuItem.Close
         };
 
@@ -113,6 +120,18 @@ namespace Mahjong.Controls
                     if (volume == settings.SoundVolume) return false;
                     settings.SoundVolume = volume;
                     return true;
+                case MenuItem.Look:
+                    if (delta == 0) return false;
+                    var theme = UiThemeSettings.Step(settings.Theme, delta);
+                    if (theme.Id == settings.Theme.Id) return false;
+                    settings.Theme = theme;
+                    return true;
+                case MenuItem.Scale:
+                    if (delta == 0) return false;
+                    var scale = UiThemeSettings.StepScale(settings.UiScale, delta);
+                    if (Math.Abs(scale - settings.UiScale) < 0.0001d) return false;
+                    settings.UiScale = scale;
+                    return true;
                 default:
                     return false;
             }
@@ -144,6 +163,10 @@ namespace Mahjong.Controls
                     ClockPaceSettings.Text(settings.ClockPace), MenuCommand.None, true),
                 MenuItem.Sound => new MenuRow(item, Loc.Get("menu.sound"),
                     SoundVolumeSettings.Text(settings.SoundVolume), MenuCommand.None, true),
+                MenuItem.Look => new MenuRow(item, Loc.Get("menu.look"), settings.Theme.Name,
+                    MenuCommand.None, true),
+                MenuItem.Scale => new MenuRow(item, Loc.Get("menu.scale"),
+                    UiThemeSettings.ScaleText(settings.UiScale), MenuCommand.None, true),
                 MenuItem.Save => new MenuRow(item, Loc.Get("menu.save"), string.Empty, MenuCommand.Save, false),
                 MenuItem.Resume => new MenuRow(item, Loc.Get("menu.resume"), string.Empty, MenuCommand.Resume, false),
                 MenuItem.Review => new MenuRow(item, Loc.Get("menu.review"), string.Empty, MenuCommand.Review, false),
@@ -173,7 +196,7 @@ namespace Mahjong.Controls
 
         private static bool ActivateSteps(MenuItem item) =>
             item is MenuItem.Language or MenuItem.Speed or MenuItem.Level or MenuItem.Result or MenuItem.Clock
-                or MenuItem.Sound;
+                or MenuItem.Sound or MenuItem.Look or MenuItem.Scale;
 
         /// <summary>Next of the three levels, clamped: the menu has no fourth setting to step into.</summary>
         private static int NextLevel(BotLevel level, int delta)

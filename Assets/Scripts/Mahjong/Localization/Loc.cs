@@ -269,6 +269,8 @@ namespace Mahjong.Localization
             Add("menu.value.manual", "по кнопке", "on the button");
             Add("menu.value.seconds", "{0} с", "{0} s");
             Add("menu.sound", "Звук", "Sound");
+            Add("menu.look", "Тема", "Theme");
+            Add("menu.scale", "Масштаб", "Size");
             Add("sound.off", "выкл", "off");
 
             // ---------------------------------------------------------------- title
@@ -288,6 +290,8 @@ namespace Mahjong.Localization
             Add("title.session", "Длина партии", "Game length");
             Add("title.seed", "Сид раздачи", "Deal seed");
             Add("title.sound", "Звук", "Sound");
+            Add("title.look", "Тема оформления", "Theme");
+            Add("title.scale", "Масштаб интерфейса", "Interface size");
             Add("title.rules", "Справочник правил", "Rulebook");
             Add("title.quit", "Выход", "Quit");
             Add("title.back", "Назад", "Back");

@@ -165,12 +165,13 @@ namespace Mahjong.Rules.Diagnostics
             report.Check(settings.SoundVolume < SoundVolumeSettings.Default,
                 "stepping the sound row makes the table quieter");
 
-            // Commands: the rows that open something say what they open.
-            menu.Move(1);
-            report.Equal(MenuCommand.Save, menu.Activate(), "the seventh row saves");
-            report.Equal(MenuCommand.Resume, menu.RowAt(7).Command, "the eighth row resumes");
-            report.Equal(MenuCommand.Review, menu.RowAt(8).Command, "the ninth row opens the review");
-            report.Equal(MenuCommand.Rules, menu.RowAt(9).Command, "the tenth row opens the rules");
+            // Commands: the rows that open something say what they open. The look rows stand between
+            // the sound of the table and the commands, so the cursor walks over them.
+            menu.Move(3);
+            report.Equal(MenuCommand.Save, menu.Activate(), "the ninth row saves");
+            report.Equal(MenuCommand.Resume, menu.RowAt(9).Command, "the tenth row resumes");
+            report.Equal(MenuCommand.Review, menu.RowAt(10).Command, "the eleventh row opens the review");
+            report.Equal(MenuCommand.Rules, menu.RowAt(11).Command, "the twelfth row opens the rules");
             menu.Move(4);
             report.Equal(MenuItem.Close, menu.Selected, "the last row closes the menu");
             report.Equal(MenuCommand.Close, menu.Activate(), "the last row asks to close");

@@ -30,7 +30,7 @@ namespace Mahjong.Rules.Diagnostics
             var title = new TitleScreen(settings);
 
             report.Equal(TitlePage.Main, title.Page, "the screen opens on the main page");
-            report.Equal(16, title.RowCount, "the main page has sixteen rows");
+            report.Equal(18, title.RowCount, "the main page has eighteen rows");
             report.Equal(TitleItem.NewGame, title.Selected, "the cursor starts on the new game");
             report.Equal("", title.Status, "a fresh screen says nothing under the rows");
 

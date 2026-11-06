@@ -1,6 +1,8 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
+using Mahjong.Controls;
+using Mahjong.Unity;
 using UnityEditor;
 using UnityEngine;
 
@@ -35,6 +37,9 @@ namespace Mahjong.EditorTools
         {
             // У-2: the screen a player meets on launch, before any hand is dealt.
             ("welcome", "welcome", new Vector3(0f, 2.70f, -2.60f), new Vector3(0f, 0f, 0.18f), 1.2),
+            // 8.10: the same screen in the light palette — one setting repaints the page, the table
+            // behind it and the tray; the shot is the proof that the look is not a filter over one theme.
+            ("welcome-ivory", "ivory", new Vector3(0f, 2.70f, -2.60f), new Vector3(0f, 0f, 0.18f), 1.4),
             // The opening runs at the table's own pace, so this shot is taken while it is running:
             // the dice in the air, the wall still whole, the break not made yet (3.5.7.5).
             ("opening-dice", "opening", new Vector3(0f, 2.20f, -1.90f), new Vector3(0f, 0f, 0.10f), 1.1),
@@ -61,6 +66,9 @@ namespace Mahjong.EditorTools
             ("result-screen", "result", new Vector3(0f, 1.15f, -1.45f), new Vector3(0f, 0f, 0.08f), SettleSeconds),
             ("replay-review", "replay", new Vector3(0f, 2.70f, -2.60f), new Vector3(0f, 0f, 0.18f), SettleSeconds)
         };
+
+        /// <summary>The palette a capture run started with; the light shot puts it back for the next step.</summary>
+        private static UiTheme? themeBeforeIvory;
 
         /// <summary>Seconds a step is given before its shot: the deal and the panels need a frame or two.</summary>
         private const double SettleSeconds = 2.0;
@@ -246,6 +254,12 @@ namespace Mahjong.EditorTools
                 case "welcome":
                     game.OpenTitle();
                     break;
+                case "ivory":
+                    themeBeforeIvory = game.Settings.Theme;
+                    game.Settings.Theme = UiThemes.Ivory;
+                    game.PaintLook();
+                    game.OpenTitle();
+                    break;
                 case "burn":
                 case "melds":
                 case "result":
@@ -263,6 +277,9 @@ namespace Mahjong.EditorTools
             {
                 "welcome" => $"welcome screen, {game.Title.RowCount} rows, on '{game.Title.RowAt(game.Title.Index)}',"
                              + $" panel {(game.TitlePanel.IsOpen ? "open" : "closed")}",
+                "ivory" => $"welcome screen in the '{game.Settings.Theme.Id}' palette,"
+                           + $" paper {game.TitlePanel.Backdrop.material.color}, cloth {game.Cloth.material.color},"
+                           + $" {game.Title.RowCount} rows",
                 "rules" => $"rulebook page {game.Rules.Page + 1}/{game.Rules.PageCount}: {game.Rules.CurrentTitle},"
                            + $" {game.Rules.RowCount} rows of contents,"
                            + $" rows {(game.Rules.RowsShown(0) ? "drawn" : "put away")}",
@@ -312,6 +329,15 @@ namespace Mahjong.EditorTools
                     break;
                 case "welcome":
                     // The next step wants a live table: the screen hands over the way a pick does.
+                    game.SkipWelcome();
+                    break;
+                case "ivory":
+                    // The palette goes back before the next shot, so one run compares the two looks.
+                    if (themeBeforeIvory != null)
+                    {
+                        game.Settings.Theme = themeBeforeIvory;
+                        game.PaintLook();
+                    }
                     game.SkipWelcome();
                     break;
                 case "result":

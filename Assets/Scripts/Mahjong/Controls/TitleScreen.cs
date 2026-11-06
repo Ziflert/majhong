@@ -45,7 +45,13 @@ namespace Mahjong.Controls
         Seed = 16,
 
         /// <summary>4.10: how loud the table is, from silence to full volume.</summary>
-        Sound = 17
+        Sound = 17,
+
+        /// <summary>Which palette the interface is painted with (headless: <see cref="UiThemes"/>).</summary>
+        Look = 18,
+
+        /// <summary>How big the interface is drawn, one step of <see cref="UiThemeSettings.Scales"/>.</summary>
+        Scale = 19
     }
 
     /// <summary>
@@ -97,7 +103,7 @@ namespace Mahjong.Controls
         /// Rows the panel draws; the main page uses them all, the load page never has more than
         /// <see cref="MaxSaves"/> saves plus "back".
         /// </summary>
-        public const int MaxRows = 16;
+        public const int MaxRows = 18;
 
         /// <summary>Saved games a single page can list; more than that would not fit the frame.</summary>
         public const int MaxSaves = 10;
@@ -109,6 +115,7 @@ namespace Mahjong.Controls
             TitleItem.LocalGame, TitleItem.Multiplayer,
             TitleItem.Variant, TitleItem.Language, TitleItem.Level, TitleItem.Speed, TitleItem.Result,
             TitleItem.Clock, TitleItem.Session, TitleItem.Seed, TitleItem.Sound,
+            TitleItem.Look, TitleItem.Scale,
             TitleItem.Rules, TitleItem.Quit
         };
 
@@ -231,6 +238,16 @@ namespace Mahjong.Controls
                     if (volume == settings.SoundVolume) return false;
                     settings.SoundVolume = volume;
                     return true;
+                case TitleItem.Look:
+                    var theme = UiThemeSettings.Step(settings.Theme, delta);
+                    if (theme.Id == settings.Theme.Id) return false;
+                    settings.Theme = theme;
+                    return true;
+                case TitleItem.Scale:
+                    var scale = UiThemeSettings.StepScale(settings.UiScale, delta);
+                    if (Math.Abs(scale - settings.UiScale) < 0.0001d) return false;
+                    settings.UiScale = scale;
+                    return true;
                 default:
                     return false;
             }
@@ -352,6 +369,10 @@ namespace Mahjong.Controls
                     DealSeedSettings.Text(settings.Seed), TitleCommand.None, TitleRowState.Ready),
                 TitleItem.Sound => new TitleRow(item, Loc.Get("title.sound"),
                     SoundVolumeSettings.Text(settings.SoundVolume), TitleCommand.None, TitleRowState.Ready),
+                TitleItem.Look => new TitleRow(item, Loc.Get("title.look"), settings.Theme.Name,
+                    TitleCommand.None, TitleRowState.Ready),
+                TitleItem.Scale => new TitleRow(item, Loc.Get("title.scale"),
+                    UiThemeSettings.ScaleText(settings.UiScale), TitleCommand.None, TitleRowState.Ready),
                 TitleItem.Rules => new TitleRow(item, Loc.Get("title.rules"), string.Empty,
                     TitleCommand.Rules, TitleRowState.Ready),
                 _ => new TitleRow(item, Loc.Get("title.quit"), string.Empty,

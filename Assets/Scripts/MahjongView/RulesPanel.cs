@@ -1,5 +1,6 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+using Mahjong.Controls;
 using Mahjong.Knowledge;
 using Mahjong.Localization;
 using UnityEngine;
@@ -106,10 +107,14 @@ namespace Mahjong.Unity
         private const float ArrowHeight = 0.016f;
         private const float BottomLine = 0.014f;
 
-        private static readonly Color PanelColour = new(0.06f, 0.08f, 0.10f, 0.96f);
-        private static readonly Color ButtonColour = new(0.13f, 0.16f, 0.19f);
-        private static readonly Color ButtonCaptionColour = new(0.84f, 0.86f, 0.83f);
-        private static readonly Color CounterColour = new(0.72f, 0.78f, 0.72f);
+        // The book is paper of the palette in effect (UiStyle), like every other page: the sheet, the
+        // arrows of the bottom line and the contents rows take their colours from the roles.
+        private static Color PanelColour => UiStyle.Of(UiRole.Surface, 0.96f);
+        private static Color ButtonColour => UiStyle.Of(UiRole.SurfaceHigh);
+        private static Color ButtonCaptionColour => UiStyle.Of(UiRole.TextMain);
+        private static Color CounterColour => UiStyle.Of(UiRole.TextMuted);
+        private static Color TitleColour => UiStyle.Of(UiRole.Accent);
+        private static Color BodyColour => UiStyle.Of(UiRole.TextMain);
 
         /// <summary>One clickable plate of the bottom line: the page back or the page on.</summary>
         private sealed class ArrowPlate
@@ -159,6 +164,9 @@ namespace Mahjong.Unity
         private TextMesh counter = null!;
         private Renderer background = null!;
         private ArrowPlate previous = null!;
+
+        /// <summary>The look the page was last painted with; a change repaints it on the next frame.</summary>
+        private int paintedRevision = -1;
         private ArrowPlate next = null!;
 
         public bool IsOpen { get; private set; }
@@ -222,14 +230,14 @@ namespace Mahjong.Unity
             panel.cameraTransform = cameraTransform;
             panel.background = CreateBackground(root.transform);
             panel.title = CreateText(root.transform, "title", Vector3.zero,
-                0.0022f, TextAnchor.UpperCenter, new Color(0.98f, 0.94f, 0.80f));
+                0.0022f, TextAnchor.UpperCenter, TitleColour);
             // UpperLeft anchors the text at its own top-left corner, so the anchor point is the left
             // margin of the page and not its middle: a body at x = 0 started in the centre and ran
             // off the right edge of the screen.
             panel.body = CreateText(root.transform, "body", Vector3.zero,
-                0.0013f, TextAnchor.UpperLeft, new Color(0.92f, 0.93f, 0.95f));
+                0.0013f, TextAnchor.UpperLeft, BodyColour);
             panel.bodyRight = CreateText(root.transform, "body-right", Vector3.zero,
-                0.0013f, TextAnchor.UpperLeft, new Color(0.92f, 0.93f, 0.95f));
+                0.0013f, TextAnchor.UpperLeft, BodyColour);
             panel.footer = CreateText(root.transform, "footer", Vector3.zero,
                 0.0013f, TextAnchor.LowerCenter, CounterColour);
             panel.counter = CreateText(root.transform, "counter", Vector3.zero,
@@ -435,7 +443,10 @@ namespace Mahjong.Unity
         /// <summary>The game view can be resized at any moment; the page follows it.</summary>
         private void Update()
         {
-            if (IsOpen) Layout();
+            if (!IsOpen) return;
+            Layout();
+            // The look can change while the book is open; one frame later the page follows it.
+            if (paintedRevision != UiStyle.Revision) Refresh();
         }
 
         public void Toggle() => SetOpen(!IsOpen);
@@ -448,6 +459,34 @@ namespace Mahjong.Unity
         }
 
         public void Close() => SetOpen(false);
+
+        /// <summary>
+        /// Paints the book in the palette that is in effect: the sheet, the title, both columns of body
+        /// text, the counter and the arrows of the bottom line with the contents rows.
+        /// </summary>
+        private void Repaint()
+        {
+            paintedRevision = UiStyle.Revision;
+            background.material.color = PanelColour;
+            title.color = TitleColour;
+            body.color = BodyColour;
+            bodyRight.color = BodyColour;
+            footer.color = CounterColour;
+            counter.color = CounterColour;
+
+            foreach (var arrow in new[] { previous, next })
+            {
+                if (arrow == null) continue;
+                arrow.Face.material.color = ButtonColour;
+                arrow.Label.color = ButtonCaptionColour;
+            }
+
+            foreach (var row in rows)
+            {
+                row.Face.material.color = ButtonColour;
+                row.Label.color = ButtonCaptionColour;
+            }
+        }
 
         /// <summary>Turns a page; wraps around so the arrows never get stuck at an end.</summary>
         public void Turn(int delta)
@@ -476,6 +515,7 @@ namespace Mahjong.Unity
         private void Refresh()
         {
             if (pages.Count == 0) return;
+            if (paintedRevision != UiStyle.Revision) Repaint();
 
             var page = pages[Page];
             title.text = page.Title;

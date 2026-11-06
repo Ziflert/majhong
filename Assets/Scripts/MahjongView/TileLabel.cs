@@ -1,3 +1,4 @@
+using Mahjong.Controls;
 using Mahjong.Rules;
 using UnityEngine;
 
@@ -30,7 +31,14 @@ namespace Mahjong.Unity
             };
         }
 
-        public static Color Face(TileType type)
+        /// <summary>
+        /// The ivory a face is printed on, tinted to the suit so a row of tiles reads by colour as well
+        /// as by shape. The ivory itself comes from the palette: a light table gets a warmer paper.
+        /// </summary>
+        public static Color Face(TileType type) => UiStyle.Mix(UiStyle.Of(UiRole.TileFace), Tint(type), 0.45f);
+
+        /// <summary>The tint of a suit on the ivory of a face; not a palette colour, a mark of the suit.</summary>
+        private static Color Tint(TileType type)
         {
             return type.Suit switch
             {

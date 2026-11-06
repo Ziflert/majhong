@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Linq;
 using Mahjong.Localization;
 using Mahjong.Unity;
@@ -203,19 +203,19 @@ namespace Mahjong.PlayTests
 
             var saveTile = tray.Tiles.Single(t => t.Type == ControlType.Save);
 
-            // Save is disabled while no hand is played: check the grey colours. The renderer lives on
-            // the child face cube, the tile root carries the collider only.
-            var saveRenderer = saveTile.GetComponentInChildren<Renderer>();
-            Assert.IsNotNull(saveRenderer, "A tray tile has no renderer to colour.");
-            Assert.AreEqual(ControlTile.DisabledColour, saveRenderer!.material.color,
-                "A save tile while no hand is played must be disabled.");
+            // Save is disabled while no hand is played: the tile wears the disabled skin of the
+            // interface, which is a palette role and not a colour written into the tile (4.10, 8.10).
+            Assert.IsFalse(saveTile.IsEnabled, "A save tile while no hand is played must be disabled.");
+            Assert.AreEqual(UiSkin.ButtonDisabled, saveTile.Face.Skin,
+                "A disabled tray tile must wear the disabled skin.");
 
             // Hovering a disabled tile keeps it disabled but highlights the face.
             var ray = new Ray(camera.transform.position,
                 (saveTile.transform.position - camera.transform.position).normalized);
             tray.Hover(ray);
-            Assert.AreEqual(ControlTile.HoverColour, saveRenderer.material.color,
-                "Hovering must change the face colour even on a disabled tile.");
+            Assert.IsTrue(saveTile.IsHovered, "Hovering a tile has to be remembered by the tile.");
+            Assert.AreEqual(UiSkin.ButtonHover, saveTile.Face.Skin,
+                "Hovering must change the skin even on a disabled tile.");
 
             tray.Hide();
             yield return null;
