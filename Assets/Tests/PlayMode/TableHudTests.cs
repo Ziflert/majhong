@@ -41,6 +41,17 @@ namespace Mahjong.PlayTests
                 StringAssert.Contains("Wall", hud.WallCounter.text);
                 Assert.AreEqual("saved", hud.Notice.text);
                 StringAssert.Contains("You", hud.PlayerLabel(0).text);
+                Assert.IsTrue(hud.HintsVisible);
+                Assert.IsFalse(hud.MeldGuideVisible);
+                hud.ToggleHints();
+                hud.ToggleMeldGuide();
+                hud.Refresh(camera, session, settings, 0, true, clock, "", "diagnostic");
+                Assert.IsFalse(hud.Hint.gameObject.activeSelf);
+                Assert.IsTrue(hud.MeldGuide.gameObject.activeSelf);
+                StringAssert.Contains("three identical tiles", hud.MeldGuide.text);
+                hud.ToggleHints();
+                hud.Refresh(camera, session, settings, 0, true, clock, "", "diagnostic");
+                Assert.IsTrue(hud.Hint.gameObject.activeSelf);
             }
             finally
             {

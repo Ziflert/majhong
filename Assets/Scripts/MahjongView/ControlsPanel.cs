@@ -30,7 +30,7 @@ namespace Mahjong.Unity
         /// edge of the play view, so a row across the whole frame would cover the tiles the player
         /// is about to discard: the tray takes a corner instead, the way the HUD takes the other.
         /// </summary>
-        private const float FrameShare = 0.45f;
+        private const float FrameShare = 0.34f;
 
         /// <summary>Frame measured when there is no camera to ask: half of a 34° frame at the tray depth.</summary>
         private const float FallbackHalfHeight = 0.159f;
@@ -119,7 +119,7 @@ namespace Mahjong.Unity
             var total = Rows.Length * slot - gap;
             // The size of the interface (8.10) is a wish, the frame is a fact: the row grows with the
             // setting, but never past its share of the frame, so no button leaves the screen.
-            var scale = Mathf.Min(UiStyle.Scale, halfWidth * 2f * FrameShare / total);
+            var scale = Mathf.Min(UiStyle.Scale * 0.75f, halfWidth * 2f * FrameShare / total);
 
             transform.localScale = Vector3.one * scale;
             transform.localPosition = new Vector3(

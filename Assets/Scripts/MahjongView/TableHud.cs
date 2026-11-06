@@ -24,6 +24,29 @@ namespace Mahjong.Unity
         private Card hint = null!;
         private Card notice = null!;
         private Card debug = null!;
+        private Card meldGuide = null!;
+        private ControlTile hintsButton = null!;
+        private ControlTile guideButton = null!;
+        private bool hintsVisible = true;
+        private bool guideVisible;
+        public bool HintsVisible => hintsVisible;
+        public bool MeldGuideVisible => guideVisible;
+        public TextMesh MeldGuide => meldGuide.Label;
+
+        public void ToggleHints() => hintsVisible = !hintsVisible;
+        public void ToggleMeldGuide() => guideVisible = !guideVisible;
+
+        /// <summary>UI clicks are consumed before any table pick, including during the opening.</summary>
+        public bool HandleClick(Ray ray)
+        {
+            foreach (var hit in Physics.RaycastAll(ray, 1f))
+            {
+                var tile = hit.collider.GetComponentInParent<ControlTile>();
+                if (tile == hintsButton) { ToggleHints(); return true; }
+                if (tile == guideButton) { ToggleMeldGuide(); return true; }
+            }
+            return false;
+        }
         private readonly Card[] players = new Card[4];
         private GameState lastState;
         private float toastUntil;
@@ -47,11 +70,15 @@ namespace Mahjong.Unity
             hud.wall = hud.CreateCard("WallCounter", TextAnchor.UpperCenter, 0.00135f);
             hud.time = hud.CreateCard("SessionClock", TextAnchor.UpperRight, 0.00135f);
             hud.rules = hud.CreateCard("RuleBadge", TextAnchor.UpperLeft, 0.0011f);
-            hud.hint = hud.CreateCard("HintBar", TextAnchor.MiddleCenter, 0.00155f);
+            hud.hint = hud.CreateCard("HintBar", TextAnchor.MiddleCenter, 0.00115f);
             hud.notice = hud.CreateCard("Notice", TextAnchor.UpperCenter, 0.0013f);
             hud.debug = hud.CreateCard("DebugPanel", TextAnchor.UpperLeft, 0.0011f);
             for (var i = 0; i < hud.players.Length; i++)
                 hud.players[i] = hud.CreateCard($"PlayerPlate-{i}", TextAnchor.MiddleCenter, 0.00125f);
+            hud.meldGuide = hud.CreateCard("MeldGuide", TextAnchor.UpperLeft, 0.00115f);
+            hud.meldGuide.Label.gameObject.SetActive(false);
+            hud.hintsButton = ControlTile.Create(host.transform, Loc.Get("hud.hints"), KeyCode.None, ControlType.Hints);
+            hud.guideButton = ControlTile.Create(host.transform, Loc.Get("hud.meldGuide"), KeyCode.None, ControlType.MeldGuide);
             hud.SetDebug(false);
             return hud;
         }
@@ -88,6 +115,8 @@ namespace Mahjong.Unity
         {
             var state = session.State;
             if (state == null) return;
+            UpdateButton(hintsButton, "hud.hints", hintsVisible);
+            UpdateButton(guideButton, "hud.meldGuide", guideVisible);
             if (!ReferenceEquals(state, lastState))
             {
                 lastState = state;
@@ -103,6 +132,14 @@ namespace Mahjong.Unity
             var left = -halfWidth + 0.014f;
             var top = halfHeight - 0.012f;
             var right = halfWidth - 0.014f;
+            PlaceButton(hintsButton, right - 0.071f * UiStyle.Scale, -halfHeight + 0.019f * UiStyle.Scale);
+            PlaceButton(guideButton, right - 0.024f * UiStyle.Scale, -halfHeight + 0.019f * UiStyle.Scale);
+            hint.Label.gameObject.SetActive(hintsVisible);
+            meldGuide.Label.gameObject.SetActive(guideVisible);
+            Set(meldGuide, Loc.Get("hud.meldDefinitions") + "\n\n"
+                + Loc.Get(session.Variant.Mode == ScoringMode.ClassicPoints
+                    ? "hud.meldClassic" : "hud.meldSports"),
+                right - 0.185f * Mathf.Min(UiStyle.Scale, 1f), top - 0.07f, UiRole.TextMain);
 
             Set(header, Loc.Format("hud.handRound", session.HandsPlayed + 1, GameSession.TotalHands,
                 Text.SeatName(session.RoundWind)), left, top, UiRole.TextMain);
@@ -161,7 +198,7 @@ namespace Mahjong.Unity
             Set(debug, diagnostic, left, top - 0.078f, UiRole.TextMuted);
 
             // Fit after the current frame's TextMesh rebuild (in LateUpdate on the following frame).
-            foreach (var card in new[] { header, wall, time, rules, hint, notice, debug }) Fit(card, camera);
+            foreach (var card in new[] { header, wall, time, rules, hint, notice, debug, meldGuide }) Fit(card, camera);
             foreach (var card in players) Fit(card, camera);
         }
 
@@ -187,6 +224,17 @@ namespace Mahjong.Unity
             var available = halfHeight * camera.aspect * 2f - 0.03f;
             var fit = Mathf.Min(1f, available / Mathf.Max(0.001f, size.x + 0.014f));
             card.Label.transform.localScale = Vector3.one * fit;
+        }
+
+        private static void PlaceButton(ControlTile button, float x, float y)
+        {
+            button.transform.localPosition = new Vector3(x, y, Depth - 0.01f);
+            button.transform.localScale = Vector3.one * (0.68f * UiStyle.Scale);
+        }
+
+        private static void UpdateButton(ControlTile button, string key, bool active)
+        {
+            button.SetCaption(Loc.Get(key), active ? "−" : "+");
         }
 
         private static string Clock(TimeSpan span) => $"{(int)span.TotalMinutes}:{span.Seconds:00}";

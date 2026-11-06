@@ -784,6 +784,13 @@ namespace Mahjong.Unity
                 lastTrayMouse = mouse;
             }
 
+            if (hud != null && hud.gameObject.activeInHierarchy && Input.GetMouseButtonDown(0)
+                && hud.HandleClick(MouseRay()))
+            {
+                SoundSelect();
+                return;
+            }
+
             // The dice, the break and the deal come before the first decision of a hand: the engine
             // has already dealt, so the table waits for the show to finish before it asks for a tile.
             if (!IsMenuOpen && !rules.IsOpen) TickOpening();

@@ -107,6 +107,14 @@ namespace Mahjong.Localization
             Add("hud.turnName", "Ходит: {0}", "Playing: {0}");
             Add("hud.playerScore", "Очки: {0}", "Score: {0}");
             Add("hud.houseBadge", "домашнее правило", "house rule");
+            Add("hud.hints", "Подсказки", "Hints");
+            Add("hud.meldGuide", "Комбинации", "Melds");
+            Add("hud.meldDefinitions", "Чоу — три подряд одной масти\nПанг — три одинаковые кости\nКонг — четыре одинаковые кости",
+                "Chow — three consecutive suited tiles\nPung — three identical tiles\nKong — four identical tiles");
+            Add("hud.meldClassic", "Классика · базовые очки до удвоений\nЧоу: 0\nПанг: открытый 2/4 · закрытый 4/8\nКонг: открытый 8/16 · закрытый 16/32\nПервая цена: 2–8; вторая: 1, 9, онеры.",
+                "Classic · base points before doublings\nChow: 0\nPung: open 2/4 · concealed 4/8\nKong: open 8/16 · concealed 16/32\nFirst: ranks 2–8; second: 1, 9, honors.");
+            Add("hud.meldSports", "Спортивный: очки комбинации\nопределяются полной рукой и фанами.",
+                "Sporting: combination value is\ndetermined by the full hand and fans.");
             Add("hud.yourTurn", "Ваш ход: щёлкните кость для сноса", "Your turn: click a tile to discard");
             Add("hud.keys",
                 "1–9 — действие, R — правила, F — свободная игра, V — просмотр, Esc — меню, F5 — сохранить, F9 — продолжить",

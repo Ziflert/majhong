@@ -145,6 +145,13 @@ namespace Mahjong.Unity
             Repaint();
         }
 
+        public void SetCaption(string text, string keyText)
+        {
+            caption.text = text;
+            keyLabel.text = keyText;
+            Repaint();
+        }
+
         public void SetEnabled(bool isEnabled)
         {
             if (enabled == isEnabled) return;
@@ -188,6 +195,8 @@ namespace Mahjong.Unity
         Replay,
         Save,
         Language,
-        FreePlay
+        FreePlay,
+        Hints,
+        MeldGuide
     }
 }
