@@ -1,5 +1,15 @@
 # Журнал проекта
 
+## 2026-11-06 — единое хранение снимков проекта
+
+Снимки, накопившиеся в `Logs/`, `Logs/shots*`, `Logs/tmp` и `Screenshots/atlas`, разложены в
+`Screenshots/archive/` по назначению. Последние кадры UI находятся в `Screenshots/current/`.
+`Logs/` оставлен только для логов Unity и XML результатов тестов.
+
+Добавлен `Screenshots/README.md` с правилами каталогов, именования и архивации. Все три editor-инструмента
+(`InterfaceCapture`, `PrototypeCapture`, `ActionBarPreview`) теперь по умолчанию пишут в
+`Screenshots/current/`. Правила добавлены в `AGENTS.md`, `docs/unity-layer.md` и карту проекта.
+
 ## 2026-11-06 — UI-профили minimal/studio
 
 Добавлена чистая модель `UiProfile` в `Assets/Scripts/Mahjong/Controls/UiProfile.cs` с профилями

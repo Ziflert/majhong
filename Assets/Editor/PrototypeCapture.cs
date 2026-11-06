@@ -31,7 +31,8 @@ namespace Mahjong.EditorTools
 
         public static void CaptureAndExit()
         {
-            var directory = Environment.GetEnvironmentVariable("MAHJONG_SHOT_DIR") ?? "Screenshots";
+            var directory = Environment.GetEnvironmentVariable("MAHJONG_SHOT_DIR")
+                ?? Path.Combine("Screenshots", "current");
             Directory.CreateDirectory(directory);
 
             // The dice and the break are captured by InterfaceCapture, which owns the opening shot;
@@ -70,8 +71,8 @@ namespace Mahjong.EditorTools
             {
                 if (elapsed < ShotAt[shot]) return;
 
-                var path = Path.GetFullPath(Path.Combine(SessionState.GetString(DirectoryKey, "Screenshots"),
-                    Shots[shot] + ".png"));
+                var path = Path.GetFullPath(Path.Combine(SessionState.GetString(DirectoryKey,
+                    Path.Combine("Screenshots", "current")), Shots[shot] + ".png"));
                 ScreenCapture.CaptureScreenshot(path);
                 Debug.Log("[capture] saved " + path);
                 SessionState.SetInt(ShotKey, shot + 1);

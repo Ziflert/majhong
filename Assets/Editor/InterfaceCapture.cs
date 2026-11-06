@@ -85,7 +85,8 @@ namespace Mahjong.EditorTools
 
         public static void CaptureAndExit()
         {
-            var directory = Environment.GetEnvironmentVariable("MAHJONG_SHOT_DIR") ?? "Screenshots";
+            var directory = Environment.GetEnvironmentVariable("MAHJONG_SHOT_DIR")
+                ?? Path.Combine("Screenshots", "current");
             Directory.CreateDirectory(directory);
 
             // A finished hand opens the result screen and deals again after five seconds; the shot of
@@ -270,7 +271,8 @@ namespace Mahjong.EditorTools
         private static void Capture(Unity.MahjongGame game, (string Name, string Open, Vector3 Eye, Vector3 Look, double Settle) step)
         {
             var (name, open, _, _, _) = step;
-            var path = Path.GetFullPath(Path.Combine(SessionState.GetString(DirectoryKey, "Screenshots"),
+            var path = Path.GetFullPath(Path.Combine(SessionState.GetString(DirectoryKey,
+                Path.Combine("Screenshots", "current")),
                 name + ".png"));
             ScreenCapture.CaptureScreenshot(path);
             var detail = open switch

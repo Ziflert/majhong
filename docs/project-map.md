@@ -41,7 +41,8 @@
 | `UI/` | Черновик UGUI-слоя к `docs/ui-design.md` (`Scripts/UIManager.cs`, `Scripts/ViewModels/TitleViewModel.cs`, `Themes/*.cs`). Лежит вне `Assets/`, Unity его не компилирует |
 | `Tiles/` + `Assets/Resources/Tiles/` | SVG-исходники лиц и собранный атлас `tile-atlas.png` |
 | `.local/dotnet-sdk/` | Локальный .NET SDK 8 для headless-прогонов; в git не входит |
-| `Logs/` | Логи Unity и XML тестовых прогонов (`Logs/editmode-results.xml`, `Logs/playmode-results.xml`); в git не входит |
+| `Logs/` | Только логи Unity и XML тестовых прогонов (`Logs/editmode-results.xml`, `Logs/playmode-results.xml`); снимки сюда не помещаются, в git не входит |
+| `Screenshots/` | Артефакты визуальных прогонов: `current/` — последний канонический UI, `archive/` — старые кадры и диагностика; правила — `Screenshots/README.md` |
 
 ## Ключевые файлы ядра
 | Файл | Назначение |

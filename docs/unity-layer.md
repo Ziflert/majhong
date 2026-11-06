@@ -93,7 +93,7 @@ Unity: слой представления подаёт ему `Time.deltaTime`,
   -runTests -testPlatform PlayMode -testResults D:\Temprary\game\Logs\playmode-results.xml -logFile -
 
 # Прогон с GUI и скриншотами Game view (нужен реальный рендер)
-$env:MAHJONG_SHOT_DIR="D:\Temprary\game\Screenshots"
+$env:MAHJONG_SHOT_DIR="D:\Temprary\game\Screenshots\current"
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game" \
   -executeMethod Mahjong.EditorTools.PrototypeCapture.CaptureAndExit
 
@@ -103,7 +103,7 @@ $env:MAHJONG_VARIANT="classic144"
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game" \
   -executeMethod Mahjong.EditorTools.PrototypeCapture.CaptureAndExit
 
-# Скриншот панели действий (та же папка, файл action-bar.png)
+# Скриншот панели действий (та же папка; правила каталогов — Screenshots/README.md)
 "D:\Software\Unity\6000.0.85f1\Editor\Unity.exe" -projectPath "D:\Temprary\game" \
   -executeMethod Mahjong.EditorTools.ActionBarPreview.CaptureAndExit
 
