@@ -22,6 +22,9 @@ namespace Mahjong.Controls
         /// </summary>
         public RuleVariant Variant { get; set; } = RuleVariant.Default;
 
+        /// <summary>Interface composition; independent from the selected colour palette.</summary>
+        public UiProfile Profile { get; set; } = UiProfiles.Default;
+
         /// <summary>Speeds the menu steps through; the delay between bot moves is divided by this.</summary>
         public static readonly double[] Speeds = { 0.25, 0.5, 1, 2, 4 };
 
@@ -72,6 +75,12 @@ namespace Mahjong.Controls
         /// <see cref="SoundVolumeSettings"/>; the player reads the value off this field and nothing else.
         /// </summary>
         public double SoundVolume { get; set; } = SoundVolumeSettings.Default;
+
+        /// <summary>
+        /// How loud the music under the table is (4.10): its own setting, on the same ladder, so a player
+        /// who wants the tiles and no tune can have exactly that.
+        /// </summary>
+        public double MusicVolume { get; set; } = MusicVolumeSettings.Default;
 
         /// <summary>
         /// The palette the interface is painted with. A name from <see cref="UiThemes.All"/>, not a set
@@ -139,6 +148,9 @@ namespace Mahjong.Controls
             if (RuleVariant.TryParse(Environment.GetEnvironmentVariable("MAHJONG_VARIANT")) is { } variant)
                 settings.Variant = variant;
 
+            if (UiProfiles.TryParse(Environment.GetEnvironmentVariable("MAHJONG_UI_PROFILE")) is { } profile)
+                settings.Profile = profile;
+
             var speedText = Environment.GetEnvironmentVariable("MAHJONG_BOT_SPEED");
             // Invariant culture: "0.5" must mean half speed even under a Russian locale, where the
             // comma is the decimal separator and TryParse would otherwise refuse the string.
@@ -168,6 +180,10 @@ namespace Mahjong.Controls
             // sound on, so a run that must stay quiet has to say so.
             var soundText = Environment.GetEnvironmentVariable("MAHJONG_SOUND");
             if (SoundVolumeSettings.TryParse(soundText) is { } volume) settings.SoundVolume = volume;
+
+            // MAHJONG_MUSIC=off silences the theme of a capture run; it is the same ladder as the sound.
+            var musicText = Environment.GetEnvironmentVariable("MAHJONG_MUSIC");
+            if (MusicVolumeSettings.TryParse(musicText) is { } music) settings.MusicVolume = music;
 
             // MAHJONG_THEME=ivory paints a capture run in the light palette and MAHJONG_UI_SCALE=1.15
             // draws the interface bigger; both are look settings, and nonsense keeps the default.

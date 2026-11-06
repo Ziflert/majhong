@@ -126,6 +126,41 @@ namespace Mahjong.PlayTests
         }
 
         [UnityTest]
+        public IEnumerator TheStudioProfileChangesCompositionWithoutChangingThePalette()
+        {
+            var game = Game();
+            yield return null;
+
+            var themeBefore = game.Settings.Theme;
+            var scaleBefore = game.Settings.UiScale;
+            var profileBefore = game.Settings.Profile;
+            try
+            {
+                game.Settings.Profile = UiProfiles.Studio;
+                game.PaintLook();
+                yield return null;
+
+                Assert.AreEqual(UiProfiles.Studio.Id, UiStyle.Profile.Id,
+                    "The Studio profile did not reach the live view.");
+                Assert.AreEqual(themeBefore.Id, UiStyle.Theme.Id,
+                    "Changing the composition profile unexpectedly changed the palette.");
+                Assert.Greater(UiStyle.Profile.RowSpacing, UiProfiles.Minimal.RowSpacing,
+                    "Studio did not add the promised breathing room between rows.");
+                Assert.Greater(UiStyle.Profile.ButtonSpacing, UiProfiles.Minimal.ButtonSpacing,
+                    "Studio did not separate action buttons from one another.");
+            }
+            finally
+            {
+                game.Settings.Theme = themeBefore;
+                game.Settings.UiScale = scaleBefore;
+                game.Settings.Profile = profileBefore;
+                game.PaintLook();
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator TheSizeRowDrawsTheInterfaceBigger()
         {
             var game = Game();

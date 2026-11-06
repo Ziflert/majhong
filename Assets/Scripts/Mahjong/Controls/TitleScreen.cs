@@ -51,7 +51,13 @@ namespace Mahjong.Controls
         Look = 18,
 
         /// <summary>How big the interface is drawn, one step of <see cref="UiThemeSettings.Scales"/>.</summary>
-        Scale = 19
+        Scale = 19,
+
+        /// <summary>4.10: how loud the music under the table is.</summary>
+        Music = 20,
+
+        /// <summary>Composition of the interface, independent from its palette.</summary>
+        Profile = 21
     }
 
     /// <summary>
@@ -103,7 +109,10 @@ namespace Mahjong.Controls
         /// Rows the panel draws; the main page uses them all, the load page never has more than
         /// <see cref="MaxSaves"/> saves plus "back".
         /// </summary>
-        public const int MaxRows = 18;
+        // Keep this in sync with MainRows: every visible row must have a collider. If the panel has
+        // fewer strips than the model, the lower settings appear to change selection but cannot be
+        // clicked, which is especially confusing on the welcome screen.
+        public const int MaxRows = 20;
 
         /// <summary>Saved games a single page can list; more than that would not fit the frame.</summary>
         public const int MaxSaves = 10;
@@ -114,8 +123,8 @@ namespace Mahjong.Controls
             TitleItem.NewGame, TitleItem.Continue, TitleItem.LoadGame,
             TitleItem.LocalGame, TitleItem.Multiplayer,
             TitleItem.Variant, TitleItem.Language, TitleItem.Level, TitleItem.Speed, TitleItem.Result,
-            TitleItem.Clock, TitleItem.Session, TitleItem.Seed, TitleItem.Sound,
-            TitleItem.Look, TitleItem.Scale,
+            TitleItem.Clock, TitleItem.Session, TitleItem.Seed, TitleItem.Sound, TitleItem.Music,
+            TitleItem.Look, TitleItem.Scale, TitleItem.Profile,
             TitleItem.Rules, TitleItem.Quit
         };
 
@@ -237,6 +246,16 @@ namespace Mahjong.Controls
                     var volume = SoundVolumeSettings.Step(settings.SoundVolume, delta);
                     if (volume == settings.SoundVolume) return false;
                     settings.SoundVolume = volume;
+                    return true;
+                case TitleItem.Music:
+                    var music = MusicVolumeSettings.Step(settings.MusicVolume, delta);
+                    if (music == settings.MusicVolume) return false;
+                    settings.MusicVolume = music;
+                    return true;
+                case TitleItem.Profile:
+                    var profile = UiProfiles.Step(settings.Profile, delta);
+                    if (profile.Id == settings.Profile.Id) return false;
+                    settings.Profile = profile;
                     return true;
                 case TitleItem.Look:
                     var theme = UiThemeSettings.Step(settings.Theme, delta);
@@ -369,7 +388,11 @@ namespace Mahjong.Controls
                     DealSeedSettings.Text(settings.Seed), TitleCommand.None, TitleRowState.Ready),
                 TitleItem.Sound => new TitleRow(item, Loc.Get("title.sound"),
                     SoundVolumeSettings.Text(settings.SoundVolume), TitleCommand.None, TitleRowState.Ready),
+                TitleItem.Music => new TitleRow(item, Loc.Get("title.music"),
+                    MusicVolumeSettings.Text(settings.MusicVolume), TitleCommand.None, TitleRowState.Ready),
                 TitleItem.Look => new TitleRow(item, Loc.Get("title.look"), settings.Theme.Name,
+                    TitleCommand.None, TitleRowState.Ready),
+                TitleItem.Profile => new TitleRow(item, Loc.Get("title.profile"), settings.Profile.Name,
                     TitleCommand.None, TitleRowState.Ready),
                 TitleItem.Scale => new TitleRow(item, Loc.Get("title.scale"),
                     UiThemeSettings.ScaleText(settings.UiScale), TitleCommand.None, TitleRowState.Ready),

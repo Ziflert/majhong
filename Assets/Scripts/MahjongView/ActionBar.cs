@@ -87,9 +87,10 @@ namespace Mahjong.Unity
             Fingerprint = prompt.Fingerprint;
             shownLanguage = Loc.Current;
 
-            var slot = Mathf.Min(MaxSlot, MaxWidth / prompt.Count);
-            var width = slot - Gap;
-            var total = prompt.Count * slot - Gap;
+            var gap = UiStyle.ButtonGap(Gap);
+            var slot = Mathf.Min(MaxSlot * UiStyle.Profile.ButtonSpacing, MaxWidth / prompt.Count);
+            var width = slot - gap;
+            var total = prompt.Count * slot - gap;
             for (var i = 0; i < prompt.Count; i++)
             {
                 var button = ActionButton.Create(transform, prompt.Options[i], width, ButtonHeight);

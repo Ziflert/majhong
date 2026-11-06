@@ -165,13 +165,33 @@ namespace Mahjong.Rules.Diagnostics
             report.Check(settings.SoundVolume < SoundVolumeSettings.Default,
                 "stepping the sound row makes the table quieter");
 
+            // The music (4.10): its own row, its own ladder, its own place under the sound of the table.
+            menu.Move(1);
+            report.Equal(MenuItem.Music, menu.Selected, "the seventh row is the music under the table");
+            report.Equal(MusicVolumeSettings.Text(settings.MusicVolume), menu.RowAt(6).Value,
+                "the music row shows the volume of the theme");
+            report.Check(MusicVolumeSettings.Default < SoundVolumeSettings.Default,
+                "the theme starts quieter than the sound of the table");
+            report.Check(menu.Adjust(-1), "the music row can be stepped");
+            report.Check(settings.MusicVolume < MusicVolumeSettings.Default,
+                "stepping the music row turns the theme down");
+            report.Check(menu.Adjust(1), "the music row can be stepped back up");
+            report.Equal(MusicVolumeSettings.Default, settings.MusicVolume, "the theme is back where it was");
+
+            // Interface profile: composition is separate from the palette.
+            var profileSteps = 0;
+            while (menu.Selected != MenuItem.Profile && profileSteps++ < GameMenu.TotalRows) menu.Move(1);
+            report.Equal(MenuItem.Profile, menu.Selected, "the profile has its own row");
+            report.Check(menu.Adjust(1), "the profile row can be stepped");
+            report.Equal("studio", settings.Profile.Id, "the profile row selects Studio");
+
             // Commands: the rows that open something say what they open. The look rows stand between
-            // the sound of the table and the commands, so the cursor walks over them.
+            // the music and the commands, so the cursor walks over them.
             menu.Move(3);
-            report.Equal(MenuCommand.Save, menu.Activate(), "the ninth row saves");
-            report.Equal(MenuCommand.Resume, menu.RowAt(9).Command, "the tenth row resumes");
-            report.Equal(MenuCommand.Review, menu.RowAt(10).Command, "the eleventh row opens the review");
-            report.Equal(MenuCommand.Rules, menu.RowAt(11).Command, "the twelfth row opens the rules");
+            report.Equal(MenuCommand.Save, menu.Activate(), "the eleventh row saves");
+            report.Equal(MenuCommand.Resume, menu.RowAt(11).Command, "the twelfth row resumes");
+            report.Equal(MenuCommand.Review, menu.RowAt(12).Command, "the thirteenth row opens the review");
+            report.Equal(MenuCommand.Rules, menu.RowAt(13).Command, "the fourteenth row opens the rules");
             menu.Move(4);
             report.Equal(MenuItem.Close, menu.Selected, "the last row closes the menu");
             report.Equal(MenuCommand.Close, menu.Activate(), "the last row asks to close");

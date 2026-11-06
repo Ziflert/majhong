@@ -173,8 +173,8 @@ namespace Mahjong.Unity
                 : MaxPanelHeight * 0.5f;
             var halfWidth = camera != null ? halfHeight * camera.aspect : MaxPanelWidth * 0.5f;
 
-            var width = Mathf.Min(MaxPanelWidth, halfWidth * 2f * FrameShare);
-            var height = Mathf.Min(MaxPanelHeight, halfHeight * 2f * FrameShare);
+            var width = Mathf.Min(MaxPanelWidth, halfWidth * 2f * FrameShare) * UiStyle.Profile.PanelWidth;
+            var height = Mathf.Min(MaxPanelHeight, halfHeight * 2f * FrameShare) * UiStyle.Profile.PanelHeight;
 
             background.transform.localScale = new Vector3(width, height, 1f);
 
@@ -194,7 +194,7 @@ namespace Mahjong.Unity
 
             for (var index = 0; index < rowColliders.Count; index++)
             {
-                var y = rowsTop - index * step;
+                var y = rowsTop - index * step * UiStyle.Profile.RowSpacing;
                 var box = rowColliders[index];
                 box.transform.localPosition = new Vector3(0f, y, 0f);
                 // The box is the whole strip, the plate a shade shorter: a click between two rows

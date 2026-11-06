@@ -210,6 +210,8 @@ namespace Mahjong.Localization
             Add("ui.rulesClosed", "Открыть правила — R", "Open the rules — R");
             Add("ui.language", "Язык", "Language");
             Add("ui.freeMode", "Свободная игра", "Free play");
+            Add("menu.profile", "Профиль интерфейса", "Interface profile");
+            Add("title.profile", "Профиль интерфейса", "Interface profile");
 
             // --------------------------------------------------------- on-screen controls
             // The tiles are narrow: the caption is the name alone and the hot key is printed in the
@@ -278,6 +280,7 @@ namespace Mahjong.Localization
             Add("menu.value.manual", "по кнопке", "on the button");
             Add("menu.value.seconds", "{0} с", "{0} s");
             Add("menu.sound", "Звук", "Sound");
+            Add("menu.music", "Музыка", "Music");
             Add("menu.look", "Тема", "Theme");
             Add("menu.scale", "Масштаб", "Size");
             Add("sound.off", "выкл", "off");
@@ -299,6 +302,7 @@ namespace Mahjong.Localization
             Add("title.session", "Длина партии", "Game length");
             Add("title.seed", "Сид раздачи", "Deal seed");
             Add("title.sound", "Звук", "Sound");
+            Add("title.music", "Музыка", "Music");
             Add("title.look", "Тема оформления", "Theme");
             Add("title.scale", "Масштаб интерфейса", "Interface size");
             Add("title.rules", "Справочник правил", "Rulebook");

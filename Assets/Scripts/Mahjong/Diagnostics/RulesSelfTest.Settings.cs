@@ -102,6 +102,20 @@ namespace Mahjong.Rules.Diagnostics
                     $"volume {volume} survives the file");
             }
 
+            foreach (var volume in MusicVolumeSettings.Steps)
+            {
+                settings.MusicVolume = volume;
+                report.Equal(volume, SettingsFile.Load(SettingsFile.Save(settings)).MusicVolume,
+                    $"music volume {volume} survives the file");
+            }
+
+            foreach (var profile in UiProfiles.All)
+            {
+                settings.Profile = profile;
+                report.Equal(profile.Id, SettingsFile.Load(SettingsFile.Save(settings)).Profile.Id,
+                    $"interface profile {profile.Id} survives the file");
+            }
+
             foreach (var theme in UiThemes.All)
             {
                 settings.Theme = theme;
@@ -137,7 +151,9 @@ namespace Mahjong.Rules.Diagnostics
                 Seed = 777,
                 LastSeed = 778,
                 SoundVolume = 0.25d,
+                MusicVolume = 0.75d,
                 Theme = UiThemes.Ivory,
+                Profile = UiProfiles.Studio,
                 UiScale = 1.3d
             };
             whole.SetSpeedIndex(4);
@@ -152,7 +168,9 @@ namespace Mahjong.Rules.Diagnostics
             report.Equal(777, read.Seed, "one file keeps the chosen seed");
             report.Equal(778, read.LastSeed, "one file keeps the last deal");
             report.Equal(0.25d, read.SoundVolume, "one file keeps the volume");
+            report.Equal(0.75d, read.MusicVolume, "one file keeps the music");
             report.Equal("ivory", read.Theme.Id, "one file keeps the palette");
+            report.Equal("studio", read.Profile.Id, "one file keeps the interface profile");
             report.Equal(1.3d, read.UiScale, "one file keeps the size");
         }
 
@@ -235,14 +253,15 @@ namespace Mahjong.Rules.Diagnostics
                 Variant = RuleVariant.Classic144,
                 Level = BotLevel.Fast,
                 ClockPace = ClockPace.Unlimited,
-                SoundVolume = 1d
+                SoundVolume = 1d,
+                MusicVolume = 0d
             };
             chosen.SetSpeedIndex(0);
 
             var names = new[]
             {
                 "MAHJONG_LANG", "MAHJONG_THEME", "MAHJONG_UI_SCALE", "MAHJONG_VARIANT", "MAHJONG_BOT_LEVEL",
-                "MAHJONG_BOT_SPEED", "MAHJONG_CLOCK", "MAHJONG_SOUND"
+                "MAHJONG_BOT_SPEED", "MAHJONG_CLOCK", "MAHJONG_SOUND", "MAHJONG_MUSIC"
             };
             var previous = names.ToDictionary(name => name, Environment.GetEnvironmentVariable);
             try
@@ -259,6 +278,7 @@ namespace Mahjong.Rules.Diagnostics
                 report.Equal(0.25d, fromFile.Speed, "without MAHJONG_BOT_SPEED the file's speed stands");
                 report.Equal(ClockPace.Unlimited, fromFile.ClockPace, "without MAHJONG_CLOCK the file's windows stand");
                 report.Equal(1d, fromFile.SoundVolume, "without MAHJONG_SOUND the file's volume stands");
+                report.Equal(0d, fromFile.MusicVolume, "without MAHJONG_MUSIC the file's theme stands");
 
                 // Every variable set: the capture run wins.
                 Environment.SetEnvironmentVariable("MAHJONG_LANG", "ru");
@@ -269,6 +289,7 @@ namespace Mahjong.Rules.Diagnostics
                 Environment.SetEnvironmentVariable("MAHJONG_BOT_SPEED", "2");
                 Environment.SetEnvironmentVariable("MAHJONG_CLOCK", "rules");
                 Environment.SetEnvironmentVariable("MAHJONG_SOUND", "off");
+                Environment.SetEnvironmentVariable("MAHJONG_MUSIC", "50%");
 
                 var fromRun = GameSettings.FromEnvironment(BotLevel.Strategic, SettingsFile.Load(SettingsFile.Save(chosen)));
                 report.Equal(Language.Ru, fromRun.Language, "MAHJONG_LANG beats the file");
@@ -279,6 +300,7 @@ namespace Mahjong.Rules.Diagnostics
                 report.Equal(2d, fromRun.Speed, "MAHJONG_BOT_SPEED beats the file");
                 report.Equal(ClockPace.Rules, fromRun.ClockPace, "MAHJONG_CLOCK beats the file");
                 report.Equal(0d, fromRun.SoundVolume, "MAHJONG_SOUND beats the file");
+                report.Equal(0.5d, fromRun.MusicVolume, "MAHJONG_MUSIC beats the file");
 
                 // A broken variable is not "set to nothing": the file keeps its value.
                 Environment.SetEnvironmentVariable("MAHJONG_THEME", "какая-то тема");

@@ -74,7 +74,7 @@ namespace Mahjong.Unity
         /// How big a corner is on screen, in world units before the interface size is applied. It stays
         /// the same whatever the plate is: corner radius is a property of the look, not of the panel.
         /// </summary>
-        public const float Corner = 0.0075f;
+        public static float Corner => 0.0075f * UiStyle.Profile.Corner;
 
         private static readonly Dictionary<UiSkin, Texture2D> textures = new();
         private static readonly Dictionary<UiSkin, Material> materials = new();
@@ -129,7 +129,7 @@ namespace Mahjong.Unity
                 UiStyle.Of(UiRole.Border, 0.25f)),
             UiSkin.Accent => (UiStyle.Of(UiRole.Accent), Color.clear),
             UiSkin.Scrim => (UiStyle.Of(UiRole.Background, 0.55f), Color.clear),
-            _ => (new Color(0f, 0f, 0f, 0.55f), Color.clear)
+            _ => (new Color(0f, 0f, 0f, 0.55f * UiStyle.Profile.Shadow), Color.clear)
         };
 
         /// <summary>

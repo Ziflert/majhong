@@ -2077,7 +2077,8 @@ namespace Mahjong.Unity
             if (sound != null) sound.ApplyMusic(settings.MusicVolume);
             // 8.10: the palette and the size are the same kind of setting: stepped, they show at once.
             if (UiStyle.Theme.Id != settings.Theme.Id ||
-                System.Math.Abs(UiStyle.Scale - (float)settings.UiScale) > 0.0001f)
+                UiStyle.Profile.Id != settings.Profile.Id ||
+                System.Math.Abs(UiStyle.Scale - (float)settings.UiScale * settings.Profile.Density) > 0.0001f)
                 PaintLook();
             RefreshResultTexts();
             // 8.11: every step of a setting is written down, so the choice outlives the run.

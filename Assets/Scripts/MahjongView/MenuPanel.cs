@@ -149,8 +149,8 @@ namespace Mahjong.Unity
                 : MaxPanelHeight * 0.5f;
             var halfWidth = camera != null ? halfHeight * camera.aspect : MaxPanelWidth * 0.5f;
 
-            var width = Mathf.Min(MaxPanelWidth, halfWidth * 2f * FrameShare);
-            var height = Mathf.Min(MaxPanelHeight, halfHeight * 2f * FrameShare);
+            var width = Mathf.Min(MaxPanelWidth, halfWidth * 2f * FrameShare) * UiStyle.Profile.PanelWidth;
+            var height = Mathf.Min(MaxPanelHeight, halfHeight * 2f * FrameShare) * UiStyle.Profile.PanelHeight;
 
             background.transform.localScale = new Vector3(width, height, 1f);
             title.transform.localPosition = new Vector3(0f, height * 0.5f - 0.018f, -0.0009f);
@@ -159,7 +159,7 @@ namespace Mahjong.Unity
             var rowWidth = Mathf.Min(RowWidth, width * 0.94f);
             for (var index = 0; index < rowColliders.Count; index++)
             {
-                var y = FirstRowY - index * RowStep;
+                var y = FirstRowY * UiStyle.Profile.PanelHeight - index * UiStyle.Row(RowStep);
                 var box = rowColliders[index];
                 box.transform.localPosition = new Vector3(0f, y, 0f);
                 // The box is the whole pitch of the list: a click in the gap between two rows lands

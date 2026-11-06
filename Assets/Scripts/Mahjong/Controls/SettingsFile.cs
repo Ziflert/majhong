@@ -41,7 +41,7 @@ namespace Mahjong.Controls
         public static readonly IReadOnlyList<string> Keys = new[]
         {
             "rules", "language", "bots", "speed", "result", "clock", "session", "seed", "last_seed",
-            "sound", "theme", "scale"
+            "sound", "music", "profile", "theme", "scale"
         };
 
         /// <summary>The settings file of a folder: <c>&lt;folder&gt;/settings.txt</c>.</summary>
@@ -73,6 +73,8 @@ namespace Mahjong.Controls
             text.Append("seed=").AppendLine(settings.Seed.ToString(CultureInfo.InvariantCulture));
             text.Append("last_seed=").AppendLine(settings.LastSeed.ToString(CultureInfo.InvariantCulture));
             text.Append("sound=").AppendLine(SoundVolumeSettings.Text(settings.SoundVolume));
+            text.Append("music=").AppendLine(MusicVolumeSettings.Text(settings.MusicVolume));
+            text.Append("profile=").AppendLine(settings.Profile.Id);
             text.Append("theme=").AppendLine(settings.Theme.Id);
             text.Append("scale=").AppendLine(UiThemeSettings.ScaleText(settings.UiScale));
             return text.ToString();
@@ -227,6 +229,12 @@ namespace Mahjong.Controls
                     break;
                 case "sound":
                     if (SoundVolumeSettings.TryParse(value) is { } volume) settings.SoundVolume = volume;
+                    break;
+                case "music":
+                    if (MusicVolumeSettings.TryParse(value) is { } music) settings.MusicVolume = music;
+                    break;
+                case "profile":
+                    if (UiProfiles.TryParse(value) is { } profile) settings.Profile = profile;
                     break;
                 case "theme":
                     if (UiThemeSettings.TryParseTheme(value) is { } theme) settings.Theme = theme;

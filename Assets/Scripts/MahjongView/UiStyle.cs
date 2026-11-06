@@ -16,14 +16,18 @@ namespace Mahjong.Unity
     public static class UiStyle
     {
         private static UiTheme theme = UiThemes.Default;
+        private static UiProfile profile = UiProfiles.Default;
         private static float scale = 1f;
         private static int revision;
 
         /// <summary>The palette in effect.</summary>
         public static UiTheme Theme => theme;
 
+        /// <summary>The composition profile in effect.</summary>
+        public static UiProfile Profile => profile;
+
         /// <summary>The size factor in effect; layout numbers are written for 100%.</summary>
-        public static float Scale => scale;
+        public static float Scale => scale * profile.Density;
 
         /// <summary>Goes up whenever the look changes, so a panel can tell it has to repaint itself.</summary>
         public static int Revision => revision;
@@ -31,18 +35,25 @@ namespace Mahjong.Unity
         /// <summary>Puts a palette and a size in effect; every panel reads them on its next repaint.</summary>
         public static void Apply(UiTheme? next, double uiScale)
         {
+            Apply(UiProfiles.Default, next, uiScale);
+        }
+
+        public static void Apply(UiProfile? nextProfile, UiTheme? next, double uiScale)
+        {
             var palette = next ?? UiThemes.Default;
+            var nextProfileValue = nextProfile ?? UiProfiles.Default;
             var factor = (float)UiThemeSettings.ClampScale(uiScale);
-            if (palette.Id == theme.Id && Mathf.Abs(factor - scale) < 0.0001f) return;
+            if (palette.Id == theme.Id && nextProfileValue.Id == profile.Id && Mathf.Abs(factor - scale) < 0.0001f) return;
 
             theme = palette;
+            profile = nextProfileValue;
             scale = factor;
             revision++;
             UiSkins.Forget(); // the baked skins belong to the palette that was in effect
         }
 
         /// <summary>Puts the look of these settings in effect.</summary>
-        public static void Apply(GameSettings settings) => Apply(settings.Theme, settings.UiScale);
+        public static void Apply(GameSettings settings) => Apply(settings.Profile, settings.Theme, settings.UiScale);
 
         /// <summary>The colour of a role in the palette in effect.</summary>
         public static Color Of(UiRole role) => ToColor(theme.Of(role));
@@ -61,6 +72,18 @@ namespace Mahjong.Unity
 
         /// <summary>A length scaled for the interface size the player chose.</summary>
         public static float S(float value) => value * scale;
+
+        /// <summary>A composition-specific panel length, kept separate from text scaling.</summary>
+        public static float Panel(float value) => value * profile.PanelWidth;
+
+        /// <summary>A composition-specific vertical length.</summary>
+        public static float PanelHeight(float value) => value * profile.PanelHeight;
+
+        /// <summary>Spacing between rows in a modal list.</summary>
+        public static float Row(float value) => value * profile.RowSpacing;
+
+        /// <summary>Spacing between action buttons.</summary>
+        public static float ButtonGap(float value) => value * profile.ButtonSpacing;
 
         /// <summary>Mixes two colours, 0 keeping <paramref name="from"/> and 1 giving <paramref name="to"/>.</summary>
         public static Color Mix(Color from, Color to, float t)
