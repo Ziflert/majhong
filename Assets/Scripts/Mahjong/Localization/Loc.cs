@@ -46,16 +46,25 @@ namespace Mahjong.Localization
         public static Language PreferredLanguage => FromEnvironment();
 
         /// <summary>Language chosen by the environment, Russian unless MAHJONG_LANG says otherwise.</summary>
-        private static Language FromEnvironment()
+        private static Language FromEnvironment() => TryParseLanguage(Environment.GetEnvironmentVariable("MAHJONG_LANG")) ?? Language.Ru;
+
+        /// <summary>
+        /// A language from text: <c>ru</c>, <c>en</c>, or the language's own name. Null when the text
+        /// means nothing, so a broken <c>MAHJONG_LANG</c> or a strange settings file keeps the default.
+        /// </summary>
+        public static Language? TryParseLanguage(string? raw)
         {
-            var raw = Environment.GetEnvironmentVariable("MAHJONG_LANG");
-            if (string.IsNullOrWhiteSpace(raw)) return Language.Ru;
-            return raw.Trim().ToLowerInvariant() switch
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            return raw!.Trim().ToLowerInvariant() switch
             {
                 "en" or "english" or "eng" => Language.En,
-                _ => Language.Ru
+                "ru" or "russian" or "rus" or "русский" => Language.Ru,
+                _ => null
             };
         }
+
+        /// <summary>The language as the settings file writes it: <c>ru</c> or <c>en</c>.</summary>
+        public static string LanguageId(Language language) => language == Language.En ? "en" : "ru";
 
         /// <summary>Flips the interface language; returns the language that is now in effect.</summary>
         public static Language Toggle()

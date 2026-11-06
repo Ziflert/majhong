@@ -115,15 +115,29 @@ namespace Mahjong.Controls
         /// language, a bot level and a bot speed without touching the scene. Values that make no sense
         /// are ignored instead of crashing the table: a wrong variable must not stop the game from
         /// starting.
+        ///
+        /// <paramref name="basis"/> is what sits under the environment — the settings read from the
+        /// player's file (8.11). A variable that is not set then leaves the file's value alone; without
+        /// a basis the fresh table's own defaults apply.
         /// </summary>
-        public static GameSettings FromEnvironment(BotLevel fallbackLevel = BotLevel.Strategic)
+        public static GameSettings FromEnvironment(BotLevel fallbackLevel = BotLevel.Strategic,
+            GameSettings? basis = null)
         {
-            var settings = new GameSettings
+            var settings = basis ?? new GameSettings
             {
                 Language = Loc.PreferredLanguage,
-                Level = FromLevelText(Environment.GetEnvironmentVariable("MAHJONG_BOT_LEVEL")) ?? fallbackLevel,
-                Variant = RuleVariant.Parse(Environment.GetEnvironmentVariable("MAHJONG_VARIANT"))
+                Level = fallbackLevel
             };
+
+            // MAHJONG_LANG=ru switches a capture run; a file that already holds a language keeps it.
+            if (Loc.TryParseLanguage(Environment.GetEnvironmentVariable("MAHJONG_LANG")) is { } language)
+                settings.Language = language;
+
+            if (FromLevelText(Environment.GetEnvironmentVariable("MAHJONG_BOT_LEVEL")) is { } level)
+                settings.Level = level;
+
+            if (RuleVariant.TryParse(Environment.GetEnvironmentVariable("MAHJONG_VARIANT")) is { } variant)
+                settings.Variant = variant;
 
             var speedText = Environment.GetEnvironmentVariable("MAHJONG_BOT_SPEED");
             // Invariant culture: "0.5" must mean half speed even under a Russian locale, where the

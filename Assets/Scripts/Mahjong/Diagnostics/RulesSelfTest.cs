@@ -95,6 +95,7 @@ namespace Mahjong.Rules.Diagnostics
             TitleGroups(report);
             SoundGroups(report);
             LookGroups(report);
+            SettingsGroups(report);
 
             return report;
         }

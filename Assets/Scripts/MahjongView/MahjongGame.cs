@@ -358,6 +358,12 @@ namespace Mahjong.Unity
         /// <summary>The opening beat the table has already sounded; empty after the deal (4.10).</summary>
         private OpeningStep? openingStep;
 
+        /// <summary>
+        /// The settings as they were last written to the file (8.11). Compared before every save so a
+        /// step that changed nothing does not touch the disk.
+        /// </summary>
+        private string savedSettingsText = string.Empty;
+
         private float nextBotAction;
         private bool waitingForNextHand;
 
@@ -383,7 +389,10 @@ namespace Mahjong.Unity
         {
             // Language, bot strength and bot speed have one place where they are parsed (GameSettings);
             // everything below builds its captions from Loc, so the language is set before the scene.
-            settings = GameSettings.FromEnvironment(InspectorLevel());
+            // The order is defaults → the player's file (8.11) → MAHJONG_*: a capture run still wins,
+            // and a player who chose a palette and a volume finds them again next time.
+            settings = GameSettings.FromEnvironment(InspectorLevel(), SettingsFile.Read(SettingsPath()));
+            savedSettingsText = SettingsFile.Save(settings);
             Loc.Current = settings.Language;
             // The palette and the size of the interface (8.10) are one place: every panel and the
             // table itself ask UiStyle for a colour instead of writing one, so they are set before the
@@ -417,6 +426,7 @@ namespace Mahjong.Unity
         {
             gameSeed = seed;
             settings.LastSeed = seed;
+            PersistSettings();
             dealRandom = new System.Random(seed);
             firstDealPending = true;
             bots = CreateBots(settings.Level, seed);
@@ -1113,6 +1123,7 @@ namespace Mahjong.Unity
         public void QuitGame()
         {
             SaveReplay();
+            PersistSettings();
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
 #else
@@ -1646,6 +1657,50 @@ namespace Mahjong.Unity
                 : directory;
         }
 
+        // ------------------------------------------------------------- settings (8.11)
+
+        /// <summary>
+        /// Where the player's settings live: <c>settings.txt</c> in the player data, next to the saves.
+        /// MAHJONG_SETTINGS names the file itself, which is how a capture run or a play-mode test keeps
+        /// away from the settings of whoever is playing.
+        /// </summary>
+        public static string SettingsPath()
+        {
+            var forced = System.Environment.GetEnvironmentVariable("MAHJONG_SETTINGS");
+            return string.IsNullOrWhiteSpace(forced)
+                ? SettingsFile.PathIn(Application.persistentDataPath)
+                : forced;
+        }
+
+        /// <summary>
+        /// Writes the settings out so the next run opens the table as this one was left: the palette,
+        /// the size, the volume, the language, the bots, the windows, the length of the session and the
+        /// seed of the last deal. Truthful about failure: false and a warning when the file cannot be
+        /// written, because a lost settings file must not stop a game.
+        /// </summary>
+        public bool SaveSettings()
+        {
+            var path = SettingsPath();
+            if (SettingsFile.Write(path, settings))
+            {
+                savedSettingsText = SettingsFile.Save(settings);
+                return true;
+            }
+
+            Debug.LogWarning($"[settings] the settings could not be written to {path}");
+            return false;
+        }
+
+        /// <summary>
+        /// Writes the settings if they differ from what is already on disk. Called after every step of a
+        /// setting, when a session begins (the last deal is a setting of its own) and on the way out.
+        /// </summary>
+        private void PersistSettings()
+        {
+            if (SettingsFile.Save(settings) == savedSettingsText) return;
+            SaveSettings();
+        }
+
         /// <summary>The most recently written save, or an empty path when there is none.</summary>
         private static string NewestSave() => SaveSlots.Newest(SaveDirectory());
 
@@ -1863,6 +1918,8 @@ namespace Mahjong.Unity
                 System.Math.Abs(UiStyle.Scale - (float)settings.UiScale) > 0.0001f)
                 PaintLook();
             RefreshResultTexts();
+            // 8.11: every step of a setting is written down, so the choice outlives the run.
+            PersistSettings();
         }
 
         /// <summary>
@@ -2087,8 +2144,12 @@ namespace Mahjong.Unity
             return string.IsNullOrWhiteSpace(forced) ? NewestSave() : forced;
         }
 
-        /// <summary>The session is saved on the way out: a game interrupted mid-hand is still reviewable.</summary>
-        private void OnApplicationQuit() => SaveReplay();
+        /// <summary>The session and the settings are saved on the way out: nothing chosen is lost.</summary>
+        private void OnApplicationQuit()
+        {
+            SaveReplay();
+            PersistSettings();
+        }
 
         // ---------------------------------------------------------------- view
 

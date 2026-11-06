@@ -4,10 +4,10 @@
 Постоянные записи — `docs/journal.md` (вехи), `docs/plan.md` (что сделано), `docs/rules-status.md`,
 `docs/unity-layer.md`, трактовки классики — `docs/rules-classic.md`. Здесь — только «где мы стоим».
 
-**Обновлён:** 2026-11-06, веха «интерфейс берёт цвет из палитры (8.10)».
+**Обновлён:** 2026-11-06, веха «настройки стола переживают выход из игры (8.11)».
 Код вехи закоммичен одним коммитом. `UI/` и `docs/ui-design.md` по-прежнему не в git (черновик UGUI,
-решения нет; в нём ссылки на TMP, которого в проекте нет). Новая палитра и плитки сделаны в текущем
-слое (`MahjongView`, `TextMesh`), а не по этому черновику.
+решения нет; в нём ссылки на TMP, которого в проекте нет). Палитры, плитки и файл настроек сделаны
+в текущем слое (`Controls/` + `MahjongView`, `TextMesh`), а не по этому черновику.
 
 ---
 
@@ -17,10 +17,10 @@
 **У-2** (приветственный экран, 4.16), **У-3** (комбинации по кадру), **У-5** (справочник),
 **У-6** (панель экранных кнопок), **У-7** (экран конца руки), **У-11** (стена не открывается до
 раздачи). Плюс профиль правил (1.13, 1.14, 2.18–2.22), стена из 18 стопок (4.8.1), справочник-книга
-(4.12.1), длина партии и сид (8.7), звук стола (4.10) и вид интерфейса (8.10, частично).
-Дальше по плану — настройки на диск (8.11), остаток 8.10 (масштаб страниц, отдельные поля сукна
-и рубашки), остаток 4.10 (звуки интерфейса, музыка), У-8, этап 3 профиля (Просящая рука, пенальти,
-лимитированные руки, 136 костей).
+(4.12.1), длина партии и сид (8.7), звук стола (4.10), вид интерфейса (8.10, частично)
+и файл настроек (8.11).
+Дальше по плану — остаток 8.10 (масштаб страниц), остаток 4.10 (звуки интерфейса, музыка), У-8,
+этап 3 профиля (Просящая рука, пенальти, лимитированные руки, 136 костей).
 
 ---
 
@@ -28,9 +28,9 @@
 
 | Проверка | Когда | Результат | Файл результатов |
 |---|---|---|---|
-| `Tools/RulesCheck` | 2026-11-06 | **OK — 85 групп, 123 423 проверки** | stdout |
+| `Tools/RulesCheck` | 2026-11-06 | **OK — 89 групп, 123 555 проверок** | stdout |
 | Unity EditMode | 2026-11-06 | **13/13 Passed** | `Logs/editmode-results.xml` |
-| Unity PlayMode | 2026-11-06 | **67/67 Passed** | `Logs/playmode-results.xml` |
+| Unity PlayMode | 2026-11-06 | **69/69 Passed** | `Logs/playmode-results.xml` |
 | `InterfaceCapture` | 2026-11-06 | `welcome` (18 строк), `welcome-ivory`, `opening-dice`, `table-overview`, `controls-panel`, `rules-panel`, `rules-page`, `rules-fans`, `free-play`, `table-midgame` пересняты | `Screenshots/*.png` |
 
 Кадры `melds.png`, `menu-panel.png`, `result-screen.png`, `replay-review.png` — **от 2026-11-05**,
@@ -75,6 +75,17 @@ MAHJONG_SHOT_DIR=D:/Temprary/game/Screenshots MAHJONG_RESULT_DELAY=0 \
 | `Editor/InterfaceCapture.cs` | Шаг `welcome-ivory` (`MAHJONG_THEME` не нужен: палитра ставится в прогоне и возвращается перед следующим шагом) |
 | Индексы строк | `RulesSelfTest.Menu.cs` (save 6 → 8, resume 9, review 10, rules 11), `RulesSelfTest.Title.cs` (16 → 18 строк), `PlayMode/MenuTests.cs` (rules 9 → 11, review 8 → 10), `PlayMode/ControlsPanelTests.cs` (скины вместо удалённых `ControlTile.DisabledColour`) |
 
+### Что сделано в этой вехе (8.11, файл настроек)
+
+| Файл | Что сделано |
+|---|---|
+| `Controls/SettingsFile.cs` | Формат `settings.txt` (`Version = 1`, `FileName`, `Keys`), `Save` (текст из `GameSettings`), `Load`/`Apply` (текст → настройки, неизвестные и битые строки пропускаются), `Read` (файла нет / файл битый → свежий стол), `Write`/`WriteText` (создаёт папку, пишет через временный файл и `File.Replace`, отказ вместо исключения) |
+| `Controls/GameSettings.cs` | `FromEnvironment(level, basis)` — переменные ложатся на основу (файл); незаданная или битая переменная больше не затирает значение файла (`MAHJONG_VARIANT`, `MAHJONG_LANG` читаются через `TryParse`) |
+| `Localization/Loc.cs` | `TryParseLanguage` (`ru`/`ru-RU`/`russian`/`русский`, `en`/`english`) и `LanguageId` — файл пишет `ru`/`en`; `MAHJONG_LANG` разбирается тем же методом |
+| `MahjongView/MahjongGame.cs` | `SettingsPath()` (`MAHJONG_SETTINGS` или `persistentDataPath/settings.txt`), `SaveSettings()`, `PersistSettings()` (пишет только если текст отличается от последнего записанного); чтение файла в `Start` до `UiStyle.Apply`; запись из `ApplySettings`, `BeginSession` и `OnApplicationQuit`/`QuitGame` |
+| `Diagnostics/RulesSelfTest.Settings.cs` | Группы `settings: the file keeps the table as the player left it`, `settings: a line that makes no sense keeps the default`, `settings: the environment sits on top of the file`, `settings: a missing or unreadable file gives a fresh table` |
+| `Tests/PlayMode/SettingsTests.cs` | `TheChoiceOnTheScreenReachesTheFile` (шаг строки палитры пишет файл; второй `SaveSettings` дописывает размер), `TheFileOpensTheNextRunAsTheLastOneWasLeft` (файл + `GameSettings.FromEnvironment` дают ту же палитру, размер, тишину, язык, правила, темп) |
+
 ### Что осталось по 8.10
 
 Палитры живут в коде (`UiThemes`), `ScriptableObject`-настроек вида нет — это осознанно.
@@ -86,12 +97,10 @@ MAHJONG_SHOT_DIR=D:/Temprary/game/Screenshots MAHJONG_RESULT_DELAY=0 \
 
 ## Следующее по плану
 
-1. **8.11 настройки на диск.** Выбор на приветственном экране и в меню (язык, боты, звук, тема,
-   размер, правила, длина партии, сид) живёт только в памяти и в `MAHJONG_*`; нужен файл рядом
-   с сохранениями (`persistentDataPath`), формат версионировать.
-2. **Остаток 8.10:** масштаб страниц, отдельные поля сукна и рубашки.
-3. **Остаток 4.10:** звуки интерфейса (меню, справочник, панель действий), музыка.
-4. **У-8** (переосмыслить свободный стол).
+1. **Остаток 4.10:** звуки интерфейса (меню, справочник, панель действий), музыка — ещё одна
+   строка в `settings.txt` и одна лестница рядом с громкостью.
+2. **Остаток 8.10:** масштаб страниц (справочник, меню, результат), отдельные поля сукна и рубашки.
+3. **У-8** (переосмыслить свободный стол).
 5. **Этап 3 профиля:** Просящая рука, пенальти «заплатил за всех», 14 лимитированных рук,
    набор 136 костей.
 6. **З-2/З-3:** эталонные руки MCR (21/24 сейчас), формулировка про «24/24» (У-10).
@@ -111,9 +120,12 @@ MAHJONG_SHOT_DIR=D:/Temprary/game/Screenshots MAHJONG_RESULT_DELAY=0 \
 | `Replay/SessionLog.cs`, `SessionRestore.cs` | Строка `rules=<id>` в сейве; старые файлы читаются спортивными; `limit=0` — партия без часов |
 | `Controls/SessionLength.cs`, `Controls/DealSeed.cs` | Длина партии (150 / 90 / 60 / 30 / без часов) и сид раздачи (8.7) |
 
-## Что где лежит по виду интерфейса (8.10)
+## Что где лежит по настройкам и виду интерфейса (8.10, 8.11)
 
 | Файл | Что делает |
+|---|---|
+| `Controls/GameSettings.cs` | Все поля настроек стола и разбор `MAHJONG_*`; `FromEnvironment(level, basis)` — основа из файла |
+| `Controls/SettingsFile.cs` | Файл настроек: формат, чтение, атомарная запись
 |---|---|
 | `Controls/UiTheme.cs` | Роли, палитры, размеры: проверяется headless, Unity не знает |
 | `MahjongView/UiStyle.cs` | Роль → `Color`, размер → коэффициент, `Revision` как сигнал «перерисуйся» |
