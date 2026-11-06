@@ -47,7 +47,7 @@ namespace Mahjong.Unity
             hud.wall = hud.CreateCard("WallCounter", TextAnchor.UpperCenter, 0.00135f);
             hud.time = hud.CreateCard("SessionClock", TextAnchor.UpperRight, 0.00135f);
             hud.rules = hud.CreateCard("RuleBadge", TextAnchor.UpperLeft, 0.0011f);
-            hud.hint = hud.CreateCard("HintBar", TextAnchor.MiddleCenter, 0.0019f);
+            hud.hint = hud.CreateCard("HintBar", TextAnchor.MiddleCenter, 0.00155f);
             hud.notice = hud.CreateCard("Notice", TextAnchor.UpperCenter, 0.0013f);
             hud.debug = hud.CreateCard("DebugPanel", TextAnchor.UpperLeft, 0.0011f);
             for (var i = 0; i < hud.players.Length; i++)
@@ -123,7 +123,9 @@ namespace Mahjong.Unity
                 : Loc.Format("hud.secondsNone", Text.ClockLabel(clock.Window)));
             if (state.IsWinForbidden(humanSeat))
                 prompt += "\n" + Loc.Format("hud.huForbidden", state.WinForbiddenReason(humanSeat));
-            Set(hint, prompt, 0f, -halfHeight + 0.052f, humanTurn ? UiRole.Accent : UiRole.TextMain);
+            // Keep the hint above the hand and below the table center; the previous position
+            // made the two-line clock prompt cover the player's tiles on 1080p.
+            Set(hint, prompt, 0f, -halfHeight + 0.105f, humanTurn ? UiRole.Accent : UiRole.TextMain);
 
             for (var seat = 0; seat < players.Length; seat++)
             {
