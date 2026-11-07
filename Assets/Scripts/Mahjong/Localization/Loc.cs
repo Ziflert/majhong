@@ -129,9 +129,20 @@ namespace Mahjong.Localization
                 "1-9 — an action, R — rules, F — free play, V — review, Esc — menu, F5 — save, F9 — resume");
             Add("hud.waiting", "Ход игрока {0}", "Waiting for player {0}");
             Add("hud.wall", "В стене: {0}", "Wall: {0}");
+            Add("hud.wallCaption", "В стене:", "Wall:");
+            Add("hud.secondsShort", "{0} с", "{0} s");
+            Add("hud.noLimit", "без ограничения", "no limit");
             Add("hud.rules", "Правила: {0}", "Rules: {0}");
             Add("hud.dice", "Кубики {0}, бросал {1} · разрыв после {2}-й стопки",
                 "Dice {0}, thrown by {1} · break after stack {2}");
+            Add("hud.diceThrow", "Бросок: {0}", "Throw: {0}");
+            Add("hud.breakAfter", "Разрыв после {0}-й стопки", "Break after stack {0}");
+            Add("hud.youSeat", "Вы · {0}", "You · {0}");
+            Add("hud.dealerLetter", "Д", "D");
+            Add("hud.btn.rules", "Правила", "Rules");
+            Add("hud.btn.pause", "Пауза", "Pause");
+            Add("hud.btn.review", "Просмотр", "Review");
+            Add("hud.btn.save", "Сохранить", "Save");
             Add("hud.points", "Очки: {0}", "Points: {0}");
             Add("hud.clock", "Часы: {0} / {1}", "Clock: {0} / {1}");
             Add("hud.timeUp", "время истекло", "time is up");

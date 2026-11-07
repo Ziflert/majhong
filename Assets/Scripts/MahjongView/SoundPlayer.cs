@@ -12,6 +12,9 @@ namespace Mahjong.Unity
     ///
     /// One-shot playback, not <c>Play</c>: the dice rattle while the deal starts, and a discard can land
     /// inside the win chime — sounds of a table overlap, so they mix instead of cutting each other off.
+    ///
+    /// The theme is the exception (4.10): it is one clip played in a loop on a source of its own, with a
+    /// volume of its own, so a player can keep the tiles and drop the music.
     /// </summary>
     public sealed class SoundPlayer : MonoBehaviour
     {
@@ -22,8 +25,10 @@ namespace Mahjong.Unity
         private const int History = 128;
 
         private AudioSource source = null!;
+        private AudioSource theme = null!;
         private readonly Dictionary<SoundCue, AudioClip> clips = new();
         private readonly List<SoundCue> played = new();
+        private AudioClip? themeClip;
 
         /// <summary>Volume the table was built with; the settings field is the only thing that changes it.</summary>
         public double Volume { get; private set; } = SoundVolumeSettings.Default;
@@ -46,6 +51,27 @@ namespace Mahjong.Unity
         /// <summary>Forgets the cues that have sounded; a test reads the history one window at a time.</summary>
         public void ForgetPlayed() => played.Clear();
 
+        /// <summary>The theme the table plays under everything else.</summary>
+        public MusicTrack Track => MusicTracks.Default;
+
+        /// <summary>How loud the theme is: a setting of its own, not a share of <see cref="Volume"/>.</summary>
+        public double MusicVolume { get; private set; } = MusicVolumeSettings.Default;
+
+        /// <summary>True while the theme is meant to be heard: the setting is not silence and it plays.</summary>
+        public bool MusicOn { get; private set; }
+
+        /// <summary>True when the music setting is silence.</summary>
+        public bool IsMusicMuted => MusicVolumeSettings.IsMuted(MusicVolume);
+
+        /// <summary>The theme source volume as Unity sees it; the tests compare it with the setting.</summary>
+        public double AppliedMusicVolume => theme != null ? theme.volume : 0d;
+
+        /// <summary>The theme as a clip, rendered on first use and kept for the session.</summary>
+        public AudioClip? MusicClip => themeClip ??= MakeClip(Track, "music-" + Track.Id);
+
+        /// <summary>True when Unity itself says the theme source is playing (not read in batch mode).</summary>
+        public bool IsMusicPlaying => theme != null && theme.isPlaying;
+
         /// <summary>The audio source volume as Unity sees it; the tests compare it with the setting.</summary>
         public double AppliedVolume => source != null ? source.volume : 0d;
 
@@ -62,6 +88,16 @@ namespace Mahjong.Unity
             player.source.spatialBlend = 0f;
             player.source.volume = (float)player.Volume;
 
+            // The theme sits on a source of its own: it loops, it is never one-shot, and its volume is
+            // a setting the table volume must not overwrite.
+            var themeHost = new GameObject("Music");
+            themeHost.transform.SetParent(host.transform, false);
+            player.theme = themeHost.AddComponent<AudioSource>();
+            player.theme.playOnAwake = false;
+            player.theme.loop = true;
+            player.theme.spatialBlend = 0f;
+            player.theme.volume = (float)player.MusicVolume;
+
             // A scene built code-first has no listener; without one Unity plays nothing and says so
             // once per clip. The camera of a real scene usually ships with one, and then ours is skipped.
             if (FindAnyObjectByType<AudioListener>() == null) host.AddComponent<AudioListener>();
@@ -74,6 +110,53 @@ namespace Mahjong.Unity
         {
             Volume = SoundVolumeSettings.Clamp(volume);
             if (source != null) source.volume = (float)Volume;
+        }
+
+        /// <summary>
+        /// Sets the volume of the theme. Silence stops it rather than playing it at zero: a muted loop
+        /// still burns a mixer channel and still asks Unity for a clip.
+        /// </summary>
+        public void ApplyMusic(double volume)
+        {
+            MusicVolume = MusicVolumeSettings.Clamp(volume);
+            if (theme == null) return;
+            theme.volume = (float)MusicVolume;
+
+            if (MusicVolumeSettings.IsMuted(MusicVolume))
+            {
+                StopMusic();
+                return;
+            }
+
+            PlayMusic();
+        }
+
+        /// <summary>
+        /// Starts the theme, or keeps it running where it is. False when nothing sounded: the music is
+        /// muted or the clip could not be made. A muted theme is a setting, not an error.
+        /// </summary>
+        public bool PlayMusic()
+        {
+            if (IsMusicMuted || theme == null) return false;
+            if (MusicOn) return true;
+
+            var clip = MusicClip;
+            if (clip == null) return false;
+
+            theme.clip = clip;
+            theme.loop = true;
+            theme.Play();
+            MusicOn = true;
+            return true;
+        }
+
+        /// <summary>Stops the theme; the clip stays rendered, so turning it back on is instant.</summary>
+        public void StopMusic()
+        {
+            MusicOn = false;
+            if (theme == null) return;
+            theme.Stop();
+            theme.clip = null;
         }
 
         /// <summary>
@@ -103,12 +186,25 @@ namespace Mahjong.Unity
             if (clips.TryGetValue(cue, out var ready)) return ready;
 
             var recipe = SoundCues.Recipe(cue);
-            var samples = SoundSynth.Render(recipe, SampleRate);
-            var clip = AudioClip.Create($"cue-{recipe.Name}", samples.Length, 1, SampleRate, false);
+            var clip = MakeClip(recipe, "cue-" + recipe.Name);
             if (clip == null) return null;
-            clip.SetData(samples, 0);
 
             clips[cue] = clip;
+            return clip;
+        }
+
+        /// <summary>Turns a recipe or a theme into a clip Unity can play; the samples come from the core.</summary>
+        private static AudioClip? MakeClip(SoundRecipe recipe, string name) =>
+            MakeClip(SoundSynth.Render(recipe, SampleRate), name);
+
+        private static AudioClip? MakeClip(MusicTrack track, string name) =>
+            MakeClip(SoundSynth.Render(track, SampleRate), name);
+
+        private static AudioClip? MakeClip(float[] samples, string name)
+        {
+            var clip = AudioClip.Create(name, samples.Length, 1, SampleRate, false);
+            if (clip == null) return null;
+            clip.SetData(samples, 0);
             return clip;
         }
     }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Mahjong.Controls
 {
@@ -34,7 +35,19 @@ namespace Mahjong.Controls
         Win = 7,
 
         /// <summary>Somebody else's hand is won: the same chime, lower and shorter.</summary>
-        Defeat = 8
+        Defeat = 8,
+
+        /// <summary>The cursor moved to another row, or a value stepped by one notch.</summary>
+        UiMove = 9,
+
+        /// <summary>A row was picked and something opened: a screen, a save, a new game.</summary>
+        UiSelect = 10,
+
+        /// <summary>A page of the rulebook turned.</summary>
+        UiPage = 11,
+
+        /// <summary>The input did nothing: the ladder is at its end or the row is not built yet.</summary>
+        UiDenied = 12
     }
 
     /// <summary>
@@ -166,8 +179,58 @@ namespace Mahjong.Controls
                 {
                     new SoundTone(392.00, 0.000, 0.70, 0.240, 0.008),
                     new SoundTone(329.63, 0.180, 0.70, 0.300, 0.008)
+                }),
+
+            // The interface (4.10, remainder). The menus, the action tray and the rulebook are not the
+            // table: their sounds are shorter, quieter and higher than a tile landing on the felt, so a
+            // player never mistakes a row he stepped for a hand he dealt.
+            //
+            // The cursor: one dry tick, the quietest thing the game says. It sounds on every row and
+            // every notch of a value, so it has to be short enough to not become a rattle.
+            new SoundRecipe(SoundCue.UiMove, 0.055, 0.30,
+                new[] { new SoundBurst(0.000, 1.00, 0.005, 0.88) },
+                new[] { new SoundTone(2350.00, 0.000, 0.40, 0.008, 0.001) }),
+
+            // Picking a row: two short rising notes — an answer, not a chime of the table.
+            new SoundRecipe(SoundCue.UiSelect, 0.16, 0.42,
+                Array.Empty<SoundBurst>(),
+                new[]
+                {
+                    new SoundTone(1174.66, 0.000, 0.55, 0.030, 0.002),
+                    new SoundTone(1567.98, 0.040, 0.60, 0.055, 0.002)
+                }),
+
+            // A turned page: the brush of paper, low and soft, with a papery edge under it.
+            new SoundRecipe(SoundCue.UiPage, 0.30, 0.34,
+                new[]
+                {
+                    new SoundBurst(0.000, 1.00, 0.055, 0.30),
+                    new SoundBurst(0.055, 0.60, 0.050, 0.24)
+                },
+                new[] { new SoundTone(320, 0.000, 0.20, 0.035) }),
+
+            // Nothing happened: a dull low double knock, the sound of a value that is already at its end.
+            new SoundRecipe(SoundCue.UiDenied, 0.22, 0.40,
+                new[] { new SoundBurst(0.000, 1.00, 0.040, 0.22) },
+                new[]
+                {
+                    new SoundTone(196.00, 0.000, 0.55, 0.070, 0.003),
+                    new SoundTone(146.83, 0.022, 0.35, 0.060, 0.003)
                 })
         };
+
+        /// <summary>
+        /// The cues of the interface: the menus, the action tray, the rulebook and the result screen.
+        /// They are a group of their own because the two kinds of sound are checked differently — a
+        /// cue of the table may last a second, a click may not.
+        /// </summary>
+        public static readonly IReadOnlyList<SoundCue> Interface = new[]
+        {
+            SoundCue.UiMove, SoundCue.UiSelect, SoundCue.UiPage, SoundCue.UiDenied
+        };
+
+        /// <summary>True for a cue the interface plays; false for a thing that happens at the table.</summary>
+        public static bool IsInterface(SoundCue cue) => Interface.Contains(cue);
 
         /// <summary>How many cues the table has.</summary>
         public static int Count => All.Count;
@@ -195,19 +258,35 @@ namespace Mahjong.Controls
         public static float[] Render(SoundRecipe recipe) => Render(recipe, SoundCues.SampleRate);
 
         /// <summary>Renders a cue at any sample rate; the length follows the sample rate exactly.</summary>
-        public static float[] Render(SoundRecipe recipe, int sampleRate)
+        public static float[] Render(SoundRecipe recipe, int sampleRate) =>
+            Render(recipe.Seconds, recipe.Gain, recipe.Noise, recipe.Tones, sampleRate, (int)recipe.Cue + 1);
+
+        /// <summary>
+        /// Renders a piece of music at the table's own sample rate. Music goes through the same mixer as
+        /// a cue — the same noise, the same tones, the same fades at both ends — because a second mixer
+        /// would be a second thing to keep in tune. The length of a track is its loop, exactly.
+        /// </summary>
+        public static float[] Render(MusicTrack track) => Render(track, SoundCues.SampleRate);
+
+        /// <summary>Renders a piece of music at any sample rate.</summary>
+        public static float[] Render(MusicTrack track, int sampleRate) =>
+            Render(track.Seconds, track.Gain, track.Noise, track.Tones, sampleRate, SeedOf(track.Id));
+
+        /// <summary>The mixer of everything the game says: strikes, tones and the fades of one clip.</summary>
+        private static float[] Render(double seconds, double gain, IReadOnlyList<SoundBurst> noise,
+            IReadOnlyList<SoundTone> tones, int sampleRate, int seedBase)
         {
             if (sampleRate <= 0) throw new ArgumentOutOfRangeException(nameof(sampleRate));
 
-            var count = Math.Max(1, (int)Math.Round(recipe.Seconds * sampleRate));
+            var count = Math.Max(1, (int)Math.Round(seconds * sampleRate));
             var mix = new double[count];
 
-            for (var index = 0; index < recipe.Noise.Count; index++)
-                AddBurst(mix, sampleRate, recipe.Noise[index], SeedOf(recipe.Cue, index));
+            for (var index = 0; index < noise.Count; index++)
+                AddBurst(mix, sampleRate, noise[index], SeedOf(seedBase, index));
 
-            foreach (var tone in recipe.Tones) AddTone(mix, sampleRate, tone);
+            foreach (var tone in tones) AddTone(mix, sampleRate, tone);
 
-            // The fades go on before the loudness is measured: a cue whose first strike is its peak
+            // The fades go on before the loudness is measured: a clip whose first strike is its peak
             // would otherwise be normalised against a sample the fade has already pulled down.
             for (var index = 0; index < count; index++) mix[index] *= FadeAt(index, count, sampleRate);
 
@@ -215,7 +294,7 @@ namespace Mahjong.Controls
             // their relative loudness however many strikes and tones were put inside one.
             var peak = 0d;
             for (var index = 0; index < count; index++) peak = Math.Max(peak, Math.Abs(mix[index]));
-            var scale = peak > 1e-9 ? recipe.Gain / peak : 0d;
+            var scale = peak > 1e-9 ? gain / peak : 0d;
 
             var samples = new float[count];
             for (var index = 0; index < count; index++)
@@ -286,11 +365,22 @@ namespace Mahjong.Controls
             return 1d;
         }
 
-        /// <summary>A seed per cue and per strike: the same noise every run, none of it random at play time.</summary>
-        private static uint SeedOf(SoundCue cue, int burst)
+        /// <summary>A seed per sound and per strike: the same noise every run, none of it random at play time.</summary>
+        private static uint SeedOf(int seedBase, int burst)
         {
-            var value = (uint)(((int)cue + 1) * 7919 + (burst + 1) * 104729 + 2463534242u);
+            var value = (uint)(seedBase * 7919 + (burst + 1) * 104729 + 2463534242u);
             return value == 0 ? 2463534242u : value;
+        }
+
+        /// <summary>
+        /// A seed for a piece of music, taken from its name: the same track is the same noise in every
+        /// run and in every build, and two tracks cannot share a texture by accident.
+        /// </summary>
+        private static int SeedOf(string id)
+        {
+            var hash = 2166136261u;
+            foreach (var letter in id) hash = (hash ^ letter) * 16777619u;
+            return (int)(hash % 100000u) + 1000;
         }
 
         /// <summary>

@@ -165,6 +165,16 @@ namespace Mahjong.Localization
 
         public static string SeatName(Wind wind) => WindName(wind);
 
+        /// <summary>
+        /// The single letter a wind plate shows in its round token (З, Ю, В, С): the reference prints a
+        /// one-letter badge instead of a full wind name, which is what keeps a seat plate 200 px wide.
+        /// </summary>
+        public static string SeatWindLetter(Wind wind)
+        {
+            var name = WindName(wind);
+            return string.IsNullOrEmpty(name) ? string.Empty : name.Substring(0, 1).ToUpperInvariant();
+        }
+
         // ---------------------------------------------------------------- score
 
         /// <summary>Fan name in the active language; the catalogue already carries both spellings.</summary>

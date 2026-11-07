@@ -40,6 +40,8 @@ namespace Mahjong.PlayTests
             if (game?.Settings == null) yield break;
 
             game.Settings.SoundVolume = SoundVolumeSettings.Default;
+            game.Settings.MusicVolume = MusicVolumeSettings.Default;
+            if (game.Sound != null) game.Sound.ApplyMusic(game.Settings.MusicVolume);
             if (game.IsMenuOpen) game.CloseMenu();
             var previousScale = Time.timeScale;
             Time.timeScale = 100f;
@@ -156,6 +158,91 @@ namespace Mahjong.PlayTests
             Assert.IsFalse(game.Sound.Play(SoundCue.Discard), "A muted table still played a cue.");
             Assert.AreEqual(before, game.Sound.PlayedCount, "A muted table counted a cue it did not play.");
             game.CloseMenu();
+        }
+
+        /// <summary>
+        /// The interface has a voice of its own (4.10, remainder): a step of a row ticks, and a step that
+        /// changes nothing knocks dully. The music row is used because stepping the sound row down to
+        /// silence would silence the very cues the test is listening for.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheInterfaceAnswersEveryStep()
+        {
+            var game = Game();
+            yield return null;
+
+            game.Settings.SoundVolume = 1d;
+            game.Sound.ForgetPlayed();
+            game.OpenMenu();
+            yield return null;
+
+            // A step of the cursor ticks; a step of a value ticks too; a step that changes nothing knocks.
+            game.MenuMove(1);
+            Assert.AreEqual(SoundCue.UiMove, game.Sound.LastCue, "A moved cursor says nothing.");
+
+            var row = -1;
+            for (var index = 0; index < game.Menu.RowCount; index++)
+                if (game.Menu.RowAt(index).Item == MenuItem.Music) row = index;
+            Assert.GreaterOrEqual(row, 0, "The menu has no music row.");
+
+            var guard = 0;
+            while (game.Menu.Selected != MenuItem.Music && guard++ < game.Menu.RowCount) game.MenuMove(1);
+            Assert.AreEqual(MenuItem.Music, game.Menu.Selected, "The cursor did not reach the music row.");
+
+            Assert.IsTrue(game.MenuAdjust(-1), "The music row cannot be stepped down.");
+            Assert.AreEqual(SoundCue.UiMove, game.Sound.LastCue, "A stepped value says nothing.");
+            Assert.AreEqual(game.Settings.MusicVolume, game.Sound.AppliedMusicVolume, 0.001f,
+                "The theme source does not carry the volume the menu set.");
+
+            while (game.MenuAdjust(-1)) { }
+            Assert.IsTrue(game.Sound.IsMusicMuted, "The theme can be stepped down to silence.");
+            Assert.AreEqual(SoundCue.UiDenied, game.Sound.LastCue,
+                "A step that changes nothing sounds like a step that did something.");
+
+            game.CloseMenu();
+            yield return null;
+        }
+
+        /// <summary>
+        /// The theme is a loop on a source of its own (4.10, remainder): it is one clip, it loops, its
+        /// volume is its own setting, and silence stops it instead of playing it at zero.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheThemeLoopsAtItsOwnVolume()
+        {
+            var game = Game();
+            yield return null;
+
+            Assert.IsNotNull(game.Sound, "The table has no ears at all.");
+            var clip = game.Sound.MusicClip;
+            Assert.IsNotNull(clip, "The theme has no clip.");
+            Assert.AreEqual(SoundPlayer.SampleRate, clip!.frequency, "The theme is played at the wrong rate.");
+            Assert.AreEqual(1, clip.channels, "The theme is not mono.");
+
+            // The clip Unity holds is the loop the rules assembly rendered, to the sample.
+            var expected = SoundSynth.Render(MusicTracks.Default, SoundPlayer.SampleRate);
+            Assert.AreEqual(expected.Length, clip.samples, "The theme clip is not one loop long.");
+            Assert.Greater(expected.Length, SoundCues.SampleRate * 3,
+                "The theme is too short to be music and too long to be a cue.");
+
+            // Its volume is a setting of its own, not a share of the table volume.
+            game.Sound.ApplyVolume(0.25d);
+            game.Sound.ApplyMusic(1d);
+            Assert.IsTrue(game.Sound.MusicOn, "The theme does not play when it is asked to.");
+            Assert.AreEqual(1d, game.Sound.AppliedMusicVolume, 0.001f,
+                "The theme source does not carry its own volume.");
+            Assert.AreEqual(0.25d, game.Sound.AppliedVolume, 0.001f,
+                "The volume of the table was overwritten by the theme.");
+
+            // Silence is silence: the loop stops instead of running at zero.
+            game.Sound.ApplyMusic(0d);
+            Assert.IsFalse(game.Sound.MusicOn, "A silent theme still runs.");
+            Assert.AreEqual(0d, game.Sound.AppliedMusicVolume, 0.001f, "A silent theme keeps its volume.");
+
+            game.Sound.ApplyMusic(MusicVolumeSettings.Default);
+            Assert.IsTrue(game.Sound.MusicOn, "The theme cannot be turned back on.");
+            Assert.AreEqual(MusicVolumeSettings.Default, game.Sound.AppliedMusicVolume, 0.001f,
+                "The theme does not come back at its own volume.");
         }
     }
 }
