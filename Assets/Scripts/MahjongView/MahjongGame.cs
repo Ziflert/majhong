@@ -4,6 +4,7 @@ using System.Linq;
 using Mahjong.Bots;
 using Mahjong.Controls;
 using Mahjong.Localization;
+using Mahjong.Net;
 using Mahjong.Replay;
 using Mahjong.Rules;
 using UnityEngine;
@@ -61,6 +62,12 @@ namespace Mahjong.Unity
 
         /// <summary>The menu that opens with Esc: settings, saving, review. Exposed for tests and tools.</summary>
         public MenuPanel MenuPanel => menu;
+
+        /// <summary>
+        /// The main interface of the game, built to the approved reference
+        /// (<c>examples/Эскизы UI Маджонг.html</c>). Exposed for tests and tools.
+        /// </summary>
+        public ReferenceHud Ui => reference;
 
         /// <summary>The menu model: rows, cursor, what a step and a pick mean. Exposed for tests.</summary>
         public GameMenu Menu => gameMenu;
@@ -123,8 +130,8 @@ namespace Mahjong.Unity
         public void ResetCameraView()
         {
             cameraYaw = 180f;
-            cameraPitch = 46f;
-            cameraDistance = 3.75f;
+            cameraPitch = 45f;
+            cameraDistance = 3.79f;
             ApplyCameraView();
         }
 
@@ -240,9 +247,17 @@ namespace Mahjong.Unity
         private const float CameraDragSensitivity = 0.18f;
         private const float CameraWheelSensitivity = 0.28f;
         private static readonly Vector3 CameraFocus = new(0f, 0.02f, 0.08f);
+
+        /// <summary>
+        /// How far below the horizon the camera looks, in degrees. The reference sheet tilts the table
+        /// instead of the camera, and its result is exactly this pitch: at 34° of field of view the
+        /// board then starts a seventh of the way down the frame and ends three quarters of the way
+        /// down, leaving the bottom of the screen to the hand, the hint and the buttons.
+        /// </summary>
+        private const float CameraAimPitch = 50.5f;
         private float cameraYaw = 180f;
-        private float cameraPitch = 46f;
-        private float cameraDistance = 3.75f;
+        private float cameraPitch = 45f;
+        private float cameraDistance = 3.79f;
         private bool cameraOrbiting;
         private Vector3 cameraLastMouse;
 
@@ -338,6 +353,9 @@ namespace Mahjong.Unity
         private FreePlayTable free = null!;
         private ControlsPanel controls = null!;
 
+        /// <summary>The interface of the reference composition: the game's main UI.</summary>
+        private ReferenceHud reference = null!;
+
         /// <summary>The ears of the table: every knock, chime and rattle of a hand (4.10).</summary>
         private SoundPlayer sound = null!;
 
@@ -367,6 +385,12 @@ namespace Mahjong.Unity
         private TitleScreen titleScreen = null!;
         private TitlePanel titlePanel = null!;
         private bool titleOpen;
+
+        /// <summary>Desktop online transport; the lobby UI can drive it without owning sockets.</summary>
+        private OnlineLobby online;
+
+        /// <summary>Current desktop online lobby, exposed for the eventual lobby panel and tests.</summary>
+        public OnlineLobby Online => online;
 
         private BotLevel botsLevel;
         private string sessionSavePath;
@@ -433,7 +457,12 @@ namespace Mahjong.Unity
             // table itself ask UiStyle for a colour instead of writing one, so they are set before the
             // scene is built and a capture run can paint the whole game light with MAHJONG_THEME.
             UiStyle.Apply(settings);
+            UiFont.Configure(settings.Font);
             gameMenu = new GameMenu(settings);
+            online = new OnlineLobby("player");
+            online.Settings.Variant = settings.Variant;
+            online.Settings.Clock = settings.Windows;
+            online.Settings.Seed = randomSeed;
             bots = CreateBots(settings.Level, randomSeed);
 
             BuildScene();
@@ -515,12 +544,16 @@ namespace Mahjong.Unity
                 camera = new GameObject("Main Camera") { tag = "MainCamera" }.AddComponent<Camera>();
             }
 
-            // The eye sits far enough back that the whole table fits with a margin above it: the top
-            // of the screen belongs to the HUD, and the far hand must not disappear behind that text.
+            // The eye and the framing are taken from the reference sheet, not from taste: there the
+            // table occupies 13 % … 74 % of the frame height and 55 % of its width, which leaves the
+            // top band to the badges and the bottom band to the hint, the hand and the buttons.
+            // The eye is the same orbit as before; the camera simply looks a little past the middle of
+            // the table (see <see cref="CameraAimPitch"/>), which is what lifts the whole board into
+            // the upper two thirds of the screen.
             var eye = new Vector3(0f, 2.70f, -2.60f);
-            var lookAt = new Vector3(0f, 0f, 0.18f);
+            var lookAt = CameraFocus;
             camera.transform.position = eye;
-            camera.transform.rotation = Quaternion.LookRotation(lookAt - eye, Vector3.up);
+            camera.transform.rotation = AimRotation(eye, lookAt);
             camera.fieldOfView = 34f;
             cameraDistance = Vector3.Distance(eye, lookAt);
             cameraYaw = 180f;
@@ -594,6 +627,10 @@ namespace Mahjong.Unity
 
             bar = ActionBar.Create(camera.transform);
             controls = ControlsPanel.Create(camera.transform);
+            // The reference composition replaces the bottom tray: its hot keys stay, its row of
+            // labelled buttons does not. The tray object is kept for the tools that photograph it.
+            controls.gameObject.SetActive(false);
+            reference = ReferenceHud.Create(camera.transform);
             rules = RulesPanel.Create(camera.transform);
             menu = MenuPanel.Create(camera.transform);
             titlePanel = TitlePanel.Create(camera.transform);
@@ -753,9 +790,22 @@ namespace Mahjong.Unity
                 Mathf.Sin(pitch) * cameraDistance,
                 Mathf.Cos(yaw) * horizontal);
             camera.transform.position = CameraFocus + offset;
-            camera.transform.rotation = Quaternion.LookRotation(CameraFocus - camera.transform.position,
-                Vector3.up);
+            camera.transform.rotation = AimRotation(camera.transform.position, CameraFocus);
             LayoutHud(camera);
+        }
+
+        /// <summary>
+        /// The rotation that points the camera at the focus and then tilts it the rest of the way to
+        /// <see cref="CameraAimPitch"/>. The orbit keeps its own geometry — one pivot, one distance —
+        /// and the framing of the reference is a property of the aim, so it survives any camera move.
+        /// </summary>
+        private static Quaternion AimRotation(Vector3 eye, Vector3 focus)
+        {
+            var forward = focus - eye;
+            if (forward.sqrMagnitude <= 0f) return Quaternion.identity;
+            var geometricPitch = Vector3.Angle(forward, Vector3.up) - 90f;
+            var tilt = Mathf.Clamp(CameraAimPitch - geometricPitch, -30f, 30f);
+            return Quaternion.LookRotation(forward, Vector3.up) * Quaternion.Euler(tilt, 0f, 0f);
         }
 
         private void Update()
@@ -763,6 +813,7 @@ namespace Mahjong.Unity
             // The welcome screen owns the table until the player starts or loads a game.
             if (titleOpen)
             {
+                online?.Pump();
                 HandleTitleInput();
                 SyncInterfaceVisibility();
                 return;
@@ -770,6 +821,7 @@ namespace Mahjong.Unity
 
             if (session?.State == null) return;
 
+            online?.Pump();
             HandleCameraInput();
             FaceSeatPlates(Camera.main != null ? Camera.main.transform : transform);
             SyncInterfaceVisibility();
@@ -789,6 +841,59 @@ namespace Mahjong.Unity
             {
                 SoundSelect();
                 return;
+            }
+
+            // The reference interface owns the bottom panels and the toast. A click on a button is read
+            // here, before the tray and before any tile: a plate that answers a click answers it with
+            // the command printed on it, never with the tile behind it.
+            if (reference != null && reference.IsOpen)
+            {
+                if (Input.GetMouseButtonDown(0))
+                {
+                    if (reference.TryDismiss(MouseRay()))
+                    {
+                        SoundSelect();
+                        return;
+                    }
+
+                    var command = reference.TryPick(MouseRay());
+                    if (command != HudCommand.None)
+                    {
+                        SoundSelect();
+                        switch (command)
+                        {
+                            case HudCommand.Pause:
+                                OpenMenu();
+                                return;
+                            case HudCommand.Rules:
+                                OpenRules();
+                                return;
+                            case HudCommand.Review:
+                                OpenReplay();
+                                return;
+                            case HudCommand.Save:
+                                if (session?.State != null)
+                                {
+                                    var saved = SaveReplay();
+                                    if (saved.Length > 0)
+                                        RenderStatus(Loc.Format("replay.saved", Path.GetFileName(saved)));
+                                }
+                                return;
+                            case HudCommand.Hints:
+                                reference.ToggleHints();
+                                return;
+                            case HudCommand.Combos:
+                                reference.ToggleGuide();
+                                return;
+                        }
+                    }
+                }
+
+                if (mouse != lastHudMouse)
+                {
+                    reference.Hover(MouseRay());
+                    lastHudMouse = mouse;
+                }
             }
 
             // The dice, the break and the deal come before the first decision of a hand: the engine
@@ -1241,11 +1346,41 @@ namespace Mahjong.Unity
                 case TitleCommand.Rules:
                     OpenRules();
                     break;
+                case TitleCommand.Multiplayer:
+                    OpenOnlineLobby();
+                    break;
                 case TitleCommand.Quit:
                     QuitGame();
                     break;
             }
         }
+
+        /// <summary>Starts the desktop host and keeps the welcome screen open as a minimal online lobby.</summary>
+        public int HostOnlineGame()
+        {
+            online.Settings.Variant = settings.Variant;
+            online.Settings.Clock = settings.Windows;
+            var port = online.StartHost();
+            titleScreen.SetStatus(port > 0
+                ? $"Online: {online.Settings.Host}:{port}"
+                : "Online: unable to start host");
+            titlePanel.Refresh(titleScreen);
+            return port;
+        }
+
+        /// <summary>Connects the current desktop player to the configured online host.</summary>
+        public bool ConnectOnlineGame(string host, int port, string playerName = "player")
+        {
+            online.Settings.Host = host;
+            online.Settings.Port = port;
+            online.Settings.PlayerName = playerName;
+            var connected = online.Connect();
+            titleScreen.SetStatus(connected ? "Online: connecting" : "Online: unable to connect");
+            titlePanel.Refresh(titleScreen);
+            return connected;
+        }
+
+        private void OpenOnlineLobby() => HostOnlineGame();
 
         /// <summary>
         /// Deals the first hand of a fresh session with the settings chosen on the welcome screen.
@@ -1347,20 +1482,30 @@ namespace Mahjong.Unity
 
             // The tray rides the bottom edge of the frame and is never part of a full-screen page:
             // it is shown whenever the table is playable and hidden only while the welcome screen is up.
-            if (controls != null && controls.gameObject.activeSelf != hudWanted)
-                controls.gameObject.SetActive(hudWanted);
+            // Since the reference composition took over the main interface the tray is not drawn at all:
+            // its row of labelled buttons covered the player's own hand.
+            if (controls != null && controls.gameObject.activeSelf) controls.gameObject.SetActive(false);
+
+            // The reference composition is the table's own interface: it steps aside for every page
+            // (rulebook, menu, result, welcome) and for the review and the free table.
+            var referenceWanted = hudWanted && !freeOpen && !replayOpen;
+            if (reference != null && reference.gameObject.activeSelf != referenceWanted)
+                reference.gameObject.SetActive(referenceWanted);
 
             // Wind plates belong to the scored table. The result screen is a page over the table as
             // well, and a plate is a billboard of text drawn without a depth test: left standing, it
-            // prints straight through the panel.
-            var platesWanted = !rulesOpen && !freeOpen && !menuOpen && !resultOpen && !welcomeOpen;
+            // prints straight through the panel. Since the reference composition draws the four seats
+            // as badges of its own, the 3D plates would print a second copy of the same score.
+            const bool platesWanted = false;
             foreach (var plate in seatPlates)
                 if (plate != null && plate.gameObject.activeSelf != platesWanted)
                     plate.gameObject.SetActive(platesWanted);
 
             // The scored hand keeps lying on the table otherwise, and the free set looks like it was
             // dealt into a live hand. The tiles are hidden, not destroyed: the hand comes back as it was.
-            var tilesWanted = !freeOpen;
+            // The welcome screen is a full-screen main menu. Keep the table hidden behind it, otherwise
+            // the old 3D board leaks through the reference menu and makes it look like a pause overlay.
+            var tilesWanted = !freeOpen && !welcomeOpen && !rulesOpen && !menuOpen && !resultOpen;
             if (tilesVisible != tilesWanted)
             {
                 SetScoredTilesVisible(tilesWanted);
@@ -1629,10 +1774,17 @@ namespace Mahjong.Unity
         private string DecisionKey(GameState state)
         {
             if (state.Phase is GamePhase.AwaitingClaims or GamePhase.AwaitingKongRobbery)
-                return HumanHasRealClaim(state) ? $"claim:{stateVersion}" : string.Empty;
+            {
+                // Bot replies also advance stateVersion while the same discard window is open.
+                // The window belongs to the discard, not to each response, so use the public
+                // discard position as its identity and keep the human clock from being renewed.
+                return HumanHasRealClaim(state)
+                    ? $"claim:{state.Discards.Count}:{state.Phase}"
+                    : string.Empty;
+            }
 
             if (state.Phase == GamePhase.AwaitingDiscard && state.CurrentPlayer == humanSeat)
-                return $"turn:{stateVersion}";
+                return $"turn:{state.Discards.Count}:{state.CurrentPlayer}";
 
             return string.Empty;
         }
@@ -2061,6 +2213,10 @@ namespace Mahjong.Unity
                     CloseMenu();
                     OpenRules(fromMenu: true);
                     break;
+                case MenuCommand.Title:
+                    CloseMenu();
+                    OpenTitle();
+                    break;
                 case MenuCommand.Close:
                     CloseMenu();
                     break;
@@ -2071,6 +2227,8 @@ namespace Mahjong.Unity
         private void ApplySettings()
         {
             Loc.Current = settings.Language;
+            UiFont.Configure(settings.Font);
+            UiStyle.SetTextScale((float)settings.FontSize);
             if (bots != null && botsLevel != settings.Level)
             {
                 bots = CreateBots(settings.Level, gameSeed != 0 ? gameSeed : randomSeed);
@@ -2524,6 +2682,9 @@ namespace Mahjong.Unity
             // heard beat by beat.
             openingStep = opening.Step;
             if (!opening.IsDone) PlayCue(SoundCue.Dice);
+            // The throw explains the gap in the wall for the whole hand, so the interface says it out
+            // loud for a few seconds after the deal (reference frame 1: the dice toast).
+            if (reference != null) reference.AnnounceDice(DiceToastSeconds);
         }
 
         /// <summary>
@@ -2614,6 +2775,12 @@ namespace Mahjong.Unity
         /// Rebuilds the HUD only when its text changes: the countdown makes it change once a second,
         /// which is cheap, but rebuilding it every frame would allocate a string per frame for nothing.
         /// </summary>
+        /// <summary>The last mouse position the interface painted a hover for.</summary>
+        private Vector3 lastHudMouse = new(-1f, -1f, -1f);
+
+        /// <summary>Seconds the dice toast of a fresh deal stays on the screen (reference, frame 1).</summary>
+        private const float DiceToastSeconds = 8f;
+
         /// <summary>
         /// A TextMesh rebuilds its mesh when the text changes, and the renderer bounds only follow on
         /// the next frame: measuring the plate here keeps it one frame behind the text instead of never.
@@ -2631,14 +2798,19 @@ namespace Mahjong.Unity
             hudPlateRenderer.enabled = !structured;
             var shown = structured && status.gameObject.activeInHierarchy
                 && !titleOpen && !menu.IsOpen && !rules.IsOpen && !resultScreen.IsOpen;
-            hud.gameObject.SetActive(shown);
+            // The reference composition is the main interface: the structured HUD of stage 1 keeps its
+            // data sources and its tests, but it is not drawn over the table any more.
+            hud.gameObject.SetActive(false);
+            if (reference != null && reference.gameObject.activeSelf != shown)
+                reference.gameObject.SetActive(shown);
             if (!shown) return;
             // F3 is deliberately view-only: it exposes the former diagnostic block without
             // changing the session or consuming a table click.
             if (Input.GetKeyDown(KeyCode.F3)) hud.ToggleDebug();
-            hud.Refresh(camera, session, settings, humanSeat, IsYourTurn, clock,
-                statusNote.Length > 0 && Time.time < statusNoteUntil ? statusNote : string.Empty,
-                DescribeState(), settings.Potential);
+            if (reference != null)
+                reference.Refresh(camera, session, settings, humanSeat, IsYourTurn, clock,
+                    statusNote.Length > 0 && Time.time < statusNoteUntil ? statusNote : string.Empty,
+                    settings.Potential);
         }
 
         private void RefreshStatus()

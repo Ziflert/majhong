@@ -28,6 +28,10 @@ namespace Mahjong.Controls
         /// <summary>Interface composition; independent from the selected colour palette.</summary>
         public UiProfile Profile { get; set; } = UiProfiles.Default;
 
+        /// <summary>Interface font preset. The Unity layer resolves the preset to a font with Cyrillic.</summary>
+        public string Font { get; set; } = UiFontSettings.Default;
+        public double FontSize { get; set; } = 1d;
+
         /// <summary>Speeds the menu steps through; the delay between bot moves is divided by this.</summary>
         public static readonly double[] Speeds = { 0.25, 0.5, 1, 2, 4 };
 
@@ -163,21 +167,21 @@ namespace Mahjong.Controls
             // MAHJONG_RESULT_DELAY=0 holds the result screen until the button is pressed, which is
             // what a capture run needs; nonsense keeps the five-second default.
             var resultText = Environment.GetEnvironmentVariable("MAHJONG_RESULT_DELAY");
-            if (ResultAdvanceSettings.TryParse(resultText) is { } advance) settings.Result = advance;
+            if (ResultAdvanceSettings.TryParse(resultText ?? string.Empty) is { } advance) settings.Result = advance;
 
             // MAHJONG_CLOCK=rules|calm|unlimited (or a triple of seconds) opens the windows of a
             // capture run without touching the scene; nonsense keeps the rules' own windows.
             var clockText = Environment.GetEnvironmentVariable("MAHJONG_CLOCK");
-            if (ClockPaceSettings.TryParse(clockText) is { } pace) settings.ClockPace = pace;
+            if (ClockPaceSettings.TryParse(clockText ?? string.Empty) is { } pace) settings.ClockPace = pace;
 
             // MAHJONG_SESSION_MINUTES=0.2 shortens the session so the time-up path can be seen in a
             // capture run; "unlimited" leaves the table without a clock. Nonsense keeps 150 minutes.
             var sessionText = Environment.GetEnvironmentVariable("MAHJONG_SESSION_MINUTES");
-            if (SessionLengthSettings.TryParse(sessionText) is { } limit) settings.SessionLimit = limit;
+            if (SessionLengthSettings.TryParse(sessionText ?? string.Empty) is { } limit) settings.SessionLimit = limit;
 
             // MAHJONG_SEED=12345 repeats a game exactly: the same deal, the same bots, the same hands.
             var seedText = Environment.GetEnvironmentVariable("MAHJONG_SEED");
-            if (DealSeedSettings.TryParse(seedText) is { } seed) settings.Seed = seed;
+            if (DealSeedSettings.TryParse(seedText ?? string.Empty) is { } seed) settings.Seed = seed;
 
             // MAHJONG_SOUND=off|0.3|70% sets the volume of a capture run; the table is built with
             // sound on, so a run that must stay quiet has to say so.
@@ -204,7 +208,7 @@ namespace Mahjong.Controls
         }
 
         /// <summary>Level from "1".."3" or from its name; null when the text means nothing.</summary>
-        public static BotLevel? FromLevelText(string text) =>
+        public static BotLevel? FromLevelText(string? text) =>
             int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var level)
                 ? level switch
                 {
