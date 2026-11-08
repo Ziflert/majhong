@@ -6,6 +6,8 @@ using Mahjong.Rules;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UiText = UnityEngine.UI.Text;
+using RulesText = Mahjong.Localization.Text;
 
 namespace Mahjong.Unity
 {
@@ -18,14 +20,14 @@ namespace Mahjong.Unity
     {
         private const float ReferenceWidth = 1280f;
         private const float ReferenceHeight = 720f;
-        private readonly List<Text> dynamicText = new();
+        private readonly List<UiText> dynamicText = new();
         private readonly List<Button> actionButtons = new();
-        private Text handText = null!;
-        private Text rulesText = null!;
-        private Text wallText = null!;
-        private Text clockText = null!;
-        private Text[] seatText = new Text[4];
-        private Text hintText = null!;
+        private UiText handText = null!;
+        private UiText rulesText = null!;
+        private UiText wallText = null!;
+        private UiText clockText = null!;
+        private UiText[] seatText = new UiText[4];
+        private UiText hintText = null!;
         private RectTransform actionRoot = null!;
         private RectTransform handRoot = null!;
         private Action? pause;
@@ -55,7 +57,7 @@ namespace Mahjong.Unity
             }
             var hud = canvasObject.AddComponent<CanvasGameHud>();
             hud.pause = owner.OpenMenu;
-            hud.rules = owner.OpenRules;
+            hud.rules = () => owner.OpenRules();
             hud.action = owner.ExecutePromptOption;
             hud.Build();
             return hud;
@@ -98,8 +100,8 @@ namespace Mahjong.Unity
             var state = session.State;
             if (state == null) return;
             handText.text = Loc.Format("hud.handRound", session.HandsPlayed + 1, GameSession.TotalHands,
-                Text.SeatName(session.RoundWind));
-            rulesText.text = Text.VariantName(session.Variant);
+                RulesText.SeatName(session.RoundWind));
+            rulesText.text = RulesText.VariantName(session.Variant);
             wallText.text = Loc.Format("hud.wall", state.Wall.Remaining);
             clockText.text = session.HasTimeLimit
                 ? $"{Clock(session.Elapsed)} / {Clock(session.TimeLimit)}"
@@ -108,7 +110,7 @@ namespace Mahjong.Unity
             for (var seat = 0; seat < 4; seat++)
             {
                 var view = (seat - humanSeat + 4) % 4;
-                var prefix = seat == humanSeat ? Loc.Get("hud.you") : Text.SeatName(state.SeatWindOf(seat));
+                var prefix = seat == humanSeat ? Loc.Get("hud.you") : RulesText.SeatName(state.SeatWindOf(seat));
                 var active = seat == state.CurrentPlayer ? "  ◉" : string.Empty;
                 seatText[view].text = $"{prefix}{active}\n{Loc.Format("hud.playerScore", session.Scores[seat])}";
                 seatText[view].color = seat == state.CurrentPlayer ? UiStyle.Of(UiRole.Accent) : UiStyle.Of(UiRole.TextMain);
@@ -116,7 +118,7 @@ namespace Mahjong.Unity
 
             hintText.text = humanTurn
                 ? Loc.Get("hud.yourTurn")
-                : Loc.Format("hud.turnName", Text.SeatName(state.SeatWindOf(state.CurrentPlayer)));
+                : Loc.Format("hud.turnName", RulesText.SeatName(state.SeatWindOf(state.CurrentPlayer)));
             if (clock.IsRunning)
                 hintText.text += clock.IsLimited ? $"  ·  {clock.SecondsLeft}s" : "  ·  ∞";
 
@@ -145,13 +147,13 @@ namespace Mahjong.Unity
             }
         }
 
-        private Text MakePlate(string name, Transform parent, Vector2 min, Vector2 max, TextAnchor anchor)
+        private UiText MakePlate(string name, Transform parent, Vector2 min, Vector2 max, TextAnchor anchor)
         {
             MakePanel(parent, name + "Panel", min, max, UiRole.Surface, 0.96f);
             return MakeLabel(name, parent, min + new Vector2(12, -2), max - new Vector2(12, 2), 16, anchor);
         }
 
-        private Text MakeLabel(string name, Transform parent, Vector2 min, Vector2 max, int size,
+        private UiText MakeLabel(string name, Transform parent, Vector2 min, Vector2 max, int size,
             TextAnchor anchor, UiRole role = UiRole.TextMain)
         {
             var go = new GameObject(name);
@@ -161,7 +163,7 @@ namespace Mahjong.Unity
             rect.anchorMax = rect.anchorMin;
             rect.offsetMin = min;
             rect.offsetMax = max;
-            var text = go.AddComponent<Text>();
+            var text = go.AddComponent<UiText>();
             text.font = font;
             text.fontSize = size;
             text.alignment = anchor;
