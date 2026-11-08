@@ -48,6 +48,19 @@ namespace Mahjong.Rules
             var list = tiles.ToList();
             if (list.Count != 14) return false;
 
+            // Cheap pre-checks before the permutation search: the knitted part needs three numbered
+            // tiles in every suit and the remaining set plus pair need at most five honors.
+            var suitCounts = new Dictionary<TileSuit, int>();
+            var honorCount = 0;
+            foreach (var tile in list)
+            {
+                if (tile.IsNumbered) suitCounts[tile.Suit] = suitCounts.GetValueOrDefault(tile.Suit) + 1;
+                else if (tile.IsHonor) honorCount++;
+                else return false;
+            }
+            if (suitCounts.Count != 3 || suitCounts.Values.Any(count => count < 3)) return false;
+            if (honorCount > 5) return false;
+
             var counts = new Dictionary<TileType, int>();
             foreach (var tile in list) counts[tile] = counts.GetValueOrDefault(tile) + 1;
 

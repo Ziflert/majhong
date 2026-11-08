@@ -31,8 +31,18 @@ namespace Mahjong.EditorTools
 
         public static void CaptureAndExit()
         {
-            var directory = Environment.GetEnvironmentVariable("MAHJONG_SHOT_DIR") ?? "Screenshots";
+            var directory = Environment.GetEnvironmentVariable("MAHJONG_SHOT_DIR")
+                ?? Path.Combine("Screenshots", "current");
             Directory.CreateDirectory(directory);
+
+            // The dice and the break are captured by InterfaceCapture, which owns the opening shot;
+            // this run wants the assembled hand, so the show is skipped unless the caller says otherwise.
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MAHJONG_OPENING_SPEED")))
+                Environment.SetEnvironmentVariable("MAHJONG_OPENING_SPEED", "0");
+
+            // This run photographs a live hand: the welcome screen (У-2) is skipped, the way a player
+            // skips it by picking "new game".
+            Environment.SetEnvironmentVariable("MAHJONG_TITLE", "0");
 
             SessionState.SetString(DirectoryKey, directory);
             SessionState.SetFloat(StartKey, (float)EditorApplication.timeSinceStartup);
@@ -61,8 +71,8 @@ namespace Mahjong.EditorTools
             {
                 if (elapsed < ShotAt[shot]) return;
 
-                var path = Path.GetFullPath(Path.Combine(SessionState.GetString(DirectoryKey, "Screenshots"),
-                    Shots[shot] + ".png"));
+                var path = Path.GetFullPath(Path.Combine(SessionState.GetString(DirectoryKey,
+                    Path.Combine("Screenshots", "current")), Shots[shot] + ".png"));
                 ScreenCapture.CaptureScreenshot(path);
                 Debug.Log("[capture] saved " + path);
                 SessionState.SetInt(ShotKey, shot + 1);

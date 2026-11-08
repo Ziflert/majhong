@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Linq;
+using Mahjong.Localization;
 using Mahjong.Unity;
 using NUnit.Framework;
 using UnityEngine;
@@ -19,6 +20,8 @@ namespace Mahjong.PlayTests
         {
             var game = Object.FindAnyObjectByType<MahjongGame>();
             if (game == null) game = new GameObject("MahjongTestHost").AddComponent<MahjongGame>();
+            // The welcome screen holds the table at launch; a test of the table starts its own game.
+            game.SkipWelcome();
 
             // one frame for Start(), one more for the first Update()
             yield return null;
@@ -48,10 +51,17 @@ namespace Mahjong.PlayTests
             var faceUp = tiles.Where(tile => tile.IsFaceUp).ToList();
             var faceDown = tiles.Where(tile => !tile.IsFaceUp).ToList();
             Assert.GreaterOrEqual(faceUp.Count, 13, "The human hand is not laid out.");
+
+            // The whole set is on the table: the wall stands as four walls of stacks, and everything
+            // that has been dealt lies in front of a seat. Nothing is created out of thin air, so the
+            // objects on the table plus the tiles of the wall must add up to 144.
+            Assert.AreEqual(144, tiles.Length, "The table does not hold the whole set of 144 tiles.");
             // Three opponents hold thirteen tiles each minus three per opened meld, so the count comes
             // from the engine instead of a hard-coded 39: a bot that claimed a discard holds fewer.
-            Assert.AreEqual(game.OpponentConcealedTileCount, faceDown.Count,
-                "The opponents' concealed tiles are not drawn face down.");
+            // Face down are their concealed tiles and the standing wall.
+            Assert.AreEqual(game.OpponentConcealedTileCount + game.WallRemaining, faceDown.Count,
+                $"The wall and the hidden hands are not drawn face down: "
+                + $"{game.OpponentConcealedTileCount} hidden + {game.WallRemaining} in the wall.");
             Assert.IsTrue(faceDown.All(tile => string.IsNullOrEmpty(LabelOf(tile))),
                 "A face-down tile shows its face label.");
 
@@ -68,8 +78,14 @@ namespace Mahjong.PlayTests
             var status = game.Status;
             Assert.IsNotNull(status, "The status line was not created.");
             Assert.IsNotNull(status!.font, "The status TextMesh has no font.");
-            StringAssert.Contains("Wall:", status.text, "Status text does not describe the session.");
-            StringAssert.Contains("Points:", status.text, "Status text does not show points.");
+            // The interface is Russian by default, so the assertions ask the catalogue rather than
+            // hard-coding English words: the HUD must use the texts of the active language.
+            StringAssert.Contains(Loc.Format("hud.wall", game.WallRemaining), status.text,
+                "Status text does not describe the wall:\n" + status.text);
+            StringAssert.Contains(Loc.Get("hud.points").Split('{')[0].Trim(), status.text,
+                "Status text does not show points:\n" + status.text);
+            StringAssert.Contains(Loc.Get("hud.header").Split('{')[0].Trim(), status.text,
+                "Status text does not describe the session:\n" + status.text);
 
             Debug.Log("[smoke] status:\n" + status.text);
             Debug.Log($"[smoke] tiles: {tiles.Length} (face up {faceUp.Count}, face down {faceDown.Count})");
@@ -100,13 +116,15 @@ namespace Mahjong.PlayTests
             var previousScale = Time.timeScale;
             var game = Object.FindAnyObjectByType<MahjongGame>();
             if (game == null) game = new GameObject("MahjongTestHost").AddComponent<MahjongGame>();
+            // The welcome screen holds the table at launch; a test of the table starts its own game.
+            game.SkipWelcome();
 
             // botDelay is 0.45 s per action; speed time up so several turns happen quickly
             Time.timeScale = 6f;
             yield return null;
 
             var status = game.Status;
-            var wallAtStart = ParseWall(status.text);
+            var wallAtStart = game.WallRemaining;
             Assert.Greater(wallAtStart, 0, "The wall count was not parsed from the status line.");
 
             var reachedHuman = false;
@@ -114,8 +132,7 @@ namespace Mahjong.PlayTests
             while (frames++ < 240 && !reachedHuman)
             {
                 yield return null;
-                var text = status.text;
-                reachedHuman = text.Contains("Your turn") || text.Contains("Waiting for player");
+                reachedHuman = game.IsYourTurn || game.HandClock.IsRunning || game.DiscardTileCount > 0;
                 if (reachedHuman) break;
             }
 
@@ -123,7 +140,7 @@ namespace Mahjong.PlayTests
 
             Assert.IsTrue(reachedHuman,
                 "After two simulated seconds the table is still not in a turn: the game loop is stuck.");
-            Debug.Log($"[smoke] reached a turn, wall at start {wallAtStart}, wall now {ParseWall(status.text)}"
+            Debug.Log($"[smoke] reached a turn, wall at start {wallAtStart}, wall now {game.WallRemaining}"
                       + "\n" + status.text);
         }
 
@@ -136,11 +153,5 @@ namespace Mahjong.PlayTests
             return label == null ? string.Empty : label.text;
         }
 
-        private static int ParseWall(string statusText)
-        {
-            var line = statusText.Split('\n').FirstOrDefault(part => part.StartsWith("Wall:"));
-            if (line == null) return -1;
-            return int.TryParse(line.Substring("Wall:".Length).Trim(), out var remaining) ? remaining : -1;
-        }
     }
 }

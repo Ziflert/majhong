@@ -1,0 +1,2245 @@
+[
+ {
+  "id": "big-four-winds",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 195,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-01",
+    "name": "四风会",
+    "points": 88
+   },
+   {
+    "code": "mcr-12",
+    "name": "四暗刻",
+    "points": 64
+   },
+   {
+    "code": "mcr-18",
+    "name": "混幺九",
+    "points": 32
+   },
+   {
+    "code": "mcr-50",
+    "name": "混一色",
+    "points": 6
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-38",
+    "name": "三风刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-49",
+    "name": "碰碰和",
+    "by": [
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-55",
+    "name": "全带幺",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-60",
+    "name": "圈风刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-61",
+    "name": "门风刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "by": [
+     null,
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "big-three-dragons",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 114,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-02",
+    "name": "大三元",
+    "points": 88
+   },
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "points": 16
+   },
+   {
+    "code": "mcr-50",
+    "name": "混一色",
+    "points": 6
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-54",
+    "name": "双箭刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-59",
+    "name": "箭刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "all-green",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 102,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-03",
+    "name": "绿一色",
+    "points": 88
+   },
+   {
+    "code": "mcr-50",
+    "name": "混一色",
+    "points": 6
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-69",
+    "name": "一般高",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "nine-gates",
+  "ok": true,
+  "handKind": "special",
+  "total": 92,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-04",
+    "name": "九莲宝灯",
+    "points": 88
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-22",
+    "name": "清一色",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "four-kongs",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 166,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-05",
+    "name": "四杠",
+    "points": 88
+   },
+   {
+    "code": "mcr-12",
+    "name": "四暗刻",
+    "points": 64
+   },
+   {
+    "code": "mcr-46",
+    "name": "杠上开花",
+    "points": 8
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-17",
+    "name": "三杠",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-49",
+    "name": "碰碰和",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "seven-shifted-pairs",
+  "ok": true,
+  "handKind": "special",
+  "total": 92,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-06",
+    "name": "连七对",
+    "points": 88
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-19",
+    "name": "七对",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-22",
+    "name": "清一色",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "thirteen-orphans",
+  "ok": true,
+  "handKind": "special",
+  "total": 92,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-07",
+    "name": "十三幺",
+    "points": 88
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-18",
+    "name": "混幺九",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-52",
+    "name": "五门齐",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "all-terminals",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 137,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-08",
+    "name": "清幺九",
+    "points": 64
+   },
+   {
+    "code": "mcr-12",
+    "name": "四暗刻",
+    "points": 64
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-65",
+    "name": "双同刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-65",
+    "name": "双同刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-49",
+    "name": "碰碰和",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-55",
+    "name": "全带幺",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "little-four-winds",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 99,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-09",
+    "name": "小四风会",
+    "points": 64
+   },
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "points": 16
+   },
+   {
+    "code": "mcr-50",
+    "name": "混一色",
+    "points": 6
+   },
+   {
+    "code": "mcr-55",
+    "name": "全带幺",
+    "points": 4
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-60",
+    "name": "圈风刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-61",
+    "name": "门风刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-77",
+    "name": "边张",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-38",
+    "name": "三风刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "little-three-dragons",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 77,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-10",
+    "name": "小三元",
+    "points": 64
+   },
+   {
+    "code": "mcr-50",
+    "name": "混一色",
+    "points": 6
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-71",
+    "name": "连六",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-54",
+    "name": "双箭刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-59",
+    "name": "箭刻",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "all-honors",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 151,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-11",
+    "name": "字一色",
+    "points": 64
+   },
+   {
+    "code": "mcr-12",
+    "name": "四暗刻",
+    "points": 64
+   },
+   {
+    "code": "mcr-38",
+    "name": "三风刻",
+    "points": 12
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-59",
+    "name": "箭刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-60",
+    "name": "圈风刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-61",
+    "name": "门风刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-49",
+    "name": "碰碰和",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-55",
+    "name": "全带幺",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "four-concealed-pungs",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 79,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-12",
+    "name": "四暗刻",
+    "points": 64
+   },
+   {
+    "code": "mcr-42",
+    "name": "三色三节高",
+    "points": 8
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-49",
+    "name": "碰碰和",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null,
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "four-terminal-chows",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 69,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-13",
+    "name": "一色双龙会",
+    "points": 64
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-22",
+    "name": "清一色",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-63",
+    "name": "平和",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-69",
+    "name": "一般高",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-72",
+    "name": "老少副",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null,
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "quadruple-chow",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 81,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-14",
+    "name": "一色四同顺",
+    "points": 48
+   },
+   {
+    "code": "mcr-22",
+    "name": "清一色",
+    "points": 24
+   },
+   {
+    "code": "mcr-55",
+    "name": "全带幺",
+    "points": 4
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-63",
+    "name": "平和",
+    "points": 2
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-64",
+    "name": "四归一",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null,
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "four-pure-shifted-pungs",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 138,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-12",
+    "name": "四暗刻",
+    "points": 64
+   },
+   {
+    "code": "mcr-15",
+    "name": "一色四节高",
+    "points": 48
+   },
+   {
+    "code": "mcr-22",
+    "name": "清一色",
+    "points": 24
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-49",
+    "name": "碰碰和",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "four-pure-shifted-chows",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 61,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-16",
+    "name": "一色四步高",
+    "points": 32
+   },
+   {
+    "code": "mcr-22",
+    "name": "清一色",
+    "points": 24
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-63",
+    "name": "平和",
+    "points": 2
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null,
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "three-kongs",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 43,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-17",
+    "name": "三杠",
+    "points": 32
+   },
+   {
+    "code": "mcr-48",
+    "name": "双暗杠",
+    "points": 8
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "points": 1
+   },
+   {
+    "code": "mcr-80",
+    "name": "自摸",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-67",
+    "name": "暗杠",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-74",
+    "name": "明杠",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "all-terminals-and-honors",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 102,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-12",
+    "name": "四暗刻",
+    "points": 64
+   },
+   {
+    "code": "mcr-18",
+    "name": "混幺九",
+    "points": 32
+   },
+   {
+    "code": "mcr-60",
+    "name": "圈风刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-65",
+    "name": "双同刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-75",
+    "name": "缺一门",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-49",
+    "name": "碰碰和",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-55",
+    "name": "全带幺",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "seven-pairs-full-flush",
+  "ok": true,
+  "handKind": "special",
+  "total": 52,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-19",
+    "name": "七对",
+    "points": 24
+   },
+   {
+    "code": "mcr-22",
+    "name": "清一色",
+    "points": 24
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "all-even-pungs",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 94,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-12",
+    "name": "四暗刻",
+    "points": 64
+   },
+   {
+    "code": "mcr-21",
+    "name": "全双刻",
+    "points": 24
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-75",
+    "name": "缺一门",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-49",
+    "name": "碰碰和",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-68",
+    "name": "断幺",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "full-flush-pure-straight",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 44,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-22",
+    "name": "清一色",
+    "points": 24
+   },
+   {
+    "code": "mcr-28",
+    "name": "清龙",
+    "points": 16
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-63",
+    "name": "平和",
+    "points": 2
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null,
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "upper-tiles",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 28,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-25",
+    "name": "全大",
+    "points": 24
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-69",
+    "name": "一般高",
+    "points": 1
+   },
+   {
+    "code": "mcr-70",
+    "name": "喜相逢",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-36",
+    "name": "大于五",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null,
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "three-suited-terminal-chows",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 19,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-29",
+    "name": "三色双龙会",
+    "points": 16
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-63",
+    "name": "平和",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-70",
+    "name": "喜相逢",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-72",
+    "name": "老少副",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null,
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "all-fives",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 21,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-31",
+    "name": "全带五",
+    "points": 16
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-64",
+    "name": "四归一",
+    "points": 2
+   },
+   {
+    "code": "mcr-70",
+    "name": "喜相逢",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-68",
+    "name": "断幺",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "triple-pung",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 34,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-32",
+    "name": "三同刻",
+    "points": 16
+   },
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "points": 16
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "three-concealed-pungs",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 22,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "points": 16
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "chicken-hand",
+  "ok": false,
+  "reason": "below-minimum",
+  "message": "The hand has fewer than eight non-flower points."
+ },
+ {
+  "id": "below-minimum",
+  "ok": false,
+  "reason": "below-minimum",
+  "message": "The hand has fewer than eight non-flower points."
+ },
+ {
+  "id": "melded-hand",
+  "ok": false,
+  "reason": "below-minimum",
+  "message": "The hand has fewer than eight non-flower points."
+ },
+ {
+  "id": "two-dragon-pungs",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 12,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-54",
+    "name": "双箭刻",
+    "points": 6
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-75",
+    "name": "缺一门",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "concealed-and-melded-kong",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 11,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-57",
+    "name": "双明杠",
+    "points": 4
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-67",
+    "name": "暗杠",
+    "points": 2
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "points": 1
+   },
+   {
+    "code": "mcr-80",
+    "name": "自摸",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-74",
+    "name": "明杠",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "two-concealed-kongs",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 30,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "points": 16
+   },
+   {
+    "code": "mcr-48",
+    "name": "双暗杠",
+    "points": 8
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null,
+     null
+    ]
+   },
+   {
+    "code": "mcr-67",
+    "name": "暗杠",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "two-melded-kongs",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 11,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-54",
+    "name": "双箭刻",
+    "points": 6
+   },
+   {
+    "code": "mcr-57",
+    "name": "双明杠",
+    "points": 4
+   },
+   {
+    "code": "mcr-75",
+    "name": "缺一门",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-74",
+    "name": "明杠",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "robbing-kong",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 12,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-47",
+    "name": "抢杠和",
+    "points": 8
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-74",
+    "name": "明杠",
+    "points": 1
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "last-tile-draw",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 14,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-44",
+    "name": "妙手回春",
+    "points": 8
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-71",
+    "name": "连六",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "last-tile-claim",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 12,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-45",
+    "name": "海底捞月",
+    "points": 8
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-71",
+    "name": "连六",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "out-with-replacement",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 14,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-46",
+    "name": "杠上开花",
+    "points": 8
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-71",
+    "name": "连六",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "last-copy",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 8,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-58",
+    "name": "和绝张",
+    "points": 4
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-71",
+    "name": "连六",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "reversible-tiles",
+  "ok": false,
+  "reason": "below-minimum",
+  "message": "The hand has fewer than eight non-flower points."
+ },
+ {
+  "id": "mixed-straight",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 11,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-39",
+    "name": "花龙",
+    "points": 8
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "mixed-triple-chow",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 12,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-41",
+    "name": "三色三同顺",
+    "points": 8
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-71",
+    "name": "连六",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "mixed-shifted-pungs",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 74,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-12",
+    "name": "四暗刻",
+    "points": 64
+   },
+   {
+    "code": "mcr-42",
+    "name": "三色三节高",
+    "points": 8
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-33",
+    "name": "三暗刻",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-49",
+    "name": "碰碰和",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "by": [
+     null,
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "half-flush",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 14,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-50",
+    "name": "混一色",
+    "points": 6
+   },
+   {
+    "code": "mcr-60",
+    "name": "圈风刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-71",
+    "name": "连六",
+    "points": 1
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "all-types",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 20,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-39",
+    "name": "花龙",
+    "points": 8
+   },
+   {
+    "code": "mcr-52",
+    "name": "五门齐",
+    "points": 6
+   },
+   {
+    "code": "mcr-60",
+    "name": "圈风刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "mixed-shifted-chows",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 10,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-51",
+    "name": "三色三步高",
+    "points": 6
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-72",
+    "name": "老少副",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "outside-hand",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 13,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-55",
+    "name": "全带幺",
+    "points": 4
+   },
+   {
+    "code": "mcr-60",
+    "name": "圈风刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-66",
+    "name": "双暗刻",
+    "points": 2
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-73",
+    "name": "幺九刻",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "knitted-straight",
+  "ok": true,
+  "handKind": "special",
+  "total": 18,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-35",
+    "name": "组合龙",
+    "points": 12
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   },
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "points": 1
+   },
+   {
+    "code": "mcr-79",
+    "name": "单调将",
+    "points": 1
+   }
+  ],
+  "exclusions": []
+ },
+ {
+  "id": "lesser-honors-knitted",
+  "ok": true,
+  "handKind": "special",
+  "total": 28,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-34",
+    "name": "全不靠",
+    "points": 12
+   },
+   {
+    "code": "mcr-35",
+    "name": "组合龙",
+    "points": 12
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-52",
+    "name": "五门齐",
+    "by": [
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "greater-honors-knitted",
+  "ok": true,
+  "handKind": "special",
+  "total": 28,
+  "flowerPoints": 0,
+  "fans": [
+   {
+    "code": "mcr-20",
+    "name": "七星不靠",
+    "points": 24
+   },
+   {
+    "code": "mcr-56",
+    "name": "不求人",
+    "points": 4
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-34",
+    "name": "全不靠",
+    "by": [
+     null
+    ]
+   },
+   {
+    "code": "mcr-52",
+    "name": "五门齐",
+    "by": [
+     null,
+     null
+    ]
+   }
+  ]
+ },
+ {
+  "id": "flowers-add-points",
+  "ok": true,
+  "handKind": "ordinary",
+  "total": 44,
+  "flowerPoints": 2,
+  "fans": [
+   {
+    "code": "mcr-22",
+    "name": "清一色",
+    "points": 24
+   },
+   {
+    "code": "mcr-28",
+    "name": "清龙",
+    "points": 16
+   },
+   {
+    "code": "mcr-62",
+    "name": "门前清",
+    "points": 2
+   },
+   {
+    "code": "mcr-63",
+    "name": "平和",
+    "points": 2
+   },
+   {
+    "code": "mcr-81",
+    "name": "花牌",
+    "points": 1
+   },
+   {
+    "code": "mcr-81",
+    "name": "花牌",
+    "points": 1
+   }
+  ],
+  "exclusions": [
+   {
+    "code": "mcr-76",
+    "name": "无字",
+    "by": [
+     null,
+     null
+    ]
+   }
+  ]
+ }
+]

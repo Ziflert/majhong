@@ -1,3 +1,4 @@
+﻿using Mahjong.Controls;
 using Mahjong.Rules;
 using UnityEngine;
 
@@ -24,6 +25,15 @@ namespace Mahjong.Unity
         /// <summary>How fast a tile turns to its new orientation, in degrees per second.</summary>
         public const float TurnSpeed = 720f;
 
+        /// <summary>
+        /// Colour of the back of a tile: the lacquer of a real set, from the palette in effect. A tile
+        /// is part of the look, and a set of green tiles on a cream table is as wrong as a blue panel.
+        /// </summary>
+        public static Color BackColour => UiStyle.Of(UiRole.TileBody);
+
+        /// <summary>How far a tile under the cursor rises; enough to read as "this one".</summary>
+        public const float HoverLift = 0.012f;
+
         private TextMesh label = null!;
         private Renderer body = null!;
         private Renderer atlasFace = null!;
@@ -31,6 +41,13 @@ namespace Mahjong.Unity
 
         /// <summary>A fresh tile shows neither face nor back until one of them is bound.</summary>
         private bool faceSet;
+
+        /// <summary>Face that waits for the tile to set off: a tile still standing in the wall shows its back.</summary>
+        private TileType pendingFace;
+        private bool hasPendingFace;
+
+        /// <summary>Whether the tile is asked to stand out; a tile with no face yet shows nothing of it.</summary>
+        private bool highlighted;
 
         public TileType Type { get; private set; }
         public bool IsFaceUp { get; private set; }
@@ -51,6 +68,12 @@ namespace Mahjong.Unity
 
         /// <summary>Where the slide ends; the hop of <see cref="Pulse"/> is added on top of it.</summary>
         private Vector3 basePosition;
+
+        private bool hovered;
+        private float hoverOffset;
+
+        /// <summary>True while the hand is being shown as its result: the tiles keep the gold tint.</summary>
+        private bool victory;
 
         private float pulseElapsed;
         private float pulseDelay;
@@ -133,11 +156,28 @@ namespace Mahjong.Unity
             return mesh;
         }
 
+        /// <summary>
+        /// Configures a duplicate of a tile for the camera-anchored hand strip. It uses the same face
+        /// and atlas as the table tile, but its transform is independent from the table perspective.
+        /// </summary>
+        public void SetHudTile(TileType type, Vector3 localPosition, float scale)
+        {
+            transform.localScale = Vector3.one * scale;
+            SpawnAt(transform.position);
+            SetFace(type);
+            transform.localPosition = localPosition;
+            // The ordinary table rotation is around Y. The pinned strip is a vertical, camera-facing
+            // tile row, so its table Z axis becomes the screen Y axis.
+            transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            SetHighlight(false);
+        }
+
         public void Bind(TileType type)
         {
             Type = type;
             IsFaceUp = true;
             faceSet = true;
+            victory = false;
             label.text = TileLabel.Short(type);
             label.color = TileLabel.Text(type);
             body.material.color = TileLabel.Face(type);
@@ -148,21 +188,40 @@ namespace Mahjong.Unity
                 atlasFace.material.mainTextureOffset = AtlasOffset(type);
                 atlasFace.gameObject.SetActive(true);
             }
+
+            ApplyHighlight();
         }
 
         public void BindBack()
         {
             IsFaceUp = false;
             faceSet = true;
+            victory = false;
             label.text = string.Empty;
-            body.material.color = new Color(0.25f, 0.45f, 0.3f);
+            body.material.color = BackColour;
             label.gameObject.SetActive(false);
             atlasFace.gameObject.SetActive(false);
+            ApplyHighlight();
         }
 
-        /// <summary>Shows a face, doing nothing when the tile already shows it.</summary>
+        /// <summary>
+        /// Shows a face, doing nothing when the tile already shows it.
+        ///
+        /// A tile that still has to wait its turn in the deal is standing in the wall, and the wall is
+        /// face down: the face waits for the tile to set off. Binding it at once is what used to make
+        /// the walls of two seats look as if they had open tiles while the dice were still being thrown.
+        /// </summary>
         public void SetFace(TileType type)
         {
+            if (animating && animationDelay > 0f)
+            {
+                pendingFace = type;
+                hasPendingFace = true;
+                SetBack();
+                return;
+            }
+
+            hasPendingFace = false;
             if (faceSet && IsFaceUp && Type == type) return;
             Bind(type);
         }
@@ -172,6 +231,14 @@ namespace Mahjong.Unity
         {
             if (faceSet && !IsFaceUp) return;
             BindBack();
+        }
+
+        /// <summary>Binds the face that was waiting for the tile to leave the wall, if there is one.</summary>
+        private void BindPendingFace()
+        {
+            if (!hasPendingFace) return;
+            hasPendingFace = false;
+            Bind(pendingFace);
         }
 
         private static Vector2 AtlasScale(TileType type) => new(1f / 9f, 1f / 5f);
@@ -191,16 +258,62 @@ namespace Mahjong.Unity
             return new Vector2(column / 9f, (4 - row) / 5f);
         }
 
-        public void SetHighlight(bool highlighted)
+        /// <summary>
+        /// Marks the tile as one the player may act on. The wish is remembered, not just painted: a tile
+        /// that is still in the wall has no face to tint yet, and it picks the highlight up when it gets one.
+        /// </summary>
+        public void SetHighlight(bool on)
         {
-            var colour = TileLabel.Face(Type);
-            body.material.color = highlighted ? Color.Lerp(colour, Color.yellow, 0.45f) : colour;
+            highlighted = on;
+            ApplyHighlight();
         }
+
+        private void ApplyHighlight()
+        {
+            // A tile that is still waiting in the wall has to keep looking like a wall tile: the tint
+            // would give away which tiles are about to leave.
+            if (!faceSet || hasPendingFace) return;
+
+            // Gold of the palette, not of the screen: a highlight belongs to the look of the table.
+            var gold = UiStyle.Of(UiRole.Accent);
+
+            // A face-down tile must stay the colour of its back: tinting it with the face colour
+            // would show which tile is being highlighted even when the player cannot see the face.
+            if (!IsFaceUp)
+            {
+                body.material.color = highlighted ? Color.Lerp(BackColour, gold, 0.35f) : BackColour;
+                return;
+            }
+
+            var colour = TileLabel.Face(Type);
+            if (victory) colour = Color.Lerp(colour, gold, 0.7f);
+            else if (highlighted) colour = Color.Lerp(colour, gold, 0.45f);
+            body.material.color = colour;
+        }
+
+        /// <summary>
+        /// Paints the tile again in the palette that is in effect. Called by the table when the player
+        /// changes the look: a tile is not asked to watch the palette on its own, because a hand, a wall
+        /// and three discard rows are a hundred and thirty-six of them.
+        /// </summary>
+        public void Repaint()
+        {
+            if (!faceSet) return;
+            if (IsFaceUp) label.color = TileLabel.Text(Type);
+            ApplyHighlight();
+        }
+
+        /// <summary>Raises the tile slightly while the cursor is over it.</summary>
+        public void SetHovered(bool on) => hovered = on;
+
+        /// <summary>Current lift of the hover, in table units; zero when the cursor is elsewhere.</summary>
+        public float HoverOffset => hoverOffset;
 
         /// <summary>Persistent victory colour used while the hand-result screen is shown.</summary>
         public void SetVictoryHighlight()
         {
-            body.material.color = Color.Lerp(TileLabel.Face(Type), Color.yellow, 0.7f);
+            victory = true;
+            ApplyHighlight();
         }
 
         /// <summary>Moves the tile to a place at once; used at the deal and by tests.</summary>
@@ -236,6 +349,10 @@ namespace Mahjong.Unity
                 transform.rotation = destinationRotation;
             }
 
+            // A tile that no longer has to wait is not standing in the wall any more: nothing would
+            // ever release its face.
+            if (!animating) BindPendingFace();
+
             transform.position = basePosition + Vector3.up * pulseOffset;
         }
 
@@ -261,6 +378,7 @@ namespace Mahjong.Unity
             animating = false;
             pulsing = false;
             pulseOffset = 0f;
+            BindPendingFace();
             transform.position = basePosition;
         }
 
@@ -270,6 +388,7 @@ namespace Mahjong.Unity
             transform.position = position;
             hasTarget = false;
             animating = false;
+            hasPendingFace = false;
             pulsing = false;
             pulseOffset = 0f;
         }
@@ -283,7 +402,15 @@ namespace Mahjong.Unity
         {
             UpdateSlide();
             UpdatePulse();
-            transform.position = basePosition + Vector3.up * pulseOffset;
+            UpdateHover();
+            transform.position = basePosition + Vector3.up * (pulseOffset + hoverOffset);
+        }
+
+        private void UpdateHover()
+        {
+            var target = hovered ? HoverLift : 0f;
+            if (Mathf.Approximately(hoverOffset, target)) return;
+            hoverOffset = Mathf.MoveTowards(hoverOffset, target, Time.deltaTime * 0.12f);
         }
 
         private void UpdateSlide()
@@ -291,6 +418,8 @@ namespace Mahjong.Unity
             if (!animating) return;
 
             animationElapsed += Time.deltaTime;
+            // The wait in the deal is over: the tile sets off and may show what it is.
+            if (hasPendingFace && animationElapsed >= animationDelay) BindPendingFace();
             var t = Mathf.Clamp01((animationElapsed - animationDelay) / animationDuration);
             // Smooth-step gives the move a deliberate ease-in/ease-out instead of robotic constant speed.
             var eased = t * t * (3f - 2f * t);

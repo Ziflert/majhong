@@ -2,7 +2,8 @@
     "name": "Mahjong.View",
     "rootNamespace": "Mahjong.Unity",
     "references": [
-        "Mahjong"
+        "Mahjong",
+        "Unity.ugui"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

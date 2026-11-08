@@ -17,12 +17,17 @@ namespace Mahjong.Rules
     public enum ActionKind { Draw, Discard, Chow, Pung, OpenKong, AddedKong, ClosedKong, Win, Pass }
 
     /// <summary>An action the engine currently allows, with everything the UI needs to describe it.</summary>
+    /// <param name="Points">
+    /// Value of a promised Hu: the interface shows it on the button, and it spares the view from
+    /// parsing the English sentence in <paramref name="Description"/> to find the number.
+    /// </param>
     public sealed record LegalAction(
         ActionKind Kind,
         int PlayerIndex,
         Tile? Tile,
         IReadOnlyList<Tile> RequiredTiles,
-        string Description)
+        string Description,
+        int Points = 0)
     {
         public override string ToString() => $"P{PlayerIndex} {Kind}: {Description}";
     }
@@ -39,6 +44,15 @@ namespace Mahjong.Rules
         private readonly Dictionary<int, LegalAction> claimResponses = new();
         private readonly Dictionary<int, string> winForbidden = new();
 
+        /// <summary>
+        /// The rules this hand is played by. The state machine itself is the same for every profile;
+        /// the profile only decides where the wall ends, which scorer prices the hand and whether a
+        /// win needs a minimum of points.
+        /// </summary>
+        public GameState(RuleVariant? variant = null) => Variant = variant ?? RuleVariant.Default;
+
+        public RuleVariant Variant { get; }
+
         private (int Player, Tile Tile)? pendingDiscard;
         private (int Player, Tile Tile)? robbery;
         private bool claimedThisTurn;
@@ -52,6 +66,13 @@ namespace Mahjong.Rules
         public GamePhase Phase { get; private set; } = GamePhase.NotStarted;
         public Tile? LastDraw { get; private set; }
         public ClaimSource? LastDrawSource { get; private set; }
+
+        /// <summary>
+        /// True when the tile behind <see cref="LastDraw"/> was the very last tile of the wall.
+        /// Recorded at the moment of the draw: after it the wall is already exhausted, so asking
+        /// the wall afterwards can no longer tell (fan 44, "last tile draw").
+        /// </summary>
+        public bool LastDrawWasLastWallTile { get; private set; }
         public Wind RoundWind { get; private set; } = Wind.East;
         public WinResult? Result { get; private set; }
         public bool EndedInDraw { get; private set; }
@@ -59,6 +80,9 @@ namespace Mahjong.Rules
         public DiceRoll DealerRoll { get; private set; }
         public DiceRoll BreakRoll { get; private set; }
         public int DiceThrower { get; private set; }
+
+        /// <summary>Rule 3.5.7.5: the stacks counted from the second thrower's right end before the break.</summary>
+        public int BreakStacks => Dice.BreakStacks(DealerRoll, BreakRoll);
 
         public Wind SeatWindOf(int player) => (Wind)(((player - Dealer) % 4 + 4) % 4);
         public IReadOnlyList<LegalAction> CurrentPlayerActions => GetLegalActions(CurrentPlayer);
@@ -91,12 +115,13 @@ namespace Mahjong.Rules
             CurrentPlayer = dealer;
             RoundWind = roundWind;
             var random = seed.HasValue ? new Random(seed.Value) : new Random();
-            Wall = Wall.CreateShuffled(random);
+            Wall = Wall.CreateShuffled(random, Variant.DeadWallTiles, Variant.FreeTiles,
+                Variant.WallStacks, Variant.IncludeFlowers);
 
             DealerRoll = Dice.Roll(random);
             DiceThrower = (dealer + Dice.ThrowerOffset(DealerRoll.Sum)) % 4;
             BreakRoll = Dice.Roll(random);
-            Wall.Break(Dice.BreakStacks(DealerRoll, BreakRoll));
+            Wall.Break(DiceThrower, BreakStacks);
 
             for (var round = 0; round < 3; round++)
                 for (var offset = 0; offset < 4; offset++)
@@ -127,6 +152,7 @@ namespace Mahjong.Rules
             EndedInDraw = false;
             LastDraw = null;
             LastDrawSource = null;
+            LastDrawWasLastWallTile = false;
             winForbidden.Clear();
             for (var i = 0; i < 4; i++) Players[i] = new PlayerHand();
         }
@@ -141,7 +167,7 @@ namespace Mahjong.Rules
                 foreach (var flower in hand.TakeConcealedFlowers())
                 {
                     hand.AddFlower(flower);
-                    if (Wall.IsExhausted) return;
+                    if (!Wall.CanReplace) return;
                     hand.AddConcealed(ResolveFlowerChain(Wall.DrawReplacement()));
                 }
             }
@@ -153,7 +179,7 @@ namespace Mahjong.Rules
             while (tile.IsFlower)
             {
                 hand.AddFlower(tile);
-                if (Wall.IsExhausted) throw new InvalidOperationException("The wall ran out while replacing flowers.");
+                if (!Wall.CanReplace) throw new InvalidOperationException("The wall ran out while replacing flowers.");
                 tile = Wall.DrawReplacement();
             }
             return tile;
@@ -186,17 +212,24 @@ namespace Mahjong.Rules
             foreach (var tile in hand.Concealed)
                 actions.Add(new LegalAction(ActionKind.Discard, player, tile, Array.Empty<Tile>(), $"Discard {tile.Type}"));
 
-            if (LastDrawSource.HasValue || hand.Concealed.Count == 14 - hand.Melds.Count * 3)
-            {
-                // A forbidden player keeps drawing and discarding, but the engine stops offering Hu (3.11.6).
-                var win = IsWinForbidden(player)
-                    ? ScoreResult.Forbidden(WinForbiddenReason(player) ?? "Hu is forbidden in this hand.")
-                    : EvaluateWin(player, hand, null, LastDrawSource ?? ClaimSource.SelfDraw, Wall.IsLastLiveTile, false);
-                if (win.IsValidWin)
-                    actions.Add(new LegalAction(ActionKind.Win, player, null, Array.Empty<Tile>(), $"Declare Hu for {win.TotalPoints} points"));
-            }
+            // A forbidden player keeps drawing and discarding, but the engine stops offering Hu (3.11.6).
+            // Normally the winning tile is the fresh draw.  A complete hand can also reach this phase
+            // after a replay/restore (or after a replacement tile was normalised by the view), where
+            // LastDrawSource is no longer present.  Do not make the Hu button depend on that UI
+            // bookkeeping: score the hand that is actually in front of us.  In the classic table a
+            // pung/chow may itself leave the hand complete (two open chows, an open pung, a concealed
+            // pung and a pair is the common example).  Keep Hu available in that state instead of
+            // forcing the player to discard a tile from an already complete hand.
+            var source = LastDrawSource ?? ClaimSource.SelfDraw;
+            var win = IsWinForbidden(player)
+                ? ScoreResult.Forbidden(WinForbiddenReason(player) ?? "Hu is forbidden in this hand.")
+                : EvaluateWin(player, hand, LastDraw?.Type, source, LastDrawWasLastWallTile, false,
+                    winningTileInHand: LastDrawSource.HasValue);
+            if (win.IsValidWin)
+                actions.Add(new LegalAction(ActionKind.Win, player, null, Array.Empty<Tile>(),
+                    $"Declare Hu for {win.TotalPoints} points", win.TotalPoints));
 
-            if (!claimedThisTurn && !Wall.IsExhausted)
+            if (!claimedThisTurn && Wall.CanReplace)
             {
                 foreach (var group in hand.Concealed.GroupBy(t => t.Type).Where(g => g.Count() == 4))
                 {
@@ -232,7 +265,8 @@ namespace Mahjong.Rules
                 ? ScoreResult.Forbidden(WinForbiddenReason(player) ?? "Hu is forbidden in this hand.")
                 : EvaluateWin(player, hand, tile.Type, ClaimSource.Discard, false, Wall.IsExhausted);
             if (win.IsValidWin)
-                actions.Add(new LegalAction(ActionKind.Win, player, tile, Array.Empty<Tile>(), $"Claim Hu on {tile.Type} for {win.TotalPoints} points"));
+                actions.Add(new LegalAction(ActionKind.Win, player, tile, Array.Empty<Tile>(),
+                    $"Claim Hu on {tile.Type} for {win.TotalPoints} points", win.TotalPoints));
 
             var copies = hand.Concealed.Where(t => t.Type == tile.Type).ToList();
             // Rule: once the last tile of the wall has been taken, only Hu may be declared.
@@ -263,7 +297,8 @@ namespace Mahjong.Rules
                 ? ScoreResult.Forbidden(WinForbiddenReason(player) ?? "Hu is forbidden in this hand.")
                 : EvaluateWin(player, Players[player], robbery.Value.Tile.Type, ClaimSource.Discard, false, false, robbedKong: true);
             if (win.IsValidWin)
-                actions.Add(new LegalAction(ActionKind.Win, player, robbery.Value.Tile, Array.Empty<Tile>(), $"Robbing the kong for {win.TotalPoints} points"));
+                actions.Add(new LegalAction(ActionKind.Win, player, robbery.Value.Tile, Array.Empty<Tile>(),
+                    $"Robbing the kong for {win.TotalPoints} points", win.TotalPoints));
             actions.Add(new LegalAction(ActionKind.Pass, player, null, Array.Empty<Tile>(), "Pass"));
             return actions;
         }
@@ -295,7 +330,11 @@ namespace Mahjong.Rules
         public void Apply(LegalAction action)
         {
             var legal = GetLegalActions(action.PlayerIndex);
-            var match = legal.FirstOrDefault(a => a.Kind == action.Kind && SameTile(a.Tile, action.Tile));
+            // Identity of a legal action is the kind, the tile and the tiles it consumes. A discard can
+            // offer two chows on the same face (678 and 789 on an 8), and they are not interchangeable:
+            // matching on the tile alone would take the first one and remove the wrong tiles from the hand.
+            var match = legal.FirstOrDefault(a => a.Kind == action.Kind && SameTile(a.Tile, action.Tile)
+                                                  && SameTiles(a.RequiredTiles, action.RequiredTiles));
             if (match == null) throw new InvalidOperationException($"Illegal action: {action}");
 
             switch (action.Kind)
@@ -331,6 +370,14 @@ namespace Mahjong.Rules
         private static bool SameTile(Tile? left, Tile? right) =>
             left.HasValue == right.HasValue && (!left.HasValue || left.Value.InstanceId == right!.Value.InstanceId);
 
+        private static bool SameTiles(IReadOnlyList<Tile> left, IReadOnlyList<Tile> right)
+        {
+            if (left.Count != right.Count) return false;
+            var leftIds = left.Select(tile => tile.InstanceId).OrderBy(id => id).ToList();
+            var rightIds = right.Select(tile => tile.InstanceId).OrderBy(id => id).ToList();
+            return leftIds.SequenceEqual(rightIds);
+        }
+
         private void DrawFromWall()
         {
             var hand = Players[CurrentPlayer];
@@ -340,13 +387,14 @@ namespace Mahjong.Rules
             {
                 hand.AddFlower(tile);
                 source = ClaimSource.FlowerReplacement;
-                if (Wall.IsExhausted) { FinishDraw(); return; }
+                if (!Wall.CanReplace) { FinishDraw(); return; }
                 tile = Wall.DrawReplacement();
             }
 
             hand.AddConcealed(tile);
             LastDraw = tile;
             LastDrawSource = source;
+            LastDrawWasLastWallTile = Wall.IsExhausted;
             claimedThisTurn = false;
             Phase = GamePhase.AwaitingDiscard;
         }
@@ -470,7 +518,8 @@ namespace Mahjong.Rules
         {
             var hand = Players[CurrentPlayer];
             var source = LastDrawSource ?? ClaimSource.SelfDraw;
-            var score = EvaluateWin(CurrentPlayer, hand, null, source, Wall.IsLastLiveTile, false);
+            var score = EvaluateWin(CurrentPlayer, hand, LastDraw?.Type, source, LastDrawWasLastWallTile, false,
+                winningTileInHand: true);
             if (!score.IsValidWin) throw new InvalidOperationException("The hand is not a valid win.");
             Result = new WinResult(CurrentPlayer, source, score);
             Phase = GamePhase.HandFinished;
@@ -553,19 +602,26 @@ namespace Mahjong.Rules
 
         private void DrawReplacementForCurrentPlayer()
         {
+            if (!Wall.CanReplace) { FinishDraw(); return; }
+
             var hand = Players[CurrentPlayer];
             var tile = Wall.DrawReplacement();
             while (tile.IsFlower)
             {
                 hand.AddFlower(tile);
-                if (Wall.IsExhausted) { FinishDraw(); return; }
+                if (!Wall.CanReplace) { FinishDraw(); return; }
                 tile = Wall.DrawReplacement();
             }
 
             hand.AddConcealed(tile);
             LastDraw = tile;
             LastDrawSource = ClaimSource.KongReplacement;
-            if (Wall.IsExhausted) { FinishDraw(); return; }
+            LastDrawWasLastWallTile = Wall.IsExhausted;
+            // The kong earned a fresh tile, so the player is free again: another kong may follow
+            // (3.6.8), and a win on this very tile (fan 46) has to stay possible even when the wall
+            // ran out. Only the discard that follows can end the hand, and that path already knows
+            // what an empty wall means ("only Hu may be declared").
+            claimedThisTurn = false;
             Phase = GamePhase.AwaitingDiscard;
         }
 
@@ -578,12 +634,13 @@ namespace Mahjong.Rules
         // -------------------------------------------------------------- scoring
 
         public ScoreResult EvaluateWin(int player, PlayerHand hand, TileType? winningTile, ClaimSource source,
-            bool lastTileOfWall, bool lastDiscard, bool robbedKong = false)
+            bool lastTileOfWall, bool lastDiscard, bool robbedKong = false, bool winningTileInHand = false)
         {
-            return Scoring.Evaluate(new ScoringContext
+            return Variant.Score(new ScoringContext
             {
                 Hand = hand,
                 WinningTile = winningTile,
+                WinningTileInHand = winningTileInHand,
                 Source = source,
                 RoundWind = RoundWind,
                 SeatWind = SeatWindOf(player),
@@ -591,7 +648,9 @@ namespace Mahjong.Rules
                 LastDiscard = lastDiscard,
                 RobbedKong = robbedKong,
                 DiscardPile = discards.Select(d => d.Tile.Type).ToList(),
-                OtherMelds = Players.SelectMany(p => p.Melds).ToList()
+                // Opponents only: the winner's own melds are part of the hand and would be counted twice
+                // when the scorer works out how many copies of the winning face are visible.
+                OtherMelds = Players.Where((_, seat) => seat != player).SelectMany(p => p.Melds).ToList()
             });
         }
     }

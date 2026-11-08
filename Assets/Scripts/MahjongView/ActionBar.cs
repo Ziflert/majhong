@@ -1,5 +1,6 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Mahjong.Controls;
+using Mahjong.Localization;
 using Mahjong.Rules;
 using UnityEngine;
 
@@ -28,6 +29,9 @@ namespace Mahjong.Unity
 
         /// <summary>Fingerprint of the option set on screen; empty when the bar is hidden.</summary>
         public string Fingerprint { get; private set; } = string.Empty;
+
+        /// <summary>Language the captions were built in; a switch rebuilds the bar.</summary>
+        private Language shownLanguage = Language.En;
 
         public bool IsOpen => buttons.Count > 0;
         public IReadOnlyList<ActionButton> Buttons => buttons;
@@ -61,8 +65,9 @@ namespace Mahjong.Unity
             mesh.fontSize = 64;
             // slightly larger than the HUD status line, which is known to be readable on 1080p
             mesh.characterSize = 0.0018f;
-            mesh.color = new Color(0.80f, 0.82f, 0.85f);
+            mesh.color = UiStyle.Of(UiRole.TextMain);
             mesh.text = string.Empty;
+            UiFont.Assign(mesh);
             return mesh;
         }
 
@@ -75,14 +80,17 @@ namespace Mahjong.Unity
                 return;
             }
 
-            if (prompt.Fingerprint == Fingerprint && buttons.Count == prompt.Count) return;
+            if (prompt.Fingerprint == Fingerprint && buttons.Count == prompt.Count
+                && shownLanguage == Loc.Current) return;
 
             Clear();
             Fingerprint = prompt.Fingerprint;
+            shownLanguage = Loc.Current;
 
-            var slot = Mathf.Min(MaxSlot, MaxWidth / prompt.Count);
-            var width = slot - Gap;
-            var total = prompt.Count * slot - Gap;
+            var gap = UiStyle.ButtonGap(Gap);
+            var slot = Mathf.Min(MaxSlot * UiStyle.Profile.ButtonSpacing, MaxWidth / prompt.Count);
+            var width = slot - gap;
+            var total = prompt.Count * slot - gap;
             for (var i = 0; i < prompt.Count; i++)
             {
                 var button = ActionButton.Create(transform, prompt.Options[i], width, ButtonHeight);
@@ -151,6 +159,8 @@ namespace Mahjong.Unity
             foreach (var button in buttons)
                 if (button != null) Destroy(button.gameObject);
             buttons.Clear();
+            // A hidden bar has no captions, so the next Show must rebuild them in the new language.
+            shownLanguage = Loc.Current;
         }
     }
 }

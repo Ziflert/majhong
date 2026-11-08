@@ -30,26 +30,20 @@ namespace Mahjong.Controls
     public sealed class PlayClock
     {
         /// <summary>Rule 3.5.7.6: 20 seconds to arrange the tiles up to the first discard.</summary>
-        public static readonly TimeSpan ArrangeLimit = TimeSpan.FromSeconds(20);
+        public static readonly TimeSpan ArrangeLimit = ClockLimits.Rules.Arrange;
 
         /// <summary>Rule 3.6.4: a tile has to be discarded within 10 seconds.</summary>
-        public static readonly TimeSpan DiscardLimit = TimeSpan.FromSeconds(10);
+        public static readonly TimeSpan DiscardLimit = ClockLimits.Rules.Discard;
 
         /// <summary>Rule 3.6.7: a pung or kong has to be spoken within 3 seconds of the discard.</summary>
-        public static readonly TimeSpan ClaimLimit = TimeSpan.FromSeconds(3);
+        public static readonly TimeSpan ClaimLimit = ClockLimits.Rules.Claim;
 
         /// <summary>The limit the rules give to a window; <see cref="ClockWindow.Idle"/> has none.</summary>
-        public static TimeSpan LimitOf(ClockWindow window) => window switch
-        {
-            ClockWindow.Arrange => ArrangeLimit,
-            ClockWindow.Discard => DiscardLimit,
-            ClockWindow.Claim => ClaimLimit,
-            _ => TimeSpan.Zero
-        };
+        public static TimeSpan LimitOf(ClockWindow window) => ClockLimits.Rules.LimitOf(window);
 
         public ClockWindow Window { get; private set; } = ClockWindow.Idle;
 
-        /// <summary>How long the current window lasts; zero when idle.</summary>
+        /// <summary>How long the current window lasts; zero when idle or when the window has no limit.</summary>
         public TimeSpan Limit { get; private set; }
 
         /// <summary>How long the current window has been open; clamped at the limit.</summary>
@@ -57,28 +51,50 @@ namespace Mahjong.Controls
 
         public bool IsRunning => Window != ClockWindow.Idle;
 
-        /// <summary>Time left in the window; zero when idle or already expired.</summary>
-        public TimeSpan Remaining => !IsRunning || Elapsed >= Limit ? TimeSpan.Zero : Limit - Elapsed;
+        /// <summary>
+        /// True when the open window counts down. A window without a limit (<see cref="ClockLimits.Unlimited"/>)
+        /// stays open until the player acts, so nothing about it ever runs out.
+        /// </summary>
+        public bool IsLimited => IsRunning && Limit > TimeSpan.Zero;
+
+        /// <summary>Time left in the window; zero when idle, unlimited or already expired.</summary>
+        public TimeSpan Remaining => !IsLimited || Elapsed >= Limit ? TimeSpan.Zero : Limit - Elapsed;
 
         /// <summary>True from the moment the limit is reached until the window is restarted or stopped.</summary>
-        public bool IsExpired => IsRunning && Elapsed >= Limit;
+        public bool IsExpired => IsLimited && Elapsed >= Limit;
 
         /// <summary>How much of the window is used up, from zero to one; used by UI strips.</summary>
-        public double Fraction => !IsRunning || Limit <= TimeSpan.Zero
-            ? 0d
-            : Math.Min(1d, Elapsed.TotalSeconds / Limit.TotalSeconds);
+        public double Fraction => !IsLimited ? 0d : Math.Min(1d, Elapsed.TotalSeconds / Limit.TotalSeconds);
 
         /// <summary>Seconds left, rounded up, for a countdown line: 3, 2, 1, 0.</summary>
-        public int SecondsLeft => IsRunning ? (int)Math.Ceiling(Remaining.TotalSeconds) : 0;
+        public int SecondsLeft => IsLimited ? (int)Math.Ceiling(Remaining.TotalSeconds) : 0;
 
         /// <summary>Opens a window with the limit the rules give it, discarding any previous window.</summary>
         public void Restart(ClockWindow window) => Restart(window, LimitOf(window));
 
+        /// <summary>
+        /// Opens a window with the limits the player chose (У-1). A zero limit opens the window without
+        /// a countdown: the table then waits for the player instead of playing for him.
+        /// </summary>
+        public void Restart(ClockWindow window, ClockLimits limits)
+        {
+            if (limits == null) throw new ArgumentNullException(nameof(limits));
+
+            var limit = limits.LimitOf(window);
+            if (limit > TimeSpan.Zero) Restart(window, limit);
+            else Set(window, TimeSpan.Zero);
+        }
+
         /// <summary>Opens a window with an explicit limit; tests and shortened demos use this.</summary>
         public void Restart(ClockWindow window, TimeSpan limit)
         {
-            if (window == ClockWindow.Idle) throw new ArgumentOutOfRangeException(nameof(window), "An idle window has no limit.");
             if (limit <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(limit));
+            Set(window, limit);
+        }
+
+        private void Set(ClockWindow window, TimeSpan limit)
+        {
+            if (window == ClockWindow.Idle) throw new ArgumentOutOfRangeException(nameof(window), "An idle window has no limit.");
 
             Window = window;
             Limit = limit;
@@ -100,7 +116,7 @@ namespace Mahjong.Controls
         /// </summary>
         public bool Tick(TimeSpan delta)
         {
-            if (!IsRunning || delta <= TimeSpan.Zero || IsExpired) return false;
+            if (!IsLimited || delta <= TimeSpan.Zero || IsExpired) return false;
 
             Elapsed += delta;
             if (Elapsed < Limit) return false;
@@ -109,6 +125,8 @@ namespace Mahjong.Controls
             return true;
         }
 
-        public override string ToString() => IsRunning ? $"{Window} {SecondsLeft}s/{Limit.TotalSeconds:0}s" : "idle";
+        public override string ToString() => !IsRunning ? "idle"
+            : IsLimited ? $"{Window} {SecondsLeft}s/{Limit.TotalSeconds:0}s"
+            : $"{Window} without a limit";
     }
 }

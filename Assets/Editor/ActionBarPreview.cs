@@ -25,7 +25,8 @@ namespace Mahjong.EditorTools
 
         public static void CaptureAndExit()
         {
-            var directory = Environment.GetEnvironmentVariable("MAHJONG_SHOT_DIR") ?? "Screenshots";
+            var directory = Environment.GetEnvironmentVariable("MAHJONG_SHOT_DIR")
+                ?? Path.Combine("Screenshots", "current");
             Directory.CreateDirectory(directory);
 
             SessionState.SetString(DirectoryKey, directory);
@@ -61,7 +62,8 @@ namespace Mahjong.EditorTools
 
             if (elapsed >= ShotAt && !SessionState.GetBool(ArmedKey + ".Shot", false))
             {
-                var path = Path.GetFullPath(Path.Combine(SessionState.GetString(DirectoryKey, "Screenshots"),
+                var path = Path.GetFullPath(Path.Combine(SessionState.GetString(DirectoryKey,
+                    Path.Combine("Screenshots", "current")),
                     "action-bar.png"));
                 ScreenCapture.CaptureScreenshot(path);
                 Debug.Log("[bar-preview] saved " + path);

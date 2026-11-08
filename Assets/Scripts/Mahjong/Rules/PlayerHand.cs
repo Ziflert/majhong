@@ -28,7 +28,11 @@ namespace Mahjong.Rules
         public bool RemoveConcealed(IEnumerable<Tile> tiles)
         {
             var selected = tiles.ToList();
-            if (selected.Any(tile => !concealed.Contains(tile))) return false;
+            // Validate multiplicity, not just membership: asking to remove the same physical
+            // tile twice must fail instead of silently removing it once.
+            var available = new HashSet<Tile>(concealed);
+            foreach (var tile in selected)
+                if (!available.Remove(tile)) return false;
             foreach (var tile in selected) concealed.Remove(tile);
             return true;
         }

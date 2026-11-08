@@ -1,0 +1,178 @@
+{
+  "comment": "Golden MCR hands used to cross-check the engine against an independent scorer (miaoda-game-mcr-mahjong-analysis-core). Notation follows the reference: suits m/p/s, honors E S W N (winds) and C F P (red, green, white dragons). `tiles` holds the 13 concealed tiles before the winning tile for a closed hand; declared melds, if any, are listed separately.",
+  "hands": [
+    {
+      "id": "pure-straight-mixed-chow",
+      "tiles": "123m 456m 789m 12p 55p",
+      "win": "3p",
+      "source": "discard",
+      "note": "Pure Straight; the reference counts One Voided Suit and Edge Wait here, not Two Terminal Chows."
+    },
+    {
+      "id": "seven-pairs-simple",
+      "tiles": "11m 22m 33m 44p 55p 66s 7s",
+      "win": "7s",
+      "source": "discard",
+      "note": "Seven Pairs across three suits, no honors."
+    },
+    {
+      "id": "thirteen-orphans",
+      "tiles": "19m 19p 19s E S W N C F P",
+      "win": "1m",
+      "source": "discard",
+      "note": "Thirteen Orphans."
+    },
+    {
+      "id": "big-four-winds",
+      "tiles": "EEE SSS WWW NNN 1m",
+      "win": "1m",
+      "source": "discard",
+      "note": "Four wind pungs plus a pair."
+    },
+    {
+      "id": "big-three-dragons",
+      "tiles": "CCC FFF PPP 123m 5m",
+      "win": "5m",
+      "source": "discard",
+      "note": "Three dragon pungs, one chow, one pair."
+    },
+    {
+      "id": "all-terminals",
+      "tiles": "111m 999m 111p 999s 1s",
+      "win": "1s",
+      "source": "discard",
+      "note": "All Terminals: terminal pungs and a terminal pair."
+    },
+    {
+      "id": "four-concealed-pungs",
+      "tiles": "111m 333m 555p 777s 9p",
+      "win": "9p",
+      "source": "wall",
+      "note": "Four concealed pungs won by self-draw."
+    },
+    {
+      "id": "all-pungs",
+      "tiles": "222m 444m 666p 888s 5p",
+      "win": "5p",
+      "source": "discard",
+      "note": "All Pungs with all simples."
+    },
+    {
+      "id": "full-flush",
+      "tiles": "123m 456m 789m 11m 44m",
+      "win": "2m",
+      "source": "discard",
+      "note": "Full Flush, one suit only; pair is deliberately not the winning tile, so Last Tile is not implied."
+    },
+    {
+      "id": "half-flush",
+      "tiles": "123s 456s 789s 11s WW",
+      "win": "W",
+      "source": "discard",
+      "note": "Half Flush with a wind pair."
+    },
+    {
+      "id": "all-chows-simple",
+      "tiles": "234m 567m 234p 678p 5s",
+      "win": "5s",
+      "source": "discard",
+      "note": "All Chows with all simples and a mixed double chow."
+    },
+    {
+      "id": "pure-triple-chow",
+      "tiles": "345m 345m 345m 777p 8p",
+      "win": "8p",
+      "source": "discard",
+      "note": "Pure Triple Chow: three identical chows in one suit."
+    },
+    {
+      "id": "mixed-triple-chow",
+      "tiles": "345m 345p 345s 777s 8m",
+      "win": "8m",
+      "source": "discard",
+      "note": "Mixed Triple Chow: same rank in three suits."
+    },
+    {
+      "id": "triple-pung",
+      "tiles": "555m 555p 555s 123s 1m",
+      "win": "1m",
+      "source": "discard",
+      "note": "Triple Pung: same rank in three suits."
+    },
+    {
+      "id": "all-fives",
+      "tiles": "345m 456m 345p 456p 5s",
+      "win": "5s",
+      "source": "discard",
+      "note": "All Fives: every set contains a 5."
+    },
+    {
+      "id": "pure-shifted-pungs",
+      "tiles": "222m 333m 444m 777p 8p",
+      "win": "8p",
+      "source": "discard",
+      "note": "Pure Shifted Pungs."
+    },
+    {
+      "id": "upper-four",
+      "tiles": "678m 678p 666s 888s 9m",
+      "win": "9m",
+      "source": "discard",
+      "note": "Upper Four, tiles 6-9 only."
+    },
+    {
+      "id": "lower-four",
+      "tiles": "123m 123p 111s 222s 4m",
+      "win": "4m",
+      "source": "discard",
+      "note": "Lower Four, tiles 1-4 only."
+    },
+    {
+      "id": "outside-hand",
+      "tiles": "123m 789m 123p 999s 1s",
+      "win": "1s",
+      "source": "discard",
+      "note": "Outside Hand: every set has a terminal or honor."
+    },
+    {
+      "id": "all-simples",
+      "tiles": "234m 567m 234p 678p 5s",
+      "win": "5s",
+      "source": "discard",
+      "note": "All Simples with all chows."
+    },
+    {
+      "id": "dragon-pung-winds",
+      "tiles": "CCC EEE 234m 456p 9p",
+      "win": "9p",
+      "source": "discard",
+      "roundWind": "E",
+      "seatWind": "E",
+      "note": "Dragon pung plus a wind pung scoring both seat and round wind (round and seat are both East)."
+    },
+    {
+      "id": "last-tile-draw",
+      "tiles": "123m 456m 789p 234s 5s",
+      "win": "5s",
+      "source": "wall",
+      "lastWallEvent": true,
+      "note": "Last Tile Draw on the final wall tile."
+    },
+    {
+      "id": "last-copy",
+      "tiles": "123m 456m 789m 12p 55p",
+      "win": "3p",
+      "source": "discard",
+      "lastCopy": true,
+      "note": "Winning on the last tile of its kind, on top of the Pure Straight shape."
+    },
+    {
+      "id": "flower-addition",
+      "tiles": "123m 456m 789m 12p 55p",
+      "win": "3p",
+      "source": "wall",
+      "flowerCount": 2,
+      "note": "Self-draw on the Pure Straight shape with two flowers; flowers score outside the 8-point gate."
+    }
+  ]
+}

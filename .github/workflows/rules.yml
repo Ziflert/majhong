@@ -1,0 +1,27 @@
+name: rules
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  rules-check:
+    name: headless rules and scoring
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # The single source of truth: rules, scoring, sessions, penalties, clocks and bots.
+      - name: RulesCheck
+        run: dotnet run --project Tools/RulesCheck
+
+      # Diagnostic only: prints our scoring of the golden hands so a diff against the
+      # reference MCR analyser (Tools/mcr-ref, needs node) can be read from the log.
+      - name: Golden hands (our scoring)
+        run: dotnet run --project Tools/GoldenCompare -- Tools/GoldenCompare/hands.json
