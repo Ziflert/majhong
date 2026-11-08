@@ -30,7 +30,7 @@ namespace Mahjong.Rules.Diagnostics
             var title = new TitleScreen(settings);
 
             report.Equal(TitlePage.Main, title.Page, "the screen opens on the main page");
-            report.Equal(20, title.RowCount, "the main page has twenty rows");
+            report.Equal(7, title.RowCount, "the main page keeps only the launch actions");
             report.Equal(TitleItem.NewGame, title.Selected, "the cursor starts on the new game");
             report.Equal("", title.Status, "a fresh screen says nothing under the rows");
 
@@ -41,18 +41,15 @@ namespace Mahjong.Rules.Diagnostics
             report.Equal(TitleItem.LoadGame, items[2], "then the list of saved games");
             report.Equal(TitleItem.Quit, items[items.Count - 1], "quitting is the last row");
 
-            // Two modes are planned and not built: they stand on the screen, say why and do nothing.
-            var local = title.RowAt(3);
-            var multi = title.RowAt(4);
-            report.Equal(TitleItem.LocalGame, local.Item, "the fourth row is the local game");
-            report.Equal(TitleRowState.Unavailable, local.State, "the local game is not built yet");
-            report.Equal(TitleRowState.Unavailable, multi.State, "multiplayer is not built yet");
-            report.Check(local.Value.Length > 0, "a row that is not built says it on screen");
+            // The unfinished modes are hidden in the normal build.
+            report.Check(!items.Contains(TitleItem.LocalGame), "local mode is hidden from the launch page");
+            report.Check(!items.Contains(TitleItem.Multiplayer), "multiplayer is hidden from the launch page");
 
-            title.Move(3);
-            report.Equal(TitleItem.LocalGame, title.Selected, "the cursor walks down the rows");
-            report.Equal(TitleCommand.None, title.Activate(), "an unbuilt mode cannot be picked");
-            report.Check(title.Status.Contains(local.Label), $"the screen explains the pick: {title.Status}");
+            title.Move(4);
+            report.Equal(TitleItem.Settings, title.Selected, "the cursor reaches the settings page");
+            report.Equal(TitleCommand.None, title.Activate(), "settings opens without starting a game");
+            report.Equal(TitlePage.Settings, title.Page, "settings opens its own page");
+            title.Back();
 
             // The cursor wraps, so one key press always lands on a row.
             title.Move(-4);
@@ -65,7 +62,7 @@ namespace Mahjong.Rules.Diagnostics
             report.Equal(TitleCommand.Quit, title.Activate(), "and picking it asks the game to quit");
 
             // With nothing saved, "continue" says so instead of opening a file that is not there.
-            title.Move(2);
+            title.Move(1);
             report.Equal(TitleItem.Continue, title.Selected, "the cursor is on continue");
             report.Check(!title.CanContinue, "an empty folder gives nothing to continue");
             report.Equal(TitleCommand.None, title.Activate(), "continue does nothing without a save");
@@ -76,7 +73,7 @@ namespace Mahjong.Rules.Diagnostics
             report.Equal(TitleCommand.NewGame, title.Activate(), "picking a new game deals a hand");
 
             // The rulebook is readable before the game starts.
-            title.Move(title.RowCount - 2);
+            title.Move(-1);
             report.Equal(TitleItem.Rules, title.Selected, "the rulebook has its own row");
             report.Equal(TitleCommand.Rules, title.Activate(), "and the row opens it");
         }
@@ -85,10 +82,12 @@ namespace Mahjong.Rules.Diagnostics
         {
             var settings = new GameSettings();
             var title = new TitleScreen(settings);
+            title.OpenSettings();
 
-            // The profile is the fifth of the settings rows; a step moves between the presets and stops.
-            title.Move(5);
-            report.Equal(TitleItem.Variant, title.Selected, "the sixth row is the rules profile");
+            // The settings page starts with the game section; its first adjustable row is bot strength.
+            title.Move(1);
+            report.Equal(TitleItem.Level, title.Selected, "the settings page starts with bot strength");
+            while (title.Selected != TitleItem.Variant) title.Move(1);
             report.Equal(Text.VariantName(RuleVariant.Sports), title.RowAt(title.Index).Value,
                 "the screen shows the profile the table will be played by");
 
@@ -99,22 +98,22 @@ namespace Mahjong.Rules.Diagnostics
             report.Check(title.Adjust(-1), "the profile steps back");
             report.Equal(RuleVariant.Sports.Id, settings.Variant.Id, "and the sporting rules are back");
 
-            // Language, bots, tempo and the result screen step the same way the in-game menu steps them.
+            // The remaining game settings step the same way the in-game menu steps them.
             title.Move(1);
-            report.Equal(TitleItem.Language, title.Selected, "the language follows the profile");
+            report.Equal(TitleItem.Speed, title.Selected, "the tempo follows bot strength");
             var spoken = settings.Language;
             report.Check(title.Adjust(1), "the language steps");
             report.Check(settings.Language != spoken, "and the interface changes the language it speaks");
 
             title.Move(1);
-            report.Equal(TitleItem.Level, title.Selected, "then the strength of the bots");
+            report.Equal(TitleItem.Result, title.Selected, "then the result screen");
             while (title.Adjust(1)) { }
             report.Equal(BotLevel.Strategic, settings.Level, "the strongest bots are the top of the ladder");
             while (title.Adjust(-1)) { }
             report.Equal(BotLevel.Fast, settings.Level, "and the weakest are the bottom");
 
             title.Move(1);
-            report.Equal(TitleItem.Speed, title.Selected, "then the tempo");
+            report.Equal(TitleItem.Clock, title.Selected, "then the clock");
             report.Check(title.Adjust(1), "the tempo steps");
             report.Equal(2.0, settings.Speed, "one step up is double speed");
 
@@ -211,8 +210,8 @@ namespace Mahjong.Rules.Diagnostics
                 report.Equal(newer, title.PendingSave, "and names the file to load");
 
                 // The load page lists every save and one row to go back.
-                title.Move(1);
-                report.Equal(TitleItem.LoadGame, title.Selected, "the third row is the list of saves");
+                while (title.Selected != TitleItem.LoadGame) title.Move(1);
+                report.Equal(TitleItem.LoadGame, title.Selected, "the load row is on the launch page");
                 report.Equal(TitleCommand.OpenLoad, title.Activate(), "picking it opens the list");
                 report.Equal(TitlePage.Load, title.Page, "the load page is open");
                 report.Equal(3, title.RowCount, "two saves and a way back");

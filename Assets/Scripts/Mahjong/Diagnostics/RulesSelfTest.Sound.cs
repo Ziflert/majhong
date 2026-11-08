@@ -164,8 +164,9 @@ namespace Mahjong.Rules.Diagnostics
                 Loc.Current = Language.Ru;
                 var settings = new GameSettings();
                 var title = new TitleScreen(settings);
+                title.OpenSettings();
 
-                // The welcome screen: the row is there, it prints the volume and it steps it.
+                // The settings page: the row is there, it prints the volume and it steps it.
                 var row = title.AllRows().FirstOrDefault(candidate => candidate.Item == TitleItem.Sound);
                 report.Check(row != null, "the welcome screen offers the sound of the table");
                 report.Equal(Loc.Get("title.sound"), row!.Label, "the row is called \"Звук\"");
@@ -350,6 +351,7 @@ namespace Mahjong.Rules.Diagnostics
                 // The welcome screen: the row is there, it shows the volume and it steps it.
                 var settings = new GameSettings();
                 var title = new TitleScreen(settings);
+                title.OpenSettings();
                 var row = title.AllRows().FirstOrDefault(candidate => candidate.Item == TitleItem.Music);
                 report.Check(row != null, "the welcome screen offers the music of the table");
                 report.Equal(Loc.Get("title.music"), row!.Label, "the row has a name of its own");

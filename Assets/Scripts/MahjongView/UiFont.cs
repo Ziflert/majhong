@@ -1,3 +1,4 @@
+using Mahjong.Controls;
 using UnityEngine;
 
 namespace Mahjong.Unity
@@ -14,6 +15,9 @@ namespace Mahjong.Unity
     {
         private static Font? cached;
         private static bool resolved;
+        private static string selectedFamily = UiFontSettings.Default;
+
+        public static string SelectedFamily => selectedFamily;
 
         /// <summary>System fonts tried in order; all of them carry Cyrillic on Windows and macOS.</summary>
         private static readonly string[] Candidates = { "Segoe UI", "Arial", "Tahoma", "Verdana", "DejaVu Sans", "Liberation Sans" };
@@ -31,7 +35,8 @@ namespace Mahjong.Unity
                 return cached;
             }
 
-            foreach (var name in Candidates)
+            var preferred = UiFontSettings.FamilyName(selectedFamily);
+            foreach (var name in new[] { preferred, "Segoe UI", "Arial", "Tahoma", "Verdana", "DejaVu Sans", "Liberation Sans" })
             {
                 var font = Font.CreateDynamicFontFromOSFont(name, 48);
                 if (font == null || !HasCyrillic(font)) continue;
@@ -61,6 +66,12 @@ namespace Mahjong.Unity
         }
 
         /// <summary>Forces a fresh lookup; used by tests that swap the font.</summary>
+        public static void Configure(string family)
+        {
+            selectedFamily = UiFontSettings.TryParseFamily(family) ?? UiFontSettings.Default;
+            Reset();
+        }
+
         public static void Reset()
         {
             cached = null;

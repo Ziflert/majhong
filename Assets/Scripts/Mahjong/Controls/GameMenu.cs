@@ -14,6 +14,7 @@ namespace Mahjong.Controls
         Resume,
         Review,
         Rules,
+        Title,
         Close
     }
 
@@ -43,6 +44,9 @@ namespace Mahjong.Controls
         /// <summary>How big the interface is drawn.</summary>
         Scale = 12,
         Profile = 14,
+        Font = 15,
+        FontSize = 16,
+        Title = 17,
 
         Save = 6,
         Resume = 7,
@@ -70,8 +74,8 @@ namespace Mahjong.Controls
         private static readonly MenuItem[] Rows =
         {
             MenuItem.Language, MenuItem.Speed, MenuItem.Level, MenuItem.Result, MenuItem.Clock,
-            MenuItem.Sound, MenuItem.Music, MenuItem.Profile, MenuItem.Look, MenuItem.Scale,
-            MenuItem.Save, MenuItem.Resume, MenuItem.Review, MenuItem.Rules, MenuItem.Close
+            MenuItem.Sound, MenuItem.Music, MenuItem.Profile, MenuItem.Font, MenuItem.FontSize,
+            MenuItem.Look, MenuItem.Scale, MenuItem.Save, MenuItem.Resume, MenuItem.Review, MenuItem.Rules, MenuItem.Title, MenuItem.Close
         };
 
         /// <summary>Row under the cursor; it wraps around, so one key press always lands somewhere.</summary>
@@ -136,6 +140,18 @@ namespace Mahjong.Controls
                     if (profile.Id == settings.Profile.Id) return false;
                     settings.Profile = profile;
                     return true;
+                case MenuItem.Font:
+                    if (delta == 0) return false;
+                    var font = UiFontSettings.StepFamily(settings.Font, delta);
+                    if (font == settings.Font) return false;
+                    settings.Font = font;
+                    return true;
+                case MenuItem.FontSize:
+                    if (delta == 0) return false;
+                    var fontSize = UiFontSettings.StepSize(settings.FontSize, delta);
+                    if (Math.Abs(fontSize - settings.FontSize) < 0.0001d) return false;
+                    settings.FontSize = fontSize;
+                    return true;
                 case MenuItem.Look:
                     if (delta == 0) return false;
                     var theme = UiThemeSettings.Step(settings.Theme, delta);
@@ -183,6 +199,10 @@ namespace Mahjong.Controls
                     MusicVolumeSettings.Text(settings.MusicVolume), MenuCommand.None, true),
                 MenuItem.Profile => new MenuRow(item, Loc.Get("menu.profile"), settings.Profile.Name,
                     MenuCommand.None, true),
+                MenuItem.Font => new MenuRow(item, Loc.Get("menu.font"), UiFontSettings.FamilyName(settings.Font),
+                    MenuCommand.None, true),
+                MenuItem.FontSize => new MenuRow(item, Loc.Get("menu.fontSize"), UiFontSettings.SizeText(settings.FontSize),
+                    MenuCommand.None, true),
                 MenuItem.Look => new MenuRow(item, Loc.Get("menu.look"), settings.Theme.Name,
                     MenuCommand.None, true),
                 MenuItem.Scale => new MenuRow(item, Loc.Get("menu.scale"),
@@ -191,6 +211,7 @@ namespace Mahjong.Controls
                 MenuItem.Resume => new MenuRow(item, Loc.Get("menu.resume"), string.Empty, MenuCommand.Resume, false),
                 MenuItem.Review => new MenuRow(item, Loc.Get("menu.review"), string.Empty, MenuCommand.Review, false),
                 MenuItem.Rules => new MenuRow(item, Loc.Get("menu.rules"), string.Empty, MenuCommand.Rules, false),
+                MenuItem.Title => new MenuRow(item, Loc.Get("menu.titleScreen"), string.Empty, MenuCommand.Title, false),
                 _ => new MenuRow(item, Loc.Get("menu.close"), string.Empty, MenuCommand.Close, false)
             };
         }
@@ -216,7 +237,8 @@ namespace Mahjong.Controls
 
         private static bool ActivateSteps(MenuItem item) =>
             item is MenuItem.Language or MenuItem.Speed or MenuItem.Level or MenuItem.Result or MenuItem.Clock
-                or MenuItem.Sound or MenuItem.Music or MenuItem.Profile or MenuItem.Look or MenuItem.Scale;
+                or MenuItem.Sound or MenuItem.Music or MenuItem.Profile or MenuItem.Font or MenuItem.FontSize
+                or MenuItem.Look or MenuItem.Scale;
 
         /// <summary>Next of the three levels, clamped: the menu has no fourth setting to step into.</summary>
         private static int NextLevel(BotLevel level, int delta)

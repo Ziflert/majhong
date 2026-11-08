@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Mahjong.Rules;
 
 namespace Mahjong.Net
@@ -40,6 +41,26 @@ namespace Mahjong.Net
 
         /// <summary>A physical tile with its identity: <c>5c#17</c>.</summary>
         public static string Format(Tile tile) => $"{Format(tile.Type)}#{tile.InstanceId}";
+
+        /// <summary>Reads a physical tile: <c>5c#17</c>. A face without an identity is not a tile.</summary>
+        public static bool TryParseTile(string? text, out Tile tile)
+        {
+            tile = default;
+            if (string.IsNullOrWhiteSpace(text)) return false;
+
+            var raw = text.Trim();
+            var hash = raw.IndexOf('#');
+            if (hash <= 0 || hash == raw.Length - 1) return false;
+            if (!TryParse(raw.Substring(0, hash), out var type)) return false;
+            if (!int.TryParse(raw.Substring(hash + 1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var id))
+                return false;
+
+            tile = new Tile(type, id);
+            return true;
+        }
+
+        public static Tile ParseTile(string text) =>
+            TryParseTile(text, out var tile) ? tile : throw new FormatException($"Not a tile: {text}");
 
         public static string Format(IEnumerable<Tile> tiles) => string.Join(",", FormatEach(tiles));
 

@@ -6,6 +6,7 @@ using UnityEditor.Build.Reporting;
 using UnityEditor.Build;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Rendering;
 
 namespace Mahjong.EditorTools
 {
@@ -37,6 +38,7 @@ namespace Mahjong.EditorTools
             PlayerSettings.bundleVersion = "0.1.0";
             PlayerSettings.companyName = "Ziflert";
             PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Standalone, "com.ziflert.mahjong");
+            EnsureRuntimeShaders();
 
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
@@ -50,6 +52,48 @@ namespace Mahjong.EditorTools
                 throw new BuildFailedException($"Windows beta build failed: {report.summary.result}\n{report.summary.totalErrors} errors");
 
             Debug.Log($"[beta] v0.1 built: {output} ({report.summary.totalSize / 1024 / 1024} MiB)");
+        }
+
+        private static void EnsureRuntimeShaders()
+        {
+            // Shader.Find works in the Editor even when a shader is not referenced by an asset.
+            // Player builds strip such shaders, which used to leave v0.1 on a blank purple screen
+            // when BuildHudPlate tried to create its first material.
+            var required = new[]
+            {
+                "Unlit/Color",
+                "Unlit/Transparent",
+                "Sprites/Default"
+            };
+            var settingsAsset = AssetDatabase.LoadMainAssetAtPath("ProjectSettings/GraphicsSettings.asset");
+            if (settingsAsset == null)
+                throw new BuildFailedException("GraphicsSettings.asset could not be loaded");
+
+            var serialized = new SerializedObject(settingsAsset);
+            var property = serialized.FindProperty("m_AlwaysIncludedShaders");
+            if (property == null || !property.isArray)
+                throw new BuildFailedException("GraphicsSettings.m_AlwaysIncludedShaders is unavailable");
+
+            foreach (var shaderName in required)
+            {
+                var shader = Shader.Find(shaderName);
+                if (shader == null)
+                {
+                    Debug.LogWarning($"[beta] Runtime shader not found in Editor: {shaderName}");
+                    continue;
+                }
+
+                var found = false;
+                for (var i = 0; i < property.arraySize; i++)
+                    found |= property.GetArrayElementAtIndex(i).objectReferenceValue == shader;
+                if (!found)
+                {
+                    property.arraySize++;
+                    property.GetArrayElementAtIndex(property.arraySize - 1).objectReferenceValue = shader;
+                }
+            }
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            AssetDatabase.SaveAssets();
         }
 
         private static void EnsureBootstrapScene(string absolutePath)

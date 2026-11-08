@@ -61,11 +61,11 @@ namespace Mahjong.PlayTests
                 Assert.AreEqual(UiStyle.Of(UiRole.TextMain), game.Status.color,
                     "The HUD text kept the colour of the old palette.");
 
-                // The skins are baked per palette: a tray tile has to be repainted in new textures, not
-                // in the ones that were baked for the palette the game started with.
-                foreach (var tile in game.Controls.Tiles)
-                    Assert.AreEqual(UiSkins.Texture(tile.Face.Skin), tile.Face.Renderer.sharedMaterial.mainTexture,
-                        "A tray tile is still drawn with the skin of the old palette.");
+                // The skins are baked per palette: the plates of the main interface have to be repainted
+                // in new textures, not in the ones that were baked for the palette the game started with.
+                foreach (var plate in game.Ui.Plates)
+                    Assert.AreEqual(UiSkins.Texture(plate.Skin), plate.Renderer.sharedMaterial.mainTexture,
+                        "A plate of the main interface is still drawn with the skin of the old palette.");
 
                 var before = game.Settings.Theme;
                 game.Settings.Theme = UiThemes.Default;
@@ -201,16 +201,16 @@ namespace Mahjong.PlayTests
                     Assert.Greater(plateAtLarge, plateAtHundred,
                         "The plate behind the HUD did not grow with the text it holds.");
 
-                    // And the tray grows with the setting too, as far as its share of the frame allows:
-                    // no tile may leave the screen at the largest step.
+                    // And the badges of the main interface stay inside the frame at the largest step too.
                     game.Settings.UiScale = UiThemeSettings.Scales[^1];
                     game.PaintLook();
                     yield return new WaitForSeconds(0.05f);
-                    foreach (var tile in game.Controls.Tiles)
+                    foreach (var plate in game.Ui.Plates)
                     {
-                        var point = camera.WorldToViewportPoint(tile.transform.position);
+                        if (!plate.gameObject.activeInHierarchy) continue;
+                        var point = camera.WorldToViewportPoint(plate.transform.position);
                         Assert.IsTrue(point.x is > 0f and < 1f && point.y is > 0f and < 1f,
-                            $"A tray tile left the frame at {UiThemeSettings.ScaleText(game.Settings.UiScale)}.");
+                            $"A plate of the main interface left the frame at {UiThemeSettings.ScaleText(game.Settings.UiScale)}.");
                     }
                 }
                 finally

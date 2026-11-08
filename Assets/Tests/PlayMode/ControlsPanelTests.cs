@@ -282,7 +282,7 @@ namespace Mahjong.PlayTests
         }
 
         [UnityTest]
-        public IEnumerator TrayIsInvisibleWhileTheWelcomeScreenIsUp()
+        public IEnumerator TheReferenceInterfaceTakesOverTheTable()
         {
             var game = Object.FindAnyObjectByType<MahjongGame>();
             if (game == null)
@@ -291,23 +291,29 @@ namespace Mahjong.PlayTests
                 game = host.AddComponent<MahjongGame>();
             }
 
-            // The game opens on the welcome screen, and the tray belongs to the table, not to it.
+            // The game opens on the welcome screen, and the main interface belongs to the table.
             game.OpenTitle();
             yield return null;
             yield return new WaitForFixedUpdate();
 
-            Assert.IsNotNull(game.Controls, "The game did not create the controls panel.");
-            Assert.IsFalse(game.Controls.gameObject.activeSelf,
-                "The tray must be hidden while the welcome screen holds the table.");
+            Assert.IsNotNull(game.Ui, "The game did not create the reference interface.");
+            Assert.IsFalse(game.Ui.IsOpen,
+                "The interface must be hidden while the welcome screen holds the table.");
 
             game.SkipWelcome();
             yield return null;
             yield return new WaitForFixedUpdate();
 
-            Assert.IsTrue(game.Controls.gameObject.activeSelf,
-                "The tray must be shown once the table is dealt.");
-            Assert.AreEqual(6, game.Controls.Tiles.Count,
-                "The tray shown after the welcome screen must carry its six buttons.");
+            Assert.IsTrue(game.Ui.IsOpen,
+                "The interface must be shown once the table is dealt.");
+            Assert.Greater(game.Ui.Plates.Count, 0,
+                "The interface shown after the welcome screen must draw its plates.");
+
+            // The old bottom tray is gone from the composition: it covered the player's hand and
+            // reached into the right-hand seat (examples/Эскизы UI Маджонг.html).
+            Assert.IsNotNull(game.Controls, "The legacy tray component must still exist for tools.");
+            Assert.IsFalse(game.Controls.gameObject.activeSelf,
+                "The legacy bottom tray must not be drawn over the table any more.");
 
             Object.Destroy(game.gameObject);
             yield return null;

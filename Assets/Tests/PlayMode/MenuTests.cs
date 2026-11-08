@@ -32,68 +32,85 @@ namespace Mahjong.PlayTests
             yield return null;
             yield return null;
 
-            Assert.IsFalse(game.IsMenuOpen, "The menu covers the table before anyone asked for it.");
-
-            game.OpenMenu();
-            yield return null;
-
-            Assert.IsTrue(game.IsMenuOpen, "Opening the menu did nothing.");
-            Assert.IsTrue(game.MenuPanel.gameObject.activeInHierarchy, "The menu object is still disabled.");
-            Assert.IsFalse(game.Status.gameObject.activeInHierarchy,
-                "The HUD is still drawn on top of the open menu.");
-            Assert.AreEqual(GameMenu.TotalRows, game.MenuPanel.RowCount, "The menu lost some of its rows.");
-            StringAssert.Contains("▸", game.MenuPanel.RowText(game.Menu.Index),
-                "The cursor does not mark the row it is on: " + game.MenuPanel.RowText(game.Menu.Index));
-            StringAssert.Contains(Loc.Get("menu.language"), game.MenuPanel.RowText(0),
-                "The first row is not the language: " + game.MenuPanel.RowText(0));
-            Assert.IsNotEmpty(game.MenuPanel.Title.text, "The menu has no title.");
-            StringAssert.IsMatch("[А-Яа-яЁё]", game.MenuPanel.Title.text, "The menu title is not in Russian.");
-
-            // Every caption sits on its own strip and the rows run down the panel: a caption drawn at
-            // twice its row's height is exactly the bug the first screenshots showed.
-            for (var row = 0; row < game.MenuPanel.RowCount; row++)
+            // The captions are read in Russian here, so the language is stated rather than inherited
+            // from whichever test ran before: the assembly starts with the language of a fresh
+            // installation, and the table applies the settings of the player only when it builds.
+            var languageBefore = game.Settings.Language;
+            game.Settings.Language = Language.Ru;
+            Loc.Current = Language.Ru;
+            try
             {
-                Assert.AreEqual(game.MenuPanel.RowStripHeight(row), game.MenuPanel.RowLabelHeight(row), 0.005f,
-                    $"The caption of row {row} is not on its strip.");
-                if (row > 0)
-                    Assert.Less(game.MenuPanel.RowStripHeight(row), game.MenuPanel.RowStripHeight(row - 1),
-                        $"Row {row} is not below row {row - 1}.");
-            }
+                Assert.IsFalse(game.IsMenuOpen, "The menu covers the table before anyone asked for it.");
 
-            // The panel is measured against the camera, so it has to stay inside the frame.
-            var camera = Camera.main;
-            Assert.IsNotNull(camera, "The prototype has no camera to measure the menu against.");
-            foreach (var corner in new[]
-                     {
-                         new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f),
-                         new Vector3(-0.5f, 0.5f, 0f), new Vector3(0.5f, 0.5f, 0f)
-                     })
+                game.OpenMenu();
+                yield return null;
+
+                Assert.IsTrue(game.IsMenuOpen, "Opening the menu did nothing.");
+                Assert.IsTrue(game.MenuPanel.gameObject.activeInHierarchy, "The menu object is still disabled.");
+                Assert.IsFalse(game.Status.gameObject.activeInHierarchy,
+                    "The HUD is still drawn on top of the open menu.");
+                Assert.AreEqual(GameMenu.TotalRows, game.MenuPanel.RowCount, "The menu lost some of its rows.");
+                StringAssert.Contains("▸", game.MenuPanel.RowText(game.Menu.Index),
+                    "The cursor does not mark the row it is on: " + game.MenuPanel.RowText(game.Menu.Index));
+                StringAssert.Contains(Loc.Get("menu.language"), game.MenuPanel.RowText(0),
+                    "The first row is not the language: " + game.MenuPanel.RowText(0));
+                Assert.IsNotEmpty(game.MenuPanel.Title.text, "The menu has no title.");
+                StringAssert.IsMatch("[А-Яа-яЁё]", game.MenuPanel.Title.text, "The menu title is not in Russian.");
+
+                // Every caption sits on its own strip and the rows run down the panel: a caption drawn at
+                // twice its row's height is exactly the bug the first screenshots showed.
+                for (var row = 0; row < game.MenuPanel.RowCount; row++)
+                {
+                    Assert.AreEqual(game.MenuPanel.RowStripHeight(row), game.MenuPanel.RowLabelHeight(row), 0.005f,
+                        $"The caption of row {row} is not on its strip.");
+                    if (row > 0)
+                        Assert.Less(game.MenuPanel.RowStripHeight(row), game.MenuPanel.RowStripHeight(row - 1),
+                            $"Row {row} is not below row {row - 1}.");
+                }
+
+                // The panel is measured against the camera, so it has to stay inside the frame.
+                var camera = Camera.main;
+                Assert.IsNotNull(camera, "The prototype has no camera to measure the menu against.");
+                var card = game.MenuPanel.Card;
+                var halfWidth = card.Width * 0.5f;
+                var halfHeight = card.Height * 0.5f;
+                foreach (var corner in new[]
+                         {
+                             new Vector3(-halfWidth, -halfHeight, 0f), new Vector3(halfWidth, -halfHeight, 0f),
+                             new Vector3(-halfWidth, halfHeight, 0f), new Vector3(halfWidth, halfHeight, 0f)
+                         })
+                {
+                    var point = camera!.WorldToViewportPoint(card.transform.TransformPoint(corner));
+                    Assert.Greater(point.z, 0f, "The menu is behind the camera.");
+                    Assert.IsTrue(point.x is >= 0f and <= 1f && point.y is >= 0f and <= 1f,
+                        $"The menu hangs off the screen at {point.x:0.00} x {point.y:0.00}.");
+                }
+
+                // The hand is paused: no bot moves and no clock while the menu is open.
+                var movesBefore = game.MoveLog.MoveCount;
+                var clockBefore = game.HandClock.IsRunning;
+                for (var frame = 0; frame < 30; frame++) yield return null;
+                Assert.AreEqual(movesBefore, game.MoveLog.MoveCount, "The bots played on behind the open menu.");
+                Assert.AreEqual(clockBefore, game.HandClock.IsRunning, "The hand clock kept running behind the menu.");
+
+                // Navigation moves the cursor and the highlight follows it.
+                var first = game.Menu.Index;
+                game.MenuMove(1);
+                yield return null;
+                Assert.AreEqual((first + 1) % GameMenu.TotalRows, game.Menu.Index, "The cursor did not move.");
+                StringAssert.Contains("▸", game.MenuPanel.RowText(game.Menu.Index), "The highlight stayed behind.");
+
+                game.CloseMenu();
+                yield return null;
+                Assert.IsFalse(game.IsMenuOpen, "The menu did not close.");
+                Assert.IsTrue(game.Status.gameObject.activeInHierarchy, "The HUD did not come back after the menu.");
+                Assert.IsNotEmpty(game.Status.text, "The table HUD is empty after the menu.");
+            }
+            finally
             {
-                var point = camera!.WorldToViewportPoint(game.MenuPanel.Backdrop.transform.TransformPoint(corner));
-                Assert.Greater(point.z, 0f, "The menu is behind the camera.");
-                Assert.IsTrue(point.x is >= 0f and <= 1f && point.y is >= 0f and <= 1f,
-                    $"The menu hangs off the screen at {point.x:0.00} x {point.y:0.00}.");
+                game.Settings.Language = languageBefore;
+                Loc.Current = languageBefore;
             }
-
-            // The hand is paused: no bot moves and no clock while the menu is open.
-            var movesBefore = game.MoveLog.MoveCount;
-            var clockBefore = game.HandClock.IsRunning;
-            for (var frame = 0; frame < 30; frame++) yield return null;
-            Assert.AreEqual(movesBefore, game.MoveLog.MoveCount, "The bots played on behind the open menu.");
-            Assert.AreEqual(clockBefore, game.HandClock.IsRunning, "The hand clock kept running behind the menu.");
-
-            // Navigation moves the cursor and the highlight follows it.
-            var first = game.Menu.Index;
-            game.MenuMove(1);
-            yield return null;
-            Assert.AreEqual((first + 1) % GameMenu.TotalRows, game.Menu.Index, "The cursor did not move.");
-            StringAssert.Contains("▸", game.MenuPanel.RowText(game.Menu.Index), "The highlight stayed behind.");
-
-            game.CloseMenu();
-            yield return null;
-            Assert.IsFalse(game.IsMenuOpen, "The menu did not close.");
-            Assert.IsTrue(game.Status.gameObject.activeInHierarchy, "The HUD did not come back after the menu.");
-            Assert.IsNotEmpty(game.Status.text, "The table HUD is empty after the menu.");
         }
 
         [UnityTest]
@@ -186,7 +203,7 @@ namespace Mahjong.PlayTests
             // The rules row opens the rulebook and leaves the menu closed.
             game.OpenMenu();
             game.MenuMove(-game.Menu.Index);      // the language row
-            game.MenuMove(11);                    // the rules row
+            game.MenuMove(13);                    // the rules row
             Assert.AreEqual(MenuItem.Rules, game.Menu.Selected, "The cursor is not on the rules row.");
             game.MenuActivate();
             yield return null;
@@ -202,7 +219,7 @@ namespace Mahjong.PlayTests
             // The review row opens the review of the game in progress.
             game.OpenMenu();
             game.MenuMove(-game.Menu.Index);
-            game.MenuMove(10);
+            game.MenuMove(12);
             Assert.AreEqual(MenuItem.Review, game.Menu.Selected, "The cursor is not on the review row.");
             game.MenuActivate();
             yield return null;

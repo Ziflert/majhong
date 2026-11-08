@@ -175,10 +175,14 @@ namespace Mahjong.Rules.Diagnostics
                                 $"seat {seat} must not see {TileNotation.Format(hidden)} of seat {other}");
                     }
 
-                    foreach (var meld in table.State.Players[seat].Melds)
-                        allowed.UnionWith(meld.Tiles.Select(tile => tile.InstanceId));
-                    foreach (var tile in table.State.Players[seat].Flowers)
-                        allowed.Add(tile.InstanceId);
+                    // A meld and a flower are face up on the table whichever seat declared them.
+                    for (var other = 0; other < 4; other++)
+                    {
+                        foreach (var meld in table.State.Players[other].Melds)
+                            allowed.UnionWith(meld.Tiles.Select(tile => tile.InstanceId));
+                        foreach (var tile in table.State.Players[other].Flowers)
+                            allowed.Add(tile.InstanceId);
+                    }
                     foreach (var discard in table.State.Discards)
                         allowed.Add(discard.Tile.InstanceId);
 

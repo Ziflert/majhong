@@ -23,9 +23,16 @@ namespace Mahjong.Unity
         private const float MaxPanelHeight = 0.30f;
         private const float FrameShare = 0.95f;
 
-        private const float RowWidth = 0.50f;
-        private const float MaxRowStep = 0.0176f;
-        private const float MaxRowHeight = 0.0166f;
+        // The reference main menu is a centered 716 px list, not a full-width modal sheet.
+        // The camera plane is roughly 1280 px wide at PanelZ, so this is its world-space equivalent.
+        private const float RowWidth = 0.32f;
+        private const float MaxRowStep = 0.022f;
+        private const float MaxRowHeight = 0.0205f;
+        private const float TitleTextScale = 0.86f;
+        private const float RowTextScale = 0.82f;
+
+        /// <summary>Size of a row caption before the interface size is applied; one place, two uses.</summary>
+        private const float RowTextSize = 0.0011f * RowTextScale;
 
         /// <summary>From the top of the panel to the game name, the profile line and the first row.</summary>
         private const float TitleOffset = 0.024f;
@@ -61,6 +68,7 @@ namespace Mahjong.Unity
         private readonly List<TextMesh> rowValues = new();
         private readonly List<BoxCollider> rowColliders = new();
         private int paintedRevision = -1;
+        private int activeRowCount = TitleScreen.MaxRows;
 
         public bool IsOpen { get; private set; }
 
@@ -83,9 +91,9 @@ namespace Mahjong.Unity
             var panel = root.AddComponent<TitlePanel>();
             panel.cameraTransform = cameraTransform;
             panel.background = CreateBackground(root.transform);
-            panel.title = CreateText(root.transform, "title", Vector3.zero, 0.0032f,
+            panel.title = CreateText(root.transform, "title", Vector3.zero, 0.0032f * TitleTextScale,
                 TextAnchor.MiddleCenter, TitleColour);
-            panel.subtitle = CreateText(root.transform, "subtitle", Vector3.zero, 0.0012f,
+            panel.subtitle = CreateText(root.transform, "subtitle", Vector3.zero, 0.0012f * TitleTextScale,
                 TextAnchor.MiddleCenter, SubtitleColour);
             panel.notice = CreateText(root.transform, "notice", Vector3.zero, 0.0011f,
                 TextAnchor.MiddleCenter, UiStyle.Of(UiRole.Accent));
@@ -119,9 +127,9 @@ namespace Mahjong.Unity
             face.material = new Material(Shader.Find("Unlit/Color"));
             face.material.color = RowColour;
 
-            var label = CreateText(root.transform, "label", Vector3.zero, 0.0011f,
+            var label = CreateText(root.transform, "label", Vector3.zero, RowTextSize,
                 TextAnchor.MiddleLeft, CaptionColour);
-            var value = CreateText(root.transform, "value", Vector3.zero, 0.0011f,
+            var value = CreateText(root.transform, "value", Vector3.zero, RowTextSize,
                 TextAnchor.MiddleRight, SelectedCaptionColour);
 
             rowRoots.Add(root);
@@ -157,7 +165,7 @@ namespace Mahjong.Unity
             mesh.alignment = anchor == TextAnchor.MiddleLeft ? TextAlignment.Left : TextAlignment.Right;
             if (anchor == TextAnchor.MiddleCenter) mesh.alignment = TextAlignment.Center;
             mesh.fontSize = 64;
-            mesh.characterSize = size;
+            mesh.characterSize = size * UiStyle.TextScale;
             mesh.color = colour;
             mesh.richText = false;
             UiFont.Assign(mesh);
@@ -188,8 +196,9 @@ namespace Mahjong.Unity
             // frame gets wider strips, a short one squeezes them instead of pushing them off the panel.
             var rowsTop = top - RowsOffset;
             var rowsBottom = -height * 0.5f + NoticeOffset + 0.013f;
+            var rows = Mathf.Max(1, activeRowCount);
             var step = Mathf.Min(MaxRowStep * UiStyle.Profile.RowSpacing,
-                Mathf.Max(0.008f, (rowsTop - rowsBottom) / TitleScreen.MaxRows));
+                Mathf.Max(0.008f, (rowsTop - rowsBottom) / rows));
             var rowHeight = Mathf.Min(MaxRowHeight, step * 0.94f);
             var rowWidth = Mathf.Min(RowWidth, width * 0.94f);
 
@@ -227,12 +236,23 @@ namespace Mahjong.Unity
         public void Refresh(TitleScreen screen)
         {
             if (paintedRevision != UiStyle.Revision) Repaint();
-            title.text = Loc.Get("title.title");
-            subtitle.text = screen.Page == TitlePage.Load
-                ? Loc.Get("title.loadTitle")
-                : Loc.Format("title.subtitle", Text.VariantName(screen.Settings.Variant));
+            activeRowCount = screen.RowCount;
+            title.text = screen.Page == TitlePage.Settings
+                ? Loc.Get("title.settings")
+                : Loc.Get("title.title");
+            subtitle.text = screen.Page switch
+            {
+                TitlePage.Load => string.Empty,
+                TitlePage.Settings => Loc.Get("title.settings.value"),
+                _ => Loc.Format("title.subtitle", Text.VariantName(screen.Settings.Variant))
+            };
             notice.text = screen.Status;
-            footer.text = screen.Page == TitlePage.Load ? Loc.Get("title.loadHint") : Loc.Get("title.hint");
+            footer.text = screen.Page switch
+            {
+                TitlePage.Load => Loc.Get("title.loadHint"),
+                TitlePage.Settings => Loc.Get("title.settingsHint"),
+                _ => Loc.Get("title.hint")
+            };
 
             for (var index = 0; index < rowLabels.Count; index++)
             {
@@ -247,11 +267,20 @@ namespace Mahjong.Unity
 
                 var row = screen.RowAt(index);
                 var selected = index == screen.Index;
-                rowLabels[index].text = (selected ? "▸ " : "   ") + row.Label;
-                rowValues[index].text = row.Value;
-                rowLabels[index].color = selected
-                    ? SelectedCaptionColour
-                    : row.Ready ? CaptionColour : PlannedCaptionColour;
+                var header = row.IsHeader;
+                // A section title is a caption over its rows, not a plate: it carries no face,
+                // answers no click and is stepped over by the cursor.
+                rowFaces[index].gameObject.SetActive(!header);
+                rowColliders[index].enabled = !header;
+                rowLabels[index].text = (selected ? "▸ " : header ? string.Empty : "   ") + row.Label;
+                if (header) rowLabels[index].text = "   " + row.Label;
+                rowValues[index].text = header ? string.Empty : row.Value;
+                rowLabels[index].characterSize = RowTextSize * (header ? 0.82f : 1f);
+                rowLabels[index].color = header
+                    ? SubtitleColour
+                    : selected
+                        ? SelectedCaptionColour
+                        : row.Ready ? CaptionColour : PlannedCaptionColour;
                 rowValues[index].color = selected
                     ? SelectedCaptionColour
                     : row.Ready ? UiStyle.Of(UiRole.Accent) : PlannedCaptionColour;
@@ -267,7 +296,9 @@ namespace Mahjong.Unity
         private void Repaint()
         {
             paintedRevision = UiStyle.Revision;
-            background.material.color = PanelColour;
+            // The reference welcome screen uses the game background directly.  Keeping this renderer
+            // disabled also prevents the welcome page from becoming an opaque rectangle over the table.
+            background.enabled = false;
             title.color = TitleColour;
             subtitle.color = SubtitleColour;
             notice.color = UiStyle.Of(UiRole.Accent);

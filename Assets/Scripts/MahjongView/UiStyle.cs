@@ -18,6 +18,7 @@ namespace Mahjong.Unity
         private static UiTheme theme = UiThemes.Default;
         private static UiProfile profile = UiProfiles.Default;
         private static float scale = 1f;
+        private static float textScale = 1f;
         private static int revision;
 
         /// <summary>The palette in effect.</summary>
@@ -28,6 +29,7 @@ namespace Mahjong.Unity
 
         /// <summary>The size factor in effect; layout numbers are written for 100%.</summary>
         public static float Scale => scale * profile.Density;
+        public static float TextScale => textScale;
 
         /// <summary>Goes up whenever the look changes, so a panel can tell it has to repaint itself.</summary>
         public static int Revision => revision;
@@ -53,7 +55,19 @@ namespace Mahjong.Unity
         }
 
         /// <summary>Puts the look of these settings in effect.</summary>
-        public static void Apply(GameSettings settings) => Apply(settings.Profile, settings.Theme, settings.UiScale);
+        public static void Apply(GameSettings settings)
+        {
+            Apply(settings.Profile, settings.Theme, settings.UiScale);
+            SetTextScale((float)settings.FontSize);
+        }
+
+        public static void SetTextScale(float value)
+        {
+            var next = Mathf.Clamp(value, 0.85f, 1.15f);
+            if (Mathf.Abs(textScale - next) < 0.0001f) return;
+            textScale = next;
+            revision++;
+        }
 
         /// <summary>The colour of a role in the palette in effect.</summary>
         public static Color Of(UiRole role) => ToColor(theme.Of(role));

@@ -243,6 +243,8 @@ namespace Mahjong.Localization
             Add("ui.language", "Язык", "Language");
             Add("ui.freeMode", "Свободная игра", "Free play");
             Add("menu.profile", "Профиль интерфейса", "Interface profile");
+            Add("menu.font", "Шрифт", "Font");
+            Add("menu.fontSize", "Размер шрифта", "Font size");
             Add("title.profile", "Профиль интерфейса", "Interface profile");
 
             // --------------------------------------------------------- on-screen controls
@@ -304,6 +306,7 @@ namespace Mahjong.Localization
             Add("menu.review", "Просмотр партии", "Review a saved game");
             Add("menu.rules", "Правила", "Rules");
             Add("menu.close", "Вернуться за стол", "Back to the table");
+            Add("menu.titleScreen", "В главное меню", "Main menu");
             Add("menu.value.ru", "Русский", "Russian");
             Add("menu.value.en", "Английский", "English");
             Add("menu.value.fast", "Быстрый", "Fast");
@@ -326,13 +329,20 @@ namespace Mahjong.Localization
             Add("title.local", "Локальная игра", "Local game");
             Add("title.multiplayer", "Мультиплеер", "Multiplayer");
             Add("title.variant", "Правила", "Rules profile");
+            Add("title.settings", "Настройки", "Settings");
+            Add("title.settings.value", "игра · звук · интерфейс", "game · sound · interface");
+            Add("title.section.game", "Игра", "Game");
+            Add("title.section.sound", "Звук", "Sound");
+            Add("title.section.interface", "Интерфейс", "Interface");
+            Add("title.font", "Шрифт", "Font");
+            Add("title.fontSize", "Размер шрифта", "Font size");
             Add("title.language", "Язык", "Language");
             Add("title.level", "Сила ботов", "Bot strength");
             Add("title.speed", "Темп ботов", "Bot speed");
             Add("title.result", "Экран результата", "Result screen");
             Add("title.clock", "Время на ход", "Time to think");
             Add("title.session", "Длина партии", "Game length");
-            Add("title.seed", "Сид раздачи", "Deal seed");
+            Add("title.seed", "Номер раздачи", "Deal number");
             Add("title.sound", "Звук", "Sound");
             Add("title.music", "Музыка", "Music");
             Add("title.look", "Тема оформления", "Theme");
@@ -347,6 +357,9 @@ namespace Mahjong.Localization
             Add("title.loadHint",
                 "↑ ↓ — сохранение, Enter — загрузить, Esc — назад",
                 "Up/down a save, Enter loads it, Esc goes back");
+            Add("title.settingsHint",
+                "↑ ↓ — строка, ← → — значение, Enter — выбрать, Esc — назад",
+                "Up/down a row, left/right a value, Enter picks, Esc goes back");
             Add("title.planned", "«{0}» ещё в работе", "“{0}” is not built yet");
             Add("title.noSave", "Сохранённых партий нет", "No game has been saved yet");
             Add("title.value.planned", "в работе", "planned");

@@ -42,7 +42,19 @@ namespace Mahjong.Unity
         Scrim = 9,
 
         /// <summary>A soft drop shadow; the only skin that is not a palette colour.</summary>
-        Shadow = 10
+        Shadow = 10,
+
+        /// <summary>A filled disc: the wind tokens and the round badges of the reference.</summary>
+        Circle = 11,
+
+        /// <summary>A thin gold ring, drawn over a disc: the rim of a token, the track of a timer.</summary>
+        Ring = 12,
+
+        /// <summary>
+        /// An empty rounded outline: the gold rim of a plate that is in play. Unlike <see cref="Ring"/>
+        /// it keeps the corners of a rectangle, so a wide plate is outlined, not turned into an ellipse.
+        /// </summary>
+        Outline = 13
     }
 
     /// <summary>
@@ -129,6 +141,9 @@ namespace Mahjong.Unity
                 UiStyle.Of(UiRole.Border, 0.25f)),
             UiSkin.Accent => (UiStyle.Of(UiRole.Accent), Color.clear),
             UiSkin.Scrim => (UiStyle.Of(UiRole.Background, 0.55f), Color.clear),
+            UiSkin.Circle => (UiStyle.Of(UiRole.SurfaceHigh), UiStyle.Of(UiRole.Border, 0.90f)),
+            UiSkin.Ring => (UiStyle.Of(UiRole.Accent), Color.clear),
+            UiSkin.Outline => (Color.clear, UiStyle.Of(UiRole.Accent, 0.95f)),
             _ => (new Color(0f, 0f, 0f, 0.55f * UiStyle.Profile.Shadow), Color.clear)
         };
 
@@ -137,12 +152,55 @@ namespace Mahjong.Unity
         /// for the shadow, a soft edge instead of a line. The edge is antialiased over one pixel, so a
         /// corner reads as a curve and not as a staircase.
         /// </summary>
+        /// <summary>True when the skin is a disc: it keeps its shape instead of being sliced.</summary>
+        public static bool IsRadial(UiSkin skin) => skin is UiSkin.Circle or UiSkin.Ring;
+
         private static Texture2D Bake(UiSkin skin)
         {
             var (fill, border) = Colours(skin);
             var soft = skin == UiSkin.Shadow;
 
             var size = TextureSize;
+
+            // A disc and a ring are the same distance field without the rounding: the corner radius of
+            // the rectangle becomes the radius of the circle, so the wind tokens read as coins.
+            if (IsRadial(skin))
+            {
+                var disc = new Color32[size * size];
+                var centre = size * 0.5f;
+                var radius = centre - 0.5f;
+                for (var y = 0; y < size; y++)
+                {
+                    for (var x = 0; x < size; x++)
+                    {
+                        var dx = x + 0.5f - centre;
+                        var dy = y + 0.5f - centre;
+                        var distance = Mathf.Sqrt(dx * dx + dy * dy) - radius;
+
+                        Color colour;
+                        if (skin == UiSkin.Ring)
+                        {
+                            // A ring is the band between the rim and a slightly smaller circle.
+                            var inner = -Mathf.Max(2.5f, radius * 0.16f);
+                            var band = Mathf.Min(Mathf.Clamp01(0.5f - distance), Mathf.Clamp01(distance - inner + 0.5f));
+                            colour = fill;
+                            colour.a *= band;
+                        }
+                        else
+                        {
+                            var coverage = Mathf.Clamp01(0.5f - distance);
+                            colour = fill;
+                            if (border.a > 0f && distance > -Border)
+                                colour = Color.Lerp(fill, border, Mathf.Clamp01(distance + Border + 0.5f));
+                            colour.a *= coverage;
+                        }
+
+                        disc[y * size + x] = colour;
+                    }
+                }
+
+                return Upload(skin, disc);
+            }
             var pixels = new Color32[size * size];
             var half = size * 0.5f;
             var box = half - 0.5f;
@@ -165,7 +223,8 @@ namespace Mahjong.Unity
                     var colour = fill;
                     if (border.a > 0f && !soft && distance > -Border)
                     {
-                        // The hairline keeps its own alpha where the fill is translucent.
+                        // The hairline keeps its own alpha where the fill is translucent, and an
+                        // outline is nothing but the hairline: its fill is fully transparent.
                         var edge = Mathf.Clamp01(distance + Border + 0.5f);
                         colour = Color.Lerp(fill, border, edge);
                     }
@@ -175,6 +234,12 @@ namespace Mahjong.Unity
                 }
             }
 
+            return Upload(skin, pixels);
+        }
+
+        private static Texture2D Upload(UiSkin skin, Color32[] pixels)
+        {
+            var size = TextureSize;
             var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
                 name = $"ui-skin-{skin}",
@@ -258,6 +323,27 @@ namespace Mahjong.Unity
         private void Rebuild()
         {
             if (mesh == null) Awake();
+
+            // A disc is one quad with the whole texture on it: slicing a circle would bend its rim.
+            if (UiSkins.IsRadial(skin))
+            {
+                var quadSize = Mathf.Min(width, height);
+                mesh.Clear();
+                mesh.vertices = new[]
+                {
+                    new Vector3(-quadSize * 0.5f, -quadSize * 0.5f, 0f),
+                    new Vector3(quadSize * 0.5f, -quadSize * 0.5f, 0f),
+                    new Vector3(-quadSize * 0.5f, quadSize * 0.5f, 0f),
+                    new Vector3(quadSize * 0.5f, quadSize * 0.5f, 0f)
+                };
+                mesh.uv = new[]
+                {
+                    new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 1f), new Vector2(1f, 1f)
+                };
+                mesh.triangles = new[] { 0, 2, 1, 1, 2, 3 };
+                mesh.RecalculateBounds();
+                return;
+            }
 
             var corner = Mathf.Min(UiStyle.S(UiSkins.Corner), Mathf.Min(width, height) * 0.5f);
             var xs = new[] { -width * 0.5f, -width * 0.5f + corner, width * 0.5f - corner, width * 0.5f };

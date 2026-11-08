@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using Mahjong.Controls;
@@ -304,6 +304,19 @@ namespace Mahjong.EditorTools
                             + $" {game.ResultPanel.LineCount} lines, {game.Result.Countdown}",
                 _ => $"hand tiles {game.TableTileCount}"
             };
+            // Temporary frame check: the screen place of the four corners of the table, so the
+            // framing of the reference can be fitted to real numbers instead of guessed.
+            var cam = Camera.main!;
+            foreach (var cx in new[] { -0.935f, 0.935f })
+            {
+                foreach (var cz in new[] { -0.935f, 0.935f })
+                {
+                    var p = cam.WorldToScreenPoint(new Vector3(cx, -0.02f, cz));
+                    Debug.Log($"[frame] corner {cx,6:F3},{cz,6:F3} -> x {p.x / Screen.width:F4} y {p.y / Screen.height:F4} z {p.z:F3}");
+                }
+            }
+            Debug.Log($"[frame] camera {cam.transform.position} rot {cam.transform.eulerAngles} fov {cam.fieldOfView:F1} aspect {cam.aspect:F4} screen {Screen.width}x{Screen.height}");
+
             Debug.Log($"[interface capture] {name}: {path} | {detail}");
         }
 

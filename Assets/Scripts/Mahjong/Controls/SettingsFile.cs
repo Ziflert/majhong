@@ -42,7 +42,7 @@ namespace Mahjong.Controls
         public static readonly IReadOnlyList<string> Keys = new[]
         {
             "rules", "language", "bots", "speed", "result", "clock", "session", "seed", "last_seed",
-            "sound", "music", "profile", "potential", "theme", "scale"
+            "sound", "music", "profile", "font", "font_size", "potential", "theme", "scale"
         };
 
         /// <summary>The settings file of a folder: <c>&lt;folder&gt;/settings.txt</c>.</summary>
@@ -76,6 +76,8 @@ namespace Mahjong.Controls
             text.Append("sound=").AppendLine(SoundVolumeSettings.Text(settings.SoundVolume));
             text.Append("music=").AppendLine(MusicVolumeSettings.Text(settings.MusicVolume));
             text.Append("profile=").AppendLine(settings.Profile.Id);
+            text.Append("font=").AppendLine(settings.Font);
+            text.Append("font_size=").AppendLine(settings.FontSize.ToString("0.##", CultureInfo.InvariantCulture));
             text.Append("potential=").AppendLine(HandPotentialModeSettings.Id(settings.Potential));
             text.Append("theme=").AppendLine(settings.Theme.Id);
             text.Append("scale=").AppendLine(UiThemeSettings.ScaleText(settings.UiScale));
@@ -237,6 +239,12 @@ namespace Mahjong.Controls
                     break;
                 case "profile":
                     if (UiProfiles.TryParse(value) is { } profile) settings.Profile = profile;
+                    break;
+                case "font":
+                    if (UiFontSettings.TryParseFamily(value) is { } family) settings.Font = family;
+                    break;
+                case "font_size":
+                    if (UiFontSettings.TryParseSize(value) is { } fontSize) settings.FontSize = fontSize;
                     break;
                 case "potential":
                     if (HandPotentialModeSettings.TryParse(value) is { } potential)

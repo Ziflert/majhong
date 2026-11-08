@@ -194,6 +194,7 @@ namespace Mahjong.Rules.Diagnostics
                 // The welcome screen.
                 var settings = new GameSettings();
                 var title = new TitleScreen(settings);
+                title.OpenSettings();
                 var look = title.AllRows().FirstOrDefault(row => row.Item == TitleItem.Look);
                 var scale = title.AllRows().FirstOrDefault(row => row.Item == TitleItem.Scale);
                 var steps = 0;

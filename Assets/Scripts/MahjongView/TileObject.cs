@@ -156,6 +156,22 @@ namespace Mahjong.Unity
             return mesh;
         }
 
+        /// <summary>
+        /// Configures a duplicate of a tile for the camera-anchored hand strip. It uses the same face
+        /// and atlas as the table tile, but its transform is independent from the table perspective.
+        /// </summary>
+        public void SetHudTile(TileType type, Vector3 localPosition, float scale)
+        {
+            transform.localScale = Vector3.one * scale;
+            SpawnAt(transform.position);
+            SetFace(type);
+            transform.localPosition = localPosition;
+            // The ordinary table rotation is around Y. The pinned strip is a vertical, camera-facing
+            // tile row, so its table Z axis becomes the screen Y axis.
+            transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            SetHighlight(false);
+        }
+
         public void Bind(TileType type)
         {
             Type = type;
