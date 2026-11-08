@@ -82,6 +82,7 @@ namespace Mahjong.EditorTools
         /// photograph an empty table.
         /// </summary>
         private const double SaveSeconds = 0.4;
+        private const double CaptureTimeoutSeconds = 5.0;
 
         public static void CaptureAndExit()
         {
@@ -214,6 +215,16 @@ namespace Mahjong.EditorTools
             }
 
             if (waited < SaveSeconds) return;
+            var capturePath = CapturePath(steps[step].Name);
+            if (!File.Exists(capturePath))
+            {
+                // ScreenCapture is asynchronous. In batch/headful runs the editor can need several
+                // frames to flush a PNG; never close the screen before the artifact exists.
+                if (waited < SaveSeconds + CaptureTimeoutSeconds) return;
+                Debug.LogError($"[interface capture] screenshot was not written: {capturePath}");
+                Quit(4);
+                return;
+            }
             Close(game, steps[step]);
             SessionState.SetInt(PhaseKey, 0);
             SessionState.SetInt(StepKey, step + 1);
@@ -271,9 +282,7 @@ namespace Mahjong.EditorTools
         private static void Capture(Unity.MahjongGame game, (string Name, string Open, Vector3 Eye, Vector3 Look, double Settle) step)
         {
             var (name, open, _, _, _) = step;
-            var path = Path.GetFullPath(Path.Combine(SessionState.GetString(DirectoryKey,
-                Path.Combine("Screenshots", "current")),
-                name + ".png"));
+            var path = CapturePath(name);
             ScreenCapture.CaptureScreenshot(path);
             var detail = open switch
             {
@@ -318,6 +327,12 @@ namespace Mahjong.EditorTools
             Debug.Log($"[frame] camera {cam.transform.position} rot {cam.transform.eulerAngles} fov {cam.fieldOfView:F1} aspect {cam.aspect:F4} screen {Screen.width}x{Screen.height}");
 
             Debug.Log($"[interface capture] {name}: {path} | {detail}");
+        }
+
+        private static string CapturePath(string name)
+        {
+            return Path.GetFullPath(Path.Combine(SessionState.GetString(DirectoryKey,
+                Path.Combine("Screenshots", "current")), name + ".png"));
         }
 
         private static void Close(Unity.MahjongGame game, (string Name, string Open, Vector3 Eye, Vector3 Look, double Settle) step)
