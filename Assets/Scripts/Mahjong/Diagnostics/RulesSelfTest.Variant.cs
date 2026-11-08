@@ -31,6 +31,7 @@ namespace Mahjong.Rules.Diagnostics
             Run(report, "variant: the classic wall ends with fourteen tiles and a free pair", () => ClassicWallEnd(report));
             Run(report, "variant: the classic settlement pays the full value and settles the losers",
                 () => ClassicSettlementNumbers(report));
+            Run(report, "variant: a classic four-set hand is offered as Hu", () => ClassicHuWithOpenAndClosedSets(report));
             Run(report, "variant: a classic session runs sixteen hands", () => ClassicSession(report));
         }
 
@@ -66,6 +67,27 @@ namespace Mahjong.Rules.Diagnostics
                 RoundWind = Wind.East,
                 SeatWind = seat
             });
+
+        private static void ClassicHuWithOpenAndClosedSets(SelfTestReport report)
+        {
+            // Two open chows, one open pung, one concealed pung and a pair: the exact hand
+            // that must produce a Hu button on the classic table (the self-drawn tile is 7s).
+            var hand = Hand("7b 7b 7b 2d 2d");
+            hand.AddMeld(new Meld(MeldKind.Chow, Tiles("1c 2c 3c"), 1));
+            hand.AddMeld(new Meld(MeldKind.Chow, Tiles("4c 5c 6c"), 2));
+            hand.AddMeld(new Meld(MeldKind.Pung, Tiles("9d 9d 9d"), 3));
+
+            var result = RuleVariant.Classic144.Score(new ScoringContext
+            {
+                Hand = hand,
+                WinningTile = ParseTile("7b"),
+                WinningTileInHand = true,
+                Source = ClaimSource.SelfDraw,
+                SeatWind = Wind.East,
+                RoundWind = Wind.East
+            });
+            report.Check(result.IsValidWin, "two open chows + open pung + concealed pung + pair must be a classic Hu: " + result.Error);
+        }
 
         private static int Doublings(ScoreResult result, string id) =>
             result.Classic?.Doublings.Count(doubling => doubling.Id == id) ?? 0;
@@ -114,8 +136,17 @@ namespace Mahjong.Rules.Diagnostics
             report.Check(classic.HasFreeTiles, "the classic wall keeps a dead end");
             report.Check(classic.DealerKeepsSeatOnWin, "a winning dealer keeps the seat in the classic rules");
 
-            report.Equal(2, RuleVariant.Presets.Count, "the table offers two presets");
-            report.Equal(2, RuleVariant.Presets.Select(preset => preset.Id).Distinct().Count(), "no preset is listed twice");
+            var classic136 = RuleVariant.Classic136;
+            report.Equal(136, WallGeometry.TileCountOf(classic136.WallStacks), "classic 136 has 136 wall positions");
+            report.Check(!classic136.IncludeFlowers, "classic 136 excludes bonus tiles");
+            var compact = new GameState(classic136);
+            compact.StartHand(seed: 11);
+            report.Equal(136, compact.Wall.TotalTiles, "classic 136 builds the compact wall");
+            report.Equal(17, compact.Wall.StacksPerSide, "classic 136 builds seventeen stacks per side");
+            report.Check(compact.Wall.TilesInRingOrder.All(tile => !tile.IsFlower), "classic 136 has no flowers");
+
+            report.Equal(3, RuleVariant.Presets.Count, "the table offers three presets");
+            report.Equal(3, RuleVariant.Presets.Select(preset => preset.Id).Distinct().Count(), "no preset is listed twice");
             report.Equal(sports, RuleVariant.Default, "a table that asks for no profile plays the sporting rules");
             report.Check(sports.NameRu != sports.NameEn, "the sporting preset is named in both languages");
             report.Check(classic.NameRu != classic.NameEn, "the classic preset is named in both languages");
@@ -126,8 +157,9 @@ namespace Mahjong.Rules.Diagnostics
                 report.Equal(sports, RuleVariant.Parse(id), $"\"{id}\" names the sporting rules");
             foreach (var id in new[] { "classic144", "Classic-144", "classic_144", "classic", "classicpoints", "home" })
                 report.Equal(classic, RuleVariant.Parse(id), $"\"{id}\" names the classic rules");
+            report.Equal(classic136, RuleVariant.Parse("classic136"), "classic136 names the compact rules");
 
-            foreach (var nonsense in new[] { "мусор", "136", "sporting-plus", "classic136" })
+            foreach (var nonsense in new[] { "мусор", "sporting-plus" })
                 report.Equal<RuleVariant?>(null, RuleVariant.TryParse(nonsense),
                     $"\"{nonsense}\" names no profile this build plays");
             report.Equal<RuleVariant?>(null, RuleVariant.TryParse(""), "an empty profile name is no profile");

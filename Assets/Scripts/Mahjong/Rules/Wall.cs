@@ -27,7 +27,7 @@ namespace Mahjong.Rules
         private int tailIndex;
         private int remaining;
 
-        private Wall(List<Tile> tiles, int deadWallTiles, int freeTiles)
+        private Wall(List<Tile> tiles, int deadWallTiles, int freeTiles, int stacksPerSide)
         {
             this.tiles = tiles;
             for (var ring = 0; ring < tiles.Count; ring++) ringOfTile[tiles[ring].InstanceId] = ring;
@@ -36,6 +36,7 @@ namespace Mahjong.Rules
             remaining = tiles.Count;
             DeadWallTiles = deadWallTiles;
             FreeTiles = freeTiles;
+            StacksPerSide = stacksPerSide;
         }
 
         public int TotalTiles => tiles.Count;
@@ -46,6 +47,7 @@ namespace Mahjong.Rules
 
         /// <summary>Tiles lying on the wall as free tiles: they pay for flowers and kongs before the wall does.</summary>
         public int FreeTiles { get; }
+        public int StacksPerSide { get; }
 
         /// <summary>Tiles still standing at the far end of the wall for any reason: the dead end plus the free pair.</summary>
         public int ReservedTiles => DeadWallTiles + FreeTiles;
@@ -98,9 +100,10 @@ namespace Mahjong.Rules
             return pair;
         }
 
-        public static Wall CreateShuffled(Random random, int deadWallTiles = 0, int freeTiles = 0)
+        public static Wall CreateShuffled(Random random, int deadWallTiles = 0, int freeTiles = 0,
+            int stacksPerSide = WallGeometry.StacksPerSide, bool includeFlowers = true)
         {
-            var tiles = new List<Tile>(WallGeometry.TileCount);
+            var tiles = new List<Tile>(WallGeometry.TileCountOf(stacksPerSide));
             var id = 0;
             foreach (var suit in new[] { TileSuit.Characters, TileSuit.Dots, TileSuit.Bamboo })
                 for (var rank = 1; rank <= 9; rank++)
@@ -112,8 +115,9 @@ namespace Mahjong.Rules
             for (var rank = 0; rank < 3; rank++)
                 for (var copy = 0; copy < 4; copy++)
                     tiles.Add(new Tile(new TileType(TileSuit.Dragon, rank), id++));
-            for (var rank = 0; rank < 8; rank++)
-                tiles.Add(new Tile(new TileType(TileSuit.Flower, rank), id++));
+            if (includeFlowers)
+                for (var rank = 0; rank < 8; rank++)
+                    tiles.Add(new Tile(new TileType(TileSuit.Flower, rank), id++));
 
             for (var i = tiles.Count - 1; i > 0; i--)
             {
@@ -121,7 +125,9 @@ namespace Mahjong.Rules
                 (tiles[i], tiles[j]) = (tiles[j], tiles[i]);
             }
 
-            return new Wall(tiles, deadWallTiles, freeTiles);
+            if (tiles.Count != WallGeometry.TileCountOf(stacksPerSide))
+                throw new InvalidOperationException("The tile set does not match the wall geometry.");
+            return new Wall(tiles, deadWallTiles, freeTiles, stacksPerSide);
         }
 
         /// <summary>
@@ -130,7 +136,7 @@ namespace Mahjong.Rules
         /// </summary>
         public void Break(int thrower, int stacks)
         {
-            BreakIndex = WallGeometry.BreakIndex(thrower, stacks);
+            BreakIndex = WallGeometry.BreakIndex(thrower, stacks, StacksPerSide);
             liveIndex = BreakIndex;
             tailIndex = Prev(BreakIndex);
             remaining = tiles.Count;

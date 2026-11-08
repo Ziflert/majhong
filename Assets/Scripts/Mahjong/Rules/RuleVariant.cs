@@ -52,7 +52,9 @@ namespace Mahjong.Rules
         int DeadWallTiles,
         int FreeTiles,
         int HouseLimit,
-        bool DealerKeepsSeatOnWin)
+        bool DealerKeepsSeatOnWin,
+        int WallStacks = 18,
+        bool IncludeFlowers = true)
     {
         /// <summary>Sporting MCR rules: the profile every earlier build played.</summary>
         public static readonly RuleVariant Sports = new(
@@ -70,10 +72,23 @@ namespace Mahjong.Rules
             DeadWallTiles: 14,
             FreeTiles: 2,
             HouseLimit: 2000,
-            DealerKeepsSeatOnWin: true);
+            DealerKeepsSeatOnWin: true,
+            WallStacks: 18,
+            IncludeFlowers: true);
+
+        /// <summary>Classic 136-tile table without flowers and seasons.</summary>
+        public static readonly RuleVariant Classic136 = new(
+            "classic136", "Классика 136", "Classic 136", ScoringMode.ClassicPoints,
+            MinimumPoints: 0,
+            DeadWallTiles: 14,
+            FreeTiles: 2,
+            HouseLimit: 2000,
+            DealerKeepsSeatOnWin: true,
+            WallStacks: 17,
+            IncludeFlowers: false);
 
         /// <summary>The presets as the table offers them, in the order a menu shows them.</summary>
-        public static IReadOnlyList<RuleVariant> Presets => new[] { Sports, Classic144 };
+        public static IReadOnlyList<RuleVariant> Presets => new[] { Sports, Classic144, Classic136 };
 
         /// <summary>Rules of a table that did not ask for any: the sporting ones.</summary>
         public static RuleVariant Default => Sports;
@@ -87,6 +102,7 @@ namespace Mahjong.Rules
             {
                 "sports" or "sport" or "mcr" or "wmo" or "wmcc" or "sporting" => Sports,
                 "classic144" or "classic" or "classicpoints" or "home" => Classic144,
+                "classic136" or "136" or "home136" => Classic136,
                 _ => null
             };
         }

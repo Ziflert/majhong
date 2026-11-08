@@ -115,7 +115,8 @@ namespace Mahjong.Rules
             CurrentPlayer = dealer;
             RoundWind = roundWind;
             var random = seed.HasValue ? new Random(seed.Value) : new Random();
-            Wall = Wall.CreateShuffled(random, Variant.DeadWallTiles, Variant.FreeTiles);
+            Wall = Wall.CreateShuffled(random, Variant.DeadWallTiles, Variant.FreeTiles,
+                Variant.WallStacks, Variant.IncludeFlowers);
 
             DealerRoll = Dice.Roll(random);
             DiceThrower = (dealer + Dice.ThrowerOffset(DealerRoll.Sum)) % 4;
@@ -211,20 +212,22 @@ namespace Mahjong.Rules
             foreach (var tile in hand.Concealed)
                 actions.Add(new LegalAction(ActionKind.Discard, player, tile, Array.Empty<Tile>(), $"Discard {tile.Type}"));
 
-            if (LastDrawSource.HasValue)
-            {
-                // A forbidden player keeps drawing and discarding, but the engine stops offering Hu (3.11.6).
-                // Hu is offered only while the player holds a freshly taken tile: after a chow or a pung
-                // the hand may look complete, yet that tile reached it as a declared set, and rules
-                // 3.6.7/3.7.2.4 want Hu spoken instead of the meld, not after it.
-                var win = IsWinForbidden(player)
-                    ? ScoreResult.Forbidden(WinForbiddenReason(player) ?? "Hu is forbidden in this hand.")
-                    : EvaluateWin(player, hand, LastDraw?.Type, LastDrawSource.Value, LastDrawWasLastWallTile, false,
-                        winningTileInHand: true);
-                if (win.IsValidWin)
-                    actions.Add(new LegalAction(ActionKind.Win, player, null, Array.Empty<Tile>(),
-                        $"Declare Hu for {win.TotalPoints} points", win.TotalPoints));
-            }
+            // A forbidden player keeps drawing and discarding, but the engine stops offering Hu (3.11.6).
+            // Normally the winning tile is the fresh draw.  A complete hand can also reach this phase
+            // after a replay/restore (or after a replacement tile was normalised by the view), where
+            // LastDrawSource is no longer present.  Do not make the Hu button depend on that UI
+            // bookkeeping: score the hand that is actually in front of us.  In the classic table a
+            // pung/chow may itself leave the hand complete (two open chows, an open pung, a concealed
+            // pung and a pair is the common example).  Keep Hu available in that state instead of
+            // forcing the player to discard a tile from an already complete hand.
+            var source = LastDrawSource ?? ClaimSource.SelfDraw;
+            var win = IsWinForbidden(player)
+                ? ScoreResult.Forbidden(WinForbiddenReason(player) ?? "Hu is forbidden in this hand.")
+                : EvaluateWin(player, hand, LastDraw?.Type, source, LastDrawWasLastWallTile, false,
+                    winningTileInHand: LastDrawSource.HasValue);
+            if (win.IsValidWin)
+                actions.Add(new LegalAction(ActionKind.Win, player, null, Array.Empty<Tile>(),
+                    $"Declare Hu for {win.TotalPoints} points", win.TotalPoints));
 
             if (!claimedThisTurn && Wall.CanReplace)
             {

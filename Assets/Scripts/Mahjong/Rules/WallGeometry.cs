@@ -47,20 +47,25 @@ namespace Mahjong.Rules
         public const int TilesPerSide = StacksPerSide * TilesPerStack;
         public const int TileCount = Sides * TilesPerSide;
 
+        public static int TilesPerSideOf(int stacksPerSide) => stacksPerSide * TilesPerStack;
+        public static int TileCountOf(int stacksPerSide) => Sides * TilesPerSideOf(stacksPerSide);
+
         /// <summary>Where a side's wall starts in the ring: the end counted as that player's right end.</summary>
-        public static int RingStart(int side) => Mod(-side, Sides) * TilesPerSide;
+        public static int RingStart(int side, int stacksPerSide = StacksPerSide) =>
+            Mod(-side, Sides) * TilesPerSideOf(stacksPerSide);
 
         /// <summary>Ring position of one tile; <paramref name="level"/> is 1 for the top of a stack.</summary>
-        public static int RingIndex(int side, int stack, int level) =>
-            RingStart(side) + Mod(stack, StacksPerSide) * TilesPerStack
+        public static int RingIndex(int side, int stack, int level, int stacksPerSide = StacksPerSide) =>
+            RingStart(side, stacksPerSide) + Mod(stack, stacksPerSide) * TilesPerStack
                             + (TilesPerStack - 1 - Mod(level, TilesPerStack));
 
         /// <summary>The tile that stands at a ring position.</summary>
-        public static WallSlot SlotAt(int ring)
+        public static WallSlot SlotAt(int ring, int stacksPerSide = StacksPerSide)
         {
-            var position = Mod(ring, TileCount);
-            var ringSide = position / TilesPerSide;
-            var within = position % TilesPerSide;
+            var tilesPerSide = TilesPerSideOf(stacksPerSide);
+            var position = Mod(ring, TileCountOf(stacksPerSide));
+            var ringSide = position / tilesPerSide;
+            var within = position % tilesPerSide;
             return new WallSlot(Mod(-ringSide, Sides), within / TilesPerStack,
                 TilesPerStack - 1 - within % TilesPerStack);
         }
@@ -70,8 +75,8 @@ namespace Mahjong.Rules
         /// thrower's wall and break there. The live wall starts with the tile after that stack, so a
         /// sum past the end of his own wall carries on into the next one.
         /// </summary>
-        public static int BreakIndex(int thrower, int stacks) =>
-            Mod(RingStart(thrower) + stacks * TilesPerStack, TileCount);
+        public static int BreakIndex(int thrower, int stacks, int stacksPerSide = StacksPerSide) =>
+            Mod(RingStart(thrower, stacksPerSide) + stacks * TilesPerStack, TileCountOf(stacksPerSide));
 
         private static int Mod(int value, int m)
         {
