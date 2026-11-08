@@ -355,6 +355,7 @@ namespace Mahjong.Unity
 
         /// <summary>The interface of the reference composition: the game's main UI.</summary>
         private ReferenceHud reference = null!;
+        private CanvasGameHud canvasHud = null!;
 
         /// <summary>The ears of the table: every knock, chime and rattle of a hand (4.10).</summary>
         private SoundPlayer sound = null!;
@@ -631,6 +632,7 @@ namespace Mahjong.Unity
             // labelled buttons does not. The tray object is kept for the tools that photograph it.
             controls.gameObject.SetActive(false);
             reference = ReferenceHud.Create(camera.transform);
+            canvasHud = CanvasGameHud.Create(this);
             rules = RulesPanel.Create(camera.transform);
             menu = MenuPanel.Create(camera.transform);
             titlePanel = TitlePanel.Create(camera.transform);
@@ -1488,9 +1490,12 @@ namespace Mahjong.Unity
 
             // The reference composition is the table's own interface: it steps aside for every page
             // (rulebook, menu, result, welcome) and for the review and the free table.
-            var referenceWanted = hudWanted && !freeOpen && !replayOpen;
+            var referenceWanted = false;
             if (reference != null && reference.gameObject.activeSelf != referenceWanted)
                 reference.gameObject.SetActive(referenceWanted);
+            var canvasWanted = hudWanted && !freeOpen && !replayOpen;
+            if (canvasHud != null && canvasHud.gameObject.activeSelf != canvasWanted)
+                canvasHud.gameObject.SetActive(canvasWanted);
 
             // Wind plates belong to the scored table. The result screen is a page over the table as
             // well, and a plate is a billboard of text drawn without a depth test: left standing, it
@@ -1655,6 +1660,11 @@ namespace Mahjong.Unity
         }
 
         // -------------------------------------------------------------- prompt
+
+        public void ExecutePromptOption(int number)
+        {
+            if (Prompt.TrySelect(number, out var selected)) Play(selected);
+        }
 
         private void ShowPrompt(ActionPrompt prompt)
         {
@@ -2801,8 +2811,10 @@ namespace Mahjong.Unity
             // The reference composition is the main interface: the structured HUD of stage 1 keeps its
             // data sources and its tests, but it is not drawn over the table any more.
             hud.gameObject.SetActive(false);
-            if (reference != null && reference.gameObject.activeSelf != shown)
-                reference.gameObject.SetActive(shown);
+            if (reference != null && reference.gameObject.activeSelf)
+                reference.gameObject.SetActive(false);
+            if (canvasHud != null && canvasHud.gameObject.activeSelf != shown)
+                canvasHud.gameObject.SetActive(shown);
             if (!shown) return;
             // F3 is deliberately view-only: it exposes the former diagnostic block without
             // changing the session or consuming a table click.
@@ -2811,6 +2823,8 @@ namespace Mahjong.Unity
                 reference.Refresh(camera, session, settings, humanSeat, IsYourTurn, clock,
                     statusNote.Length > 0 && Time.time < statusNoteUntil ? statusNote : string.Empty,
                     settings.Potential);
+            if (canvasHud != null)
+                canvasHud.Refresh(session, settings, humanSeat, IsYourTurn, clock, Prompt);
         }
 
         private void RefreshStatus()
