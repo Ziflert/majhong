@@ -35,10 +35,12 @@ namespace Mahjong.Rules
         private readonly HashSet<int> forfeited = new();
         private int dealer;
 
-        public GameSession(TimeSpan? timeLimit = null, RuleVariant? variant = null)
+        public GameSession(TimeSpan? timeLimit = null, RuleVariant? variant = null, int dealer = 0)
         {
+            if (dealer is < 0 or >= 4) throw new ArgumentOutOfRangeException(nameof(dealer));
             TimeLimit = timeLimit ?? DefaultTimeLimit;
             Variant = variant ?? RuleVariant.Default;
+            this.dealer = dealer;
         }
 
         /// <summary>The rules every hand of this session is played and paid by.</summary>
@@ -162,6 +164,20 @@ namespace Mahjong.Rules
             }
             LastSettlement = settlement;
             history.Add(settlement);
+        }
+
+        /// <summary>
+        /// Records a hand settled by an authoritative network table. The network server owns the live
+        /// <see cref="GameState"/>, so it cannot call <see cref="CompleteHand"/> on this session object;
+        /// this keeps the same score, dealer and hand-count transitions without duplicating arithmetic.
+        /// </summary>
+        public void RecordExternalHand(Settlement settlement, int? winnerPlayer)
+        {
+            if (IsFinished) throw new InvalidOperationException("The session is already finished.");
+            Apply(settlement);
+            HandsPlayed++;
+            if (!(Variant.DealerKeepsSeatOnWin && winnerPlayer == dealer))
+                dealer = (dealer + 1) % 4;
         }
 
         // ------------------------------------------------------------ penalties

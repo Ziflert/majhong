@@ -34,12 +34,15 @@ namespace Mahjong.Net
         private readonly ITableLink?[] links = new ITableLink?[Seats];
         private readonly string?[] names = new string?[Seats];
         private readonly IMahjongBot?[] bots = new IMahjongBot?[Seats];
+        private readonly GameSession session;
         private int announced;
 
         public TableServer(int dealer = 0, int? seed = null, Wind roundWind = Wind.East,
             RuleVariant? variant = null, ClockLimits? limits = null)
         {
             table = new AuthoritativeTable(dealer, seed, roundWind, variant);
+            session = new GameSession(GameSession.DefaultTimeLimit, variant, dealer);
+            session.StartNextHand(seed);
             Clock = new TableClock(limits);
             Now = TimeSpan.Zero;
             announced = table.Events.Count;
@@ -62,6 +65,8 @@ namespace Mahjong.Net
         public int Dealer => table.Dealer;
         public int? Seed => table.Seed;
         public RuleVariant Variant => table.Variant;
+        /// <summary>The public session ledger mirrored from hands settled by this table.</summary>
+        public GameSession Session => session;
 
         /// <summary>Seats with a link attached, in seat order.</summary>
         public IReadOnlyList<int> Seated => Enumerable.Range(0, Seats).Where(IsSeated).ToList();
@@ -91,6 +96,8 @@ namespace Mahjong.Net
             Push(free, WelcomeFor(free));
             Push(free, ViewFor(free));
             Push(free, WireMessage.ClockOf(Clock.Of(free), Now));
+            Push(free, WireMessage.SessionOf(SessionMessage()));
+            if (session.IsFinished) Push(free, WireMessage.StandingsOf(session.Standings()));
             return free;
         }
 
@@ -150,6 +157,9 @@ namespace Mahjong.Net
         {
             if (delta < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(delta), "A clock does not run backwards.");
             Now += delta;
+            session.AdvanceClock(delta);
+            if (session.IsTimeUp && !session.IsFinished)
+                session.StopEarly();
             Expire();
             RunBots();
             Publish();
@@ -158,7 +168,9 @@ namespace Mahjong.Net
         /// <summary>Deals the next hand on the same table; every seat gets a fresh projection.</summary>
         public void StartNextHand(int dealer, int? seed = null, Wind? roundWind = null)
         {
+            if (session.IsFinished) throw new InvalidOperationException("The network session is over.");
             table.StartNextHand(dealer, seed, roundWind);
+            session.StartNextHand(seed);
             Clock.DisarmAll();
             RefreshWindows();
             RunBots();
@@ -319,6 +331,8 @@ namespace Mahjong.Net
                     Push(seat, WelcomeFor(seat));
                     Push(seat, ViewFor(seat));
                     Push(seat, WireMessage.ClockOf(Clock.Of(seat), Now));
+                    Push(seat, WireMessage.SessionOf(SessionMessage()));
+                    if (session.IsFinished) Push(seat, WireMessage.StandingsOf(session.Standings()));
                     return;
 
                 default:
@@ -375,7 +389,13 @@ namespace Mahjong.Net
                 if (entry.Kind == "handEnd")
                 {
                     var settlement = Settlements.ForState(State, Variant);
-                    foreach (var seat in Seated) Push(seat, WireMessage.SettledOf(settlement));
+                    session.RecordExternalHand(settlement, settlement.WinnerPlayer);
+                    foreach (var seat in Seated)
+                    {
+                        Push(seat, WireMessage.SettledOf(settlement));
+                        Push(seat, WireMessage.SessionOf(SessionMessage()));
+                        if (session.IsFinished) Push(seat, WireMessage.StandingsOf(session.Standings()));
+                    }
                 }
             }
 
@@ -398,6 +418,16 @@ namespace Mahjong.Net
 
         private WireMessage ViewFor(int seat) =>
             WireMessage.ViewOf(seat, MoveIndex, SeatView.For(State, seat).Describe());
+
+        private SessionSnapshot SessionMessage() => new(
+            session.HandsPlayed,
+            GameSession.TotalHands,
+            session.RoundWind,
+            session.Dealer,
+            session.TimeLimit,
+            session.TimeLeft,
+            session.IsFinished,
+            session.Scores.ToArray());
 
         private void Push(int seat, WireMessage message)
         {

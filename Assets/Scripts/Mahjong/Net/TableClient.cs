@@ -57,6 +57,21 @@ namespace Mahjong.Net
         /// <summary>Settlements received from the authoritative table, in hand order.</summary>
         public IReadOnlyList<Settlement> Settlements => settlements;
 
+        /// <summary>
+        /// The session header the server last sent: hands played, round, dealer, session clock and the
+        /// game points of all four seats. Null until the table introduces itself.
+        /// </summary>
+        public SessionSnapshot? Session { get; private set; }
+
+        /// <summary>The final table of the session; empty until the server says the session is over.</summary>
+        public IReadOnlyList<Standing> Standings { get; private set; } = Array.Empty<Standing>();
+
+        /// <summary>True when the server has ended the session: sixteen hands played or the time is up.</summary>
+        public bool IsSessionOver => Session?.Ended == true;
+
+        /// <summary>True when the final table has arrived and can be drawn.</summary>
+        public bool HasFinalTable => Standings.Count > 0;
+
         /// <summary>Why the last move was refused; empty when the last one was played.</summary>
         public string LastReject => rejects.Count > 0 ? rejects[^1] : string.Empty;
 
@@ -166,6 +181,14 @@ namespace Mahjong.Net
 
                 case WireKind.Settled:
                     if (TryReadSettlement(message, out var settlement)) settlements.Add(settlement);
+                    return;
+
+                case WireKind.Session:
+                    if (WireMessage.TryReadSession(message, out var session)) Session = session;
+                    return;
+
+                case WireKind.Standings:
+                    if (WireMessage.TryReadStandings(message, out var standings)) Standings = standings;
                     return;
 
                 case WireKind.Accepted:

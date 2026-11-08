@@ -47,8 +47,43 @@ namespace Mahjong.Net
         /// <summary>Server → client: the hand has been settled and these payments belong on the score sheet.</summary>
         Settled,
 
+        /// <summary>Server → client: the whole session — hands played, round, dealer, clock and score sheet.</summary>
+        Session,
+
+        /// <summary>Server → client: the final table of the session (rules 3.9.2, 3.10.1).</summary>
+        Standings,
+
         /// <summary>Server → client: there is no place for you (or the table is over).</summary>
         Refused
+    }
+
+    /// <summary>
+    /// The session as every seat may see it: how many hands have been played, which round is being
+    /// dealt, who deals it, what is left of the session clock (3.5.6) and the game points of all four
+    /// seats (3.9.1). Public information — the network needs it for the header, not the hand.
+    /// </summary>
+    public sealed record SessionSnapshot(
+        int HandsPlayed,
+        int TotalHands,
+        Wind RoundWind,
+        int Dealer,
+        TimeSpan? TimeLimit,
+        TimeSpan TimeLeft,
+        bool Ended,
+        IReadOnlyList<int> Scores)
+    {
+        /// <summary>A snapshot before the server has said anything; not a table anybody played at.</summary>
+        public static SessionSnapshot Empty { get; } =
+            new(0, 0, Wind.East, 0, null, TimeSpan.Zero, false, Array.Empty<int>());
+
+        /// <summary>
+        /// True when the session runs on a clock. A zero limit is a table without one (8.7), and the
+        /// countdown is then nothing but a formality.
+        /// </summary>
+        public bool HasClock => TimeLimit is { } limit && limit > TimeSpan.Zero;
+
+        /// <summary>The hand being played (or the next one to be dealt), counted from one.</summary>
+        public int HandNumber => Math.Min(HandsPlayed + 1, Math.Max(TotalHands, 1));
     }
 
     /// <summary>
@@ -79,6 +114,8 @@ namespace Mahjong.Net
             WireKind.Resumed => "resumed",
             WireKind.Notice => "notice",
             WireKind.Settled => "settled",
+            WireKind.Session => "session",
+            WireKind.Standings => "standings",
             WireKind.Refused => "refused",
             _ => kind.ToString().ToLowerInvariant()
         };
@@ -99,6 +136,8 @@ namespace Mahjong.Net
                 case "resumed": kind = WireKind.Resumed; return true;
                 case "notice": kind = WireKind.Notice; return true;
                 case "settled": kind = WireKind.Settled; return true;
+                case "session": kind = WireKind.Session; return true;
+                case "standings": kind = WireKind.Standings; return true;
                 case "refused": kind = WireKind.Refused; return true;
                 default: kind = default; return false;
             }
@@ -249,6 +288,104 @@ namespace Mahjong.Net
                 settlement.Explanation,
                 payments);
         }
+
+        // ------------------------------------------------------- session and table
+
+        /// <summary>
+        /// The session header as a message:
+        /// <c>session|handsPlayed|totalHands|roundWind|dealer|limit|left|ended|scores</c>.
+        /// The clock travels in milliseconds like <see cref="ClockOf"/>, and as <c>-</c> when the
+        /// session has no limit — a zero must never have to mean both "no clock" and "no time left".
+        /// </summary>
+        public static WireMessage SessionOf(SessionSnapshot snapshot) => Of(WireKind.Session,
+            snapshot.HandsPlayed.ToString(CultureInfo.InvariantCulture),
+            snapshot.TotalHands.ToString(CultureInfo.InvariantCulture),
+            TileNotation.Format(TileType.WindTile(snapshot.RoundWind)),
+            snapshot.Dealer.ToString(CultureInfo.InvariantCulture),
+            MillisecondsOrDash(snapshot.TimeLimit),
+            snapshot.HasClock ? MillisecondsOrDash(snapshot.TimeLeft) : "-",
+            snapshot.Ended ? "1" : "0",
+            string.Join(',', snapshot.Scores));
+
+        public static bool TryReadSession(WireMessage message, out SessionSnapshot snapshot)
+        {
+            snapshot = SessionSnapshot.Empty;
+            if (message.Kind != WireKind.Session) return false;
+            if (!TryInt(message.Field(0), out var handsPlayed)
+                || !TryInt(message.Field(1), out var totalHands)
+                || !TryInt(message.Field(3), out var dealer)) return false;
+
+            var wind = TileNotation.TryParse(message.Field(2), out var face) && face.IsWind
+                ? (Wind)face.Rank
+                : Wind.East;
+
+            TimeSpan? limit = TryInt(message.Field(4), out var limitMs) ? TimeSpan.FromMilliseconds(limitMs) : null;
+            var left = TryInt(message.Field(5), out var leftMs) ? TimeSpan.FromMilliseconds(leftMs) : TimeSpan.Zero;
+
+            var scores = new int[4];
+            var items = message.Field(7).Split(',', StringSplitOptions.RemoveEmptyEntries);
+            if (items.Length != scores.Length) return false;
+            for (var index = 0; index < items.Length; index++)
+            {
+                if (!TryInt(items[index], out var points)) return false;
+                scores[index] = points;
+            }
+
+            snapshot = new SessionSnapshot(handsPlayed, totalHands, wind, dealer, limit, left,
+                message.Field(6).Trim() == "1", scores);
+            return true;
+        }
+
+        /// <summary>
+        /// The final table as a message: one <c>place,player,gamePoints,tablePoints,flags</c> row per
+        /// player, joined by <c>;</c>. The flags say "tied" (<c>t</c>) and "forfeited" (<c>f</c>).
+        /// </summary>
+        public static WireMessage StandingsOf(IReadOnlyList<Standing> standings) =>
+            Of(WireKind.Standings, string.Join(';', standings.Select(row => string.Join(',',
+                row.Place.ToString(CultureInfo.InvariantCulture),
+                row.Player.ToString(CultureInfo.InvariantCulture),
+                row.GamePoints.ToString(CultureInfo.InvariantCulture),
+                row.TablePoints.ToString("R", CultureInfo.InvariantCulture),
+                FlagsOf(row.Tied, row.Forfeited)))));
+
+        public static bool TryReadStandings(WireMessage message, out IReadOnlyList<Standing> standings)
+        {
+            standings = Array.Empty<Standing>();
+            if (message.Kind != WireKind.Standings) return false;
+
+            var rows = new List<Standing>(4);
+            foreach (var item in message.Field(0).Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var fields = item.Split(',');
+                if (fields.Length != 5
+                    || !TryInt(fields[0], out var place)
+                    || !TryInt(fields[1], out var player)
+                    || !TryInt(fields[2], out var gamePoints)
+                    || !double.TryParse(fields[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var tablePoints))
+                    return false;
+
+                var flags = fields[4].Trim().ToLowerInvariant();
+                rows.Add(new Standing(place, player, gamePoints, tablePoints,
+                    flags.Contains('t'), flags.Contains('f')));
+            }
+
+            standings = rows;
+            return true;
+        }
+
+        private static string MillisecondsOrDash(TimeSpan? value) =>
+            value is { } span && span > TimeSpan.Zero
+                ? ((long)Math.Ceiling(span.TotalMilliseconds)).ToString(CultureInfo.InvariantCulture)
+                : "-";
+
+        private static string FlagsOf(bool tied, bool forfeited)
+        {
+            var flags = (tied ? "t" : string.Empty) + (forfeited ? "f" : string.Empty);
+            return flags.Length > 0 ? flags : "-";
+        }
+
+        private static bool TryInt(string field, out int value) =>
+            int.TryParse(field, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
 
         /// <summary>Reads the move an <c>act</c> message carries back into the move intent.</summary>
         public static bool TryReadAct(WireMessage message, out int requestId, out string wire, out string error)
