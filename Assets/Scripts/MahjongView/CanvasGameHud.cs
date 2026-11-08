@@ -159,10 +159,7 @@ namespace Mahjong.Unity
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             var rect = go.AddComponent<RectTransform>();
-            rect.anchorMin = new Vector2(min.x >= 0 ? 0 : 1, 1);
-            rect.anchorMax = rect.anchorMin;
-            rect.offsetMin = min;
-            rect.offsetMax = max;
+            ApplyRect(rect, min, max);
             var text = go.AddComponent<UiText>();
             text.font = font;
             text.fontSize = size;
@@ -180,10 +177,7 @@ namespace Mahjong.Unity
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             var rect = go.AddComponent<RectTransform>();
-            rect.anchorMin = new Vector2(min.x >= 0 ? 0 : 1, 1);
-            rect.anchorMax = rect.anchorMin;
-            rect.offsetMin = min;
-            rect.offsetMax = max;
+            ApplyRect(rect, min, max);
             var image = go.AddComponent<Image>();
             image.color = UiStyle.Of(role, alpha);
             return go;
@@ -200,6 +194,47 @@ namespace Mahjong.Unity
                 16, TextAnchor.MiddleCenter);
             label.text = caption;
             return button;
+        }
+
+        /// <summary>
+        /// Converts the design sheet's top-origin rectangles to Unity's bottom-origin RectTransform
+        /// offsets. The previous prototype assigned top coordinates directly to offsetMin/Max, which
+        /// produced zero-height labels and inverted/negative panels at runtime.
+        /// </summary>
+        private static void ApplyRect(RectTransform rect, Vector2 first, Vector2 second)
+        {
+            var stretchX = first.x >= 0f && second.x <= 0f;
+            if (stretchX)
+            {
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(1f, 1f);
+                rect.offsetMin = new Vector2(first.x, 0f);
+                rect.offsetMax = new Vector2(second.x, 0f);
+            }
+            else if (first.x >= 0f)
+            {
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(0f, 1f);
+                rect.offsetMin = new Vector2(first.x, 0f);
+                rect.offsetMax = new Vector2(second.x, 0f);
+            }
+            else
+            {
+                rect.anchorMin = new Vector2(1f, 1f);
+                rect.anchorMax = new Vector2(1f, 1f);
+                rect.offsetMin = new Vector2(first.x, 0f);
+                rect.offsetMax = new Vector2(second.x, 0f);
+            }
+
+            var top = Mathf.Max(first.y, second.y);
+            var bottom = Mathf.Min(first.y, second.y);
+            if (Mathf.Abs(top - bottom) < 0.01f)
+            {
+                top += 14f;
+                bottom -= 14f;
+            }
+            rect.offsetMin = new Vector2(rect.offsetMin.x, bottom);
+            rect.offsetMax = new Vector2(rect.offsetMax.x, top);
         }
 
         private static string Clock(TimeSpan time) => $"{(int)time.TotalMinutes}:{time.Seconds:00}";
